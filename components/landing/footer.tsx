@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  GitBranchIcon,
   TwitterIcon,
   GithubIcon,
   LinkedinIcon,
@@ -83,7 +82,7 @@ export function Footer() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Have questions or need assistance? Reach out — we're here to
+                Have questions or need assistance? Reach out — we&apos;re here to
                 help you get the most out of GitVision.
               </p>
             </div>

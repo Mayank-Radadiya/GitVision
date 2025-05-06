@@ -4,7 +4,6 @@ import { Footer } from "@/components/landing/footer";
 import { HeroSection } from "@/components/landing/hero-section";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { PricingSection } from "@/components/landing/pricing-section";
-import Image from "next/image";
 
 export default function Home() {
   return (
