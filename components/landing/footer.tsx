@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  TwitterIcon,
-  GithubIcon,
-  LinkedinIcon,
-  MailIcon,
-} from "lucide-react";
+import { TwitterIcon, GithubIcon, LinkedinIcon, MailIcon } from "lucide-react";
 import Image from "next/image";
 
 export function Footer() {
@@ -82,8 +77,8 @@ export function Footer() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Have questions or need assistance? Reach out — we&apos;re here to
-                help you get the most out of GitVision.
+                Have questions or need assistance? Reach out — we&apos;re here
+                to help you get the most out of GitVision.
               </p>
             </div>
           </div>
@@ -97,22 +92,16 @@ export function Footer() {
 
           <div className="flex gap-6 mt-4 md:mt-0">
             <Link
-              href="#"
+              href="/legal/privacy-policy"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Privacy Policy
             </Link>
             <Link
-              href="#"
+              href="/legal/terms-of-service"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Terms of Service
-            </Link>
-            <Link
-              href="#"
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cookie Policy
             </Link>
           </div>
         </div>

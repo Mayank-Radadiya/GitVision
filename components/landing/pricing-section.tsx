@@ -108,8 +108,6 @@ export function PricingSection() {
 
   return (
     <section id="pricing" ref={ref} className="py-10 relative overflow-hidden">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-[0.02] dark:opacity-[0.05]"></div>
 
       {/* Content container */}
       <div className="container max-w-7xl mx-auto px-4">
