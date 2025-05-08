@@ -234,7 +234,7 @@ export default function SignInForm() {
             </div>
 
             <div className="text-sm text-center text-muted-foreground">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/sign-up"
                 className="font-medium text-primary underline-offset-4 hover:underline"

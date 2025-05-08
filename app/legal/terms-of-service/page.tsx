@@ -111,10 +111,11 @@ export default function TermsOfService() {
               </h2>
               <p className="leading-relaxed">
                 You retain ownership of and responsibility for the content you
-                create and share on the Service ("User Content"). By submitting
-                User Content, you grant GitVision a worldwide, royalty-free
-                license to use, reproduce, modify, and distribute the content
-                solely for the purpose of operating and improving the Service.
+                create and share on the Service (&quot;User Content&quot;). By
+                submitting User Content, you grant GitVision a worldwide,
+                royalty-free license to use, reproduce, modify, and distribute
+                the content solely for the purpose of operating and improving
+                the Service.
               </p>
             </section>
 
@@ -170,10 +171,10 @@ export default function TermsOfService() {
                 9. Disclaimer of Warranties
               </h2>
               <p className="leading-relaxed">
-                The Service is provided "as is" and "as available" without
-                warranties of any kind, either express or implied. GitVision
-                does not guarantee that the Service will be uninterrupted,
-                secure, or error-free.
+                The Service is provided &quot;as is&quot; and &quot;as
+                available&quot; without warranties of any kind, either express
+                or implied. GitVision does not guarantee that the Service will
+                be uninterrupted, secure, or error-free.
               </p>
             </section>
 
