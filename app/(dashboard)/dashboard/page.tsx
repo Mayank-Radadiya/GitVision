@@ -1,14 +1,10 @@
 import { SignOutButton } from "@clerk/nextjs";
-import { NextPage } from "next";
 
-const Page: NextPage = ({}) => {
+export default function DashboardPage() {
   return (
-    <div>
-      <p>welcome to GitVision</p>
-
-      <SignOutButton />
-    </div>
+    <>
+      <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+      <SignOutButton></SignOutButton>
+    </>
   );
-};
-
-export default Page;
+}

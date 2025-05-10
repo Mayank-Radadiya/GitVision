@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { MenuIcon, GithubIcon, ExternalLinkIcon } from "lucide-react";
 import ModeToggle from "../custom/mode-toggle";
 import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
+import { GlowingButton } from "../custom/glowing-button";
 
 const navigation = [
   { name: "Features", href: "#features" },
@@ -17,6 +19,7 @@ const navigation = [
 ];
 
 export function LandingHeader() {
+  const { user } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -107,25 +110,39 @@ export function LandingHeader() {
               </Button>
             </Link>
             <ModeToggle />
-            <div className="flex items-center gap-2.5">
-              <Link href="/sign-in">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full border border-border/50 px-5 h-9"
-                >
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/sign-up">
-                <Button
-                  size="sm"
-                  className="rounded-full shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/90 px-5 h-9 font-medium"
-                >
-                  Sign up
-                </Button>
-              </Link>
-            </div>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2.5">
+                  <Link href="/dashboard">
+                    <GlowingButton className="rounded-full shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/70 px-5 h-9 font-medium">
+                      Dashboard
+                    </GlowingButton>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2.5">
+                  <Link href="/sign-in">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full border border-border/50 px-5 h-9"
+                    >
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/sign-up">
+                    <Button
+                      size="sm"
+                      className="rounded-full shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/90 px-5 h-9 font-medium"
+                    >
+                      Sign up
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
