@@ -19,63 +19,123 @@ import { Label } from "../ui/label";
 import CustomToggleButton from "../custom/mode-toggle";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { signInZodSchema } from "@/zodSchema/signIn.schema";
+import { passwordResetZodSchema } from "@/zodSchema/passwordReset.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
 import { useRouter } from "next/navigation";
 
 import { useSignIn } from "@clerk/nextjs";
+import VerifyEmail from "./verify-email";
 import toast from "react-hot-toast";
 
-export default function SignInForm() {
+export default function ResetPassword() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<ClerkAPIError[]>();
+  const [emailCode, setEmailCode] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
   const { signIn, isLoaded, setActive } = useSignIn();
 
-  // react hook from
+  // Form validation
   const {
     handleSubmit,
     register,
     formState: { errors },
-  } = useForm<z.infer<typeof signInZodSchema>>({
-    resolver: zodResolver(signInZodSchema),
+  } = useForm<z.infer<typeof passwordResetZodSchema>>({
+    resolver: zodResolver(passwordResetZodSchema),
   });
 
-  const handleSignIn = async (data: z.infer<typeof signInZodSchema>) => {
+  // Handle email verification
+  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     setError(undefined);
 
-    if (!isLoaded) {
-      toast.error("Clerk is not loaded yet. Please try again.");
-      return;
-    }
     try {
-      const { email, password } = data;
-      const signInAttempt = await signIn.create({
-        identifier: email,
-        password,
+      if (!isLoaded) {
+        toast.error("Clerk is not loaded yet. Please try again.");
+        return;
+      }
+
+      const code = emailCode.join("");
+
+      const completeReset = await signIn?.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code,
       });
 
-      if (signInAttempt.status === "complete") {
-        setActive({ session: signInAttempt.createdSessionId });
-        toast.success("Sign in successful!");
-        // Redirect to the dashboard or home page
-        router.push("/dashboard");
-      } else {
-        console.error(JSON.stringify(signInAttempt, null, 2));
-        toast.error("Invalid credentials. Please try again.");
+      if (completeReset?.status === "needs_new_password") {
+        toast.success(
+          "Code verified successfully. Please set your new password."
+        );
       }
+      setIsEmailVerified(true);
     } catch (err) {
-      if (isClerkAPIResponseError(err)) setError(err.errors);
-      toast.error("Error signing in. Please try again.");
+      if (isClerkAPIResponseError(err)) {
+        setError(err.errors);
+      }
+      toast.error("Error verifying email. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle password reset
+  const handlePasswordReset = async (
+    data: z.infer<typeof passwordResetZodSchema>
+  ) => {
+    setIsLoading(true);
+    setError(undefined);
+
+    try {
+      if (!isLoaded) {
+        toast.error("Clerk is not loaded yet. Please try again.");
+        return;
+      }
+
+      const result = await signIn?.resetPassword({
+        password: data.password,
+      });
+
+      if (result?.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        toast.success("Password reset successful.");
+        router.push("/sign-in");
+      }
+    } catch (err) {
+      if (isClerkAPIResponseError(err)) {
+        setError(err.errors);
+      }
+      toast.error("Error resetting password. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // If not verified yet, show email verification screen
+  if (!isEmailVerified) {
+    return (
+      <VerifyEmail
+        emailCode={emailCode}
+        setEmailCode={setEmailCode}
+        handleVerify={handleVerify}
+        isLoading={isLoading}
+        error={error}
+      />
+    );
+  }
+
+  // Otherwise, show password reset form
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background relative overflow-hidden">
       {/* Background effects */}
@@ -90,11 +150,11 @@ export default function SignInForm() {
       </div>
 
       <Link
-        href="/"
+        href="/sign-in"
         className="absolute left-4 top-4 flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground z-10"
       >
         <ArrowLeft className="h-4 w-4" />
-        <span>Back</span>
+        <span>Back to sign in</span>
       </Link>
 
       <motion.div
@@ -129,49 +189,28 @@ export default function SignInForm() {
         transition={{ duration: 0.5, delay: 0.1 }}
         className="w-full max-w-md relative z-10"
       >
-        <Card className="border hover:border-white/30 transition-all duration-500 shadow-xl backdrop-blur-sm bg-background/50">
+        <Card className="border-none shadow-xl backdrop-blur-sm bg-background/80">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold bg-gradient-to-br from-foreground via-foreground to-foreground/80 bg-clip-text text-transparent">
-              Welcome back
+              Reset your password
             </CardTitle>
             <CardDescription className="text-muted-foreground/90">
-              Sign in to continue to GitVision
+              Enter a new password for your account
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <form className="space-y-4" onSubmit={handleSubmit(handleSignIn)}>
+            <form
+              className="space-y-4"
+              onSubmit={handleSubmit(handlePasswordReset)}
+            >
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  {...register("email")}
-                  type="email"
-                  placeholder="name@example.com"
-                  required
-                  className="h-11 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
-                  aria-invalid={!!errors.email}
-                />
-                {errors.email && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-primary hover:underline underline-offset-4"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+                <Label htmlFor="password">New Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     {...register("password")}
                     type={showPassword ? "text" : "password"}
+                    placeholder="Enter new password"
                     required
                     className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
                     aria-invalid={!!errors.password}
@@ -200,11 +239,46 @@ export default function SignInForm() {
                 )}
               </div>
 
-              <div id="clerk-captcha" className="mt-5" />
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    {...register("confirmPassword")}
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    required
+                    className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
+                    aria-invalid={!!errors.confirmPassword}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-11 w-11"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">
+                      {showConfirmPassword ? "Hide password" : "Show password"}
+                    </span>
+                  </Button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-destructive mt-1">
+                    {errors.confirmPassword.message}
+                  </p>
+                )}
+              </div>
+
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="h-10 w-full rounded-md shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/90 font-medium relative overflow-hidden group mt-4"
+                className="h-11 w-full rounded-md shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/90 font-medium relative overflow-hidden group mt-4"
               >
                 {/* Background shimmer effects */}
                 <span className="absolute top-0 w-12 h-full bg-white/20 transform translate-x-[-100%] skew-x-[-20deg] group-hover:translate-x-[750%] transition-transform duration-2000"></span>
@@ -214,33 +288,22 @@ export default function SignInForm() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    Resetting...
                   </>
                 ) : (
-                  "Sign in"
+                  "Reset Password"
                 )}
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4 pt-0">
-            <div className="relative w-full">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border/50"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-background/80 px-3 text-muted-foreground backdrop-blur-sm">
-                  New to GitVision?
-                </span>
-              </div>
-            </div>
-
+          <CardFooter className="flex flex-col space-y-4">
             <div className="text-sm text-center text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Remember your password?{" "}
               <Link
-                href="/sign-up"
+                href="/sign-in"
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                Create account
+                Sign in
               </Link>
             </div>
           </CardFooter>
@@ -251,40 +314,23 @@ export default function SignInForm() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="mt-4 p-4 rounded-xl border border-destructive/30 dark:border-destructive/40 backdrop-blur-md bg-destructive/10 dark:bg-destructive/20/30 shadow-sm"
+            className="mt-4 p-4 rounded-xl border bg-destructive/10 dark:bg-destructive/20 border-destructive/30 dark:border-destructive/40"
           >
             <h3 className="text-sm font-semibold text-destructive dark:text-destructive/90">
-              Sign In Error:
+              Password Reset Error:
             </h3>
-            <div className="mt-2 space-y-1 list-disc list-inside">
+            <ul className="mt-2 space-y-1 list-disc list-inside">
               {error.map((el, index) => (
-                <div
+                <li
                   key={index}
                   className="text-sm text-destructive/80 dark:text-destructive/80"
                 >
                   {el.longMessage}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </motion.div>
         )}
-
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          By signing in, you agree to our{" "}
-          <Link
-            href="/legal/terms-of-service"
-            className="font-medium text-primary underline-offset-4 hover:underline transition-colors"
-          >
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="/legal/privacy-policy"
-            className="font-medium text-primary underline-offset-4 hover:underline transition-colors"
-          >
-            Privacy Policy
-          </Link>
-        </p>
       </motion.div>
     </div>
   );

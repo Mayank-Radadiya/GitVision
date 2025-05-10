@@ -23,10 +23,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { signUpZodSchema } from "@/zodSchema/signUp.schema";
-import { toast } from "sonner";
 import VerifyEmail from "./verify-email";
 import { ClerkAPIError } from "@clerk/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
+import toast from "react-hot-toast";
 
 export default function SignUpForm() {
   const router = useRouter();
