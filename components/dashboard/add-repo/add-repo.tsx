@@ -49,6 +49,8 @@ export default function AddRepositoryForm() {
       // await addRepository(data);
 
       // Simulate API call
+      console.log("Adding repository:", data);
+
       router.push("/dashboard");
     } catch (error) {
       console.error("Error adding repository:", error);
@@ -146,7 +148,7 @@ export default function AddRepositoryForm() {
             <div className="text-sm text-muted-foreground mt-4">
               <p>
                 Adding a repository will allow GitVision to analyze your code
-                and provide insights about your project's structure,
+                and provide insights about your project&apos;s structure,
                 dependencies, and more.
               </p>
             </div>

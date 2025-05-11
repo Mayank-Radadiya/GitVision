@@ -37,12 +37,14 @@ export const getCommitHashes = async (githubUrl: string) => {
     getRepositoryFiles(owner, repo);
 
     const commitData = commits.map(
-      (commit: any): Response => ({
+      (commit): Response => ({
         commitMessage: commit.commit.message,
         commitHash: commit.sha,
-        commitAuthorName: commit.commit.author.name,
+        commitAuthorName: commit.commit.author?.name || "",
         commitAuthorAvatar: commit.author?.avatar_url || "",
-        commitDate: new Date(commit.commit.author.date).toLocaleString(),
+        commitDate: commit.commit.author?.date
+          ? new Date(commit.commit.author.date).toLocaleString()
+          : "",
       })
     );
 
