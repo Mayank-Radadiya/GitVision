@@ -46,9 +46,6 @@ export const getCommitHashes = async (githubUrl: string, projectId: string) => {
     // Insert the commit data into the database
     if (commitDataForDb.length > 0) {
       await db.insert(commitsTable).values(commitDataForDb);
-      console.log(
-        `Successfully stored ${commitDataForDb.length} commits in the database`
-      );
     }
 
     return commitDataForDb.length; // Return the number of commits stored

@@ -35,7 +35,6 @@ function VerifyEmail({
   error,
 }: VerifyEmailProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  console.log("VerifyEmail rendered");
 
   useEffect(() => {
     // Focus the first input on mount
@@ -175,7 +174,6 @@ function VerifyEmail({
               <Button
                 variant="link"
                 className="h-auto p-0 text-primary font-medium"
-                onClick={() => console.log("Resend code")}
                 disabled={isLoading}
               >
                 Resend code

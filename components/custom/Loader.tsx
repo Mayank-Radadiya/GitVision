@@ -4,7 +4,7 @@ import Image from "next/image";
 
 export default function Loader() {
   return (
-    <div className="flex flex-col items-center justify-center w-screen h-screen">
+    <div className="flex flex-col items-center justify-center w-full h-screen">
       <div className="relative animate-pulse">
         <Image
           src="/Github.svg"

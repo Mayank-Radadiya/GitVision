@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import {  NextResponse } from "next/server";
 import { db } from "@/drizzle";
 import { usersTable } from "@/drizzle/schema/schema";
 import { eq } from "drizzle-orm";
@@ -35,7 +35,6 @@ export async function POST() {
       );
     }
 
-    console.log(4);
     // If user doesn't exist, create a new user
     const newUser = await db
       .insert(usersTable)

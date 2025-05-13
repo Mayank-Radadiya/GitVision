@@ -1,66 +1,61 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-import { FolderGit2, Loader2 } from "lucide-react";
+import { FolderGit2, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { GradientHeading } from "@/components/custom/gradient-heading";
 import toast from "react-hot-toast";
 import StatsCardsSection from "@/components/dashboard/stats-cards-section";
+import { RepositoryCard } from "@/components/dashboard/repository-card";
 
 // Define the Project type with extended stats
-interface Project {
-  projectName: string;
+interface dashboardInfo {
+  totalProjects: number;
+  totalCommits: number;
+  totalFiles: number;
+  userCredits: number;
+}
+
+interface userProject {
   id: string;
-  name: string;
+  projectName: string;
   githubUrl: string;
-  ownerId: string;
-  commitsCount: number;
-  filesCount: number;
-  stars: number;
+  star: number;
   forks: number;
-  branches: number;
-  contributors: number;
+  totalCommits: number;
+  totalBranches: number;
+  totalContributors: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [info, setInfo] = useState<dashboardInfo>();
   const [loading, setLoading] = useState(true);
+  const [userProjects, setUserProjects] = useState<userProject[]>([]);
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("/api/project/getUserProject", {
-          params: {
-            userId: user?.id,
-          },
-        });
+        const response = await axios.get("/api/project/getDashboardInfo");
 
-        // Transform the API response to match our Project interface
-        const transformedProjects = response.data.projects.map(
-          (project: Project) => ({
-            id: project.id,
-            name: project.projectName,
-            githubUrl: project.githubUrl,
-            ownerId: project.ownerId,
-            commitsCount: project.commitsCount || 0,
-            filesCount: project.filesCount || 0,
-            stars: project.stars || 0,
-            forks: project.forks || 0,
-            branches: project.branches || 0,
-            contributors: project.contributors || 0,
-          })
+        const { dashboardInfo } = response.data;
+
+        const userProjectsResponse = await axios.get(
+          `/api/project/getUserProject?userId=${user?.id}`
         );
+        const { userProjects } = userProjectsResponse.data;
 
-        setProjects(transformedProjects);
-        toast.success("Projects loaded successfully!");
+        setUserProjects(userProjects);
+        setInfo(dashboardInfo);
       } catch (error) {
-        console.error("Error fetching projects:", error);
-        toast.error("Failed to load projects. Please try again.");
+        console.error("Error fetching dashboard data:", error);
+        toast.error("Failed to load dashboard data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -86,48 +81,75 @@ export default function DashboardPage() {
         </div>
 
         {/* Add Repo Button */}
-        <Button
+
+        <button
           onClick={() => router.push("/add")}
-          className="relative h-10 px-5 bg-gradient-to-r from-primary to-primary/90 text-white text-sm font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden group text-[15px]"
+          type="button"
+          className="group/button relative inline-flex items-center justify-center overflow-hidden rounded-md bg-blue-500 dark:bg-blue-500/40 backdrop-blur-lg px-4 py-2 text-base font-semibold text-white transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-xl hover:shadow-blue-500/50 border border-white/20"
         >
-          {/* Shimmer effect */}
-          <span className="absolute top-0 left-9 w-10 h-full bg-white/20 skew-x-[-20deg] group-hover:translate-x-[400%] transition-transform duration-[1000ms] ease-in-out" />
-          {/* Button content */}
-          <FolderGit2 className="mr-2 h-6 w-6" />
-          Add new repository
-        </Button>
+          <div className="text-[12px] flex items-center gap-2 relative z-10">
+            <Plus /> Add New Project
+          </div>
+          <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-13deg)_translateX(-100%)] group-hover/button:duration-1000 group-hover/button:[transform:skew(-13deg)_translateX(100%)]">
+            <div className="relative h-full w-10 bg-white/20" />
+          </div>
+        </button>
       </div>
 
       {/* Projects Summary */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[200px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-          <p className="text-muted-foreground">Loading project statistics...</p>
-        </div>
-      ) : projects.length > 0 ? (
-        <>
-          {/* Show stats for the first project by default */}
-          {projects[0] && <StatsCardsSection project={projects[0]} />}
 
-          {/* Additional project information could go here */}
-          <div className="mt-10">
-            <h2 className="text-2xl font-semibold mb-6">Your Projects</h2>
-            {/* Project list component could go here */}
-          </div>
-        </>
-      ) : (
-        <div className="bg-muted/50 rounded-lg p-8 text-center">
-          <FolderGit2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-xl font-medium mb-2">No projects yet</h3>
-          <p className="text-muted-foreground max-w-md mx-auto mb-6">
-            Start by adding your first GitHub repository to analyze its
-            structure, commits and more.
-          </p>
-          <Button onClick={() => router.push("/add")} className="mx-auto">
-            Add your first repository
-          </Button>
+      {info && <StatsCardsSection project={info} />}
+
+      {/* Projects List */}
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold">Your Projects</h2>
         </div>
-      )}
+
+        {userProjects.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+            {userProjects.map((project) => (
+              <RepositoryCard
+                key={project.id}
+                id={project.id}
+                projectName={project.projectName}
+                githubUrl={project.githubUrl}
+                star={project.star}
+                forks={project.forks}
+                totalCommits={project.totalCommits}
+                totalBranches={project.totalBranches}
+                totalContributors={project.totalContributors}
+                createdAt={project.createdAt}
+              />
+            ))}
+          </div>
+        ) : loading ? (
+          <div className="flex justify-center items-center h-64 bg-muted/30 rounded-xl border border-border/30">
+            <div className="flex flex-col items-center">
+              <Loader2 className="animate-spin h-8 w-8 text-primary mb-3" />
+              <span className="text-muted-foreground">
+                Loading your projects...
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-64 bg-muted/30 rounded-xl border border-border/30">
+            <FolderGit2 className="h-12 w-12 text-muted-foreground mb-3" />
+            <p className="text-lg font-medium">No projects found</p>
+            <p className="text-muted-foreground text-center max-w-md mt-2 mb-4">
+              You haven&apos;t added any projects yet. Add a GitHub repository
+              to start analyzing it.
+            </p>
+            <Button
+              variant="default"
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => router.push("/add")}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Your First Project
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

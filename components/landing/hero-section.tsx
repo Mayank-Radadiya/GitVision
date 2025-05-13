@@ -53,11 +53,11 @@ const PulsingGradient = memo(() => (
 ));
 PulsingGradient.displayName = "PulsingGradient";
 
-interface AnimatedStatProps {
-  label: string;
-  value: string;
-  delay?: number;
-}
+// interface AnimatedStatProps {
+//   label: string;
+//   value: string;
+//   delay?: number;
+// }
 // Animated statistic component
 // const AnimatedStat = ({ label, value, delay = 0 }: AnimatedStatProps) => (
 //   <motion.div

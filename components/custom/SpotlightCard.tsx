@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 interface Position {
@@ -28,7 +28,10 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [opacity, setOpacity] = useState<number>(0);
   const [isHovered, setIsHovered] = useState<boolean>(false);
-  const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
 
   // Handle mouse movement for spotlight effect
   const handleMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -36,7 +39,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
 
     const rect = divRef.current.getBoundingClientRect();
     setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    
+
     // Calculate position for 3D tilt effect
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
@@ -71,14 +74,14 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
   // Generate gradients for the border glow effect
   const getBorderGlowStyles = () => {
     if (!borderGlow) return {};
-    
+
     return {
-      boxShadow: isHovered 
-        ? '0 0 20px 2px rgba(120, 40, 202, 0.3), inset 0 0 20px rgba(120, 40, 202, 0.1)' 
-        : 'none',
-      border: isHovered 
-        ? '1px solid rgba(120, 40, 202, 0.5)' 
-        : '1px solid rgba(30, 30, 30, 0.8)',
+      boxShadow: isHovered
+        ? "0 0 20px 2px rgba(120, 40, 202, 0.3), inset 0 0 20px rgba(120, 40, 202, 0.1)"
+        : "none",
+      border: isHovered
+        ? "1px solid rgba(120, 40, 202, 0.5)"
+        : "1px solid rgba(30, 30, 30, 0.8)",
     };
   };
 
@@ -95,10 +98,14 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
       transition={{ duration: 0.4 }}
       whileHover={{ scale: hoverScale }}
       style={{
-        transform: isHovered 
-          ? `perspective(1000px) rotateX(${mousePosition.y * 5}deg) rotateY(${mousePosition.x * -5}deg)` 
-          : 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
-        transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.5s ease-out',
+        transform: isHovered
+          ? `perspective(1000px) rotateX(${mousePosition.y * 5}deg) rotateY(${
+              mousePosition.x * -5
+            }deg)`
+          : "perspective(1000px) rotateX(0deg) rotateY(0deg)",
+        transition: isHovered
+          ? "transform 0.1s ease-out"
+          : "transform 0.5s ease-out",
         ...getBorderGlowStyles(),
       }}
       className={`relative ${borderRadius} overflow-hidden bg-gradient-to-br from-neutral-950/70 to-neutral-900/70 backdrop-blur-md transition-all duration-300 p-8 ${className}`}
@@ -111,28 +118,26 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
           background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`,
         }}
       />
-      
+
       {/* Background ambient gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
-      
+
       {/* Animated subtle grain texture */}
       <div className="absolute inset-0 opacity-20 bg-noise animate-noise-slow mix-blend-overlay z-0" />
-      
+
       {/* Spotlight border trail effect */}
       {isHovered && (
         <div
           className="absolute inset-0 z-0 opacity-30"
           style={{
             background: `radial-gradient(circle at ${position.x}px ${position.y}px, rgba(120, 40, 202, 0.4), transparent 40%)`,
-            filter: 'blur(20px)',
+            filter: "blur(20px)",
           }}
         />
       )}
-      
+
       {/* Content container with its own z-index to appear above effects */}
-      <div className="relative z-20">
-        {children}
-      </div>
+      <div className="relative z-20">{children}</div>
     </motion.div>
   );
 };

@@ -1,24 +1,12 @@
 import React from "react";
 import DashboardCard from "@/components/dashboard/dashboard-card";
-import {
-  FileIcon,
-  GitBranch,
-  GitCommit,
-  Star,
-} from "lucide-react";
+import { FileIcon, GitBranch, CircleDollarSign, Star } from "lucide-react";
 
 interface Project {
-  projectName: string;
-  id: string;
-  name: string;
-  githubUrl: string;
-  ownerId: string;
-  commitsCount: number;
-  filesCount: number;
-  stars: number;
-  forks: number;
-  branches: number;
-  contributors: number;
+  totalProjects: number;
+  totalCommits: number;
+  totalFiles: number;
+  userCredits: number;
 }
 
 interface StatsCardsSectionProps {
@@ -27,35 +15,35 @@ interface StatsCardsSectionProps {
 
 const StatsCardsSection = ({ project }: StatsCardsSectionProps) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mt-6">
       <DashboardCard
-        name="Commits"
-        number={project?.commitsCount || 0}
-        icon={GitCommit}
+        name="Projects"
+        number={project.totalProjects || 0}
+        icon={GitBranch}
         color="purple"
-        description="Total number of commits made to this repository"
+        description="Total Repositories"
       />
       <DashboardCard
         name="Files"
-        number={project?.filesCount || 0}
+        number={project?.totalFiles || 0}
         icon={FileIcon}
         color="blue"
-        description="Total files tracked in this repository"
+        description="Total files tracked"
       />
       <DashboardCard
-        name="Stars"
-        number={project?.stars || 0}
+        name="Commits"
+        number={project?.totalCommits || 0}
         icon={Star}
         color="amber"
-        description="GitHub stars received on this project"
+        description="Commits Analyzed"
       />
 
       <DashboardCard
-        name="Contributors"
-        number={project?.contributors || 0}
-        icon={GitBranch}
+        name="Credits"
+        number={project.userCredits || 0}
+        icon={CircleDollarSign}
         color="green"
-        description="People who've contributed to this project"
+        description="Total Credits Available"
       />
     </div>
   );

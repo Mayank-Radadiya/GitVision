@@ -161,10 +161,12 @@ const Sidebar = () => {
             {user && (
               <div className="flex items-center gap-3 px-6 ">
                 <div className="rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
-                  <img
+                  <Image
                     src={user.imageUrl}
                     alt={user.fullName || "User"}
                     className="h-9 w-9 object-cover"
+                    width={30}
+                    height={30}
                   />
                 </div>
                 <div className="flex-1 min-w-0">
