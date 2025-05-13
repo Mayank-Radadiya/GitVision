@@ -131,3 +131,68 @@ body {
 .custom-spotlight-card {
   background-color: transparent !important;
 }
+
+/* Custom Animations */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes floating {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes noise {
+  0%, 100% {
+    background-position: 0% 0%;
+  }
+  20% {
+    background-position: 20% 80%;
+  }
+  40% {
+    background-position: 60% 20%;
+  }
+  60% {
+    background-position: 40% 40%;
+  }
+  80% {
+    background-position: 80% 60%;
+  }
+}
+
+/* Utility classes for animations */
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.animate-floating {
+  animation: floating 4s ease-in-out infinite;
+}
+
+.animate-noise-slow {
+  animation: noise 8s steps(10) infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Noise background */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 150px;
+}

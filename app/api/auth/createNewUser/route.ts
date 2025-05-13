@@ -4,11 +4,8 @@ import { usersTable } from "@/drizzle/schema/schema";
 import { eq } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    // get request body
-    const body = await request.json();
-
     const user = await currentUser();
     if (!user) {
       return NextResponse.json(
@@ -16,14 +13,6 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-
-    if (body.userId !== user.id) {
-      return NextResponse.json(
-        { error: "Unauthorized. User ID mismatch." },
-        { status: 401 }
-      );
-    }
-
     const email = user?.emailAddresses[0]?.emailAddress;
     const name = user?.fullName || user?.firstName || user?.lastName;
 
@@ -46,12 +35,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(4);
     // If user doesn't exist, create a new user
     const newUser = await db
       .insert(usersTable)
       .values({
         id: user.id,
         name: name || "unknown", // Use provided name or default
+        email: email, // Add the email field
         credits: 100, // Default credits
         isProUser: false, // Default to free user
         createdAt: new Date(),

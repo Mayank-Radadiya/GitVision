@@ -94,15 +94,13 @@ export default function SignUpForm() {
       });
 
       if (result?.status === "complete") {
-        toast.success("Email verified successfully.");
         await setActive({ session: result.createdSessionId });
+        toast.success("Email verified successfully.");
       }
 
-      await axios.post("/api/createUser", {
-        userId: result.id,
-      });
-      toast.success("User created successfully.");
+      await axios.post("/api/auth/createNewUser");
 
+      toast.success("User created successfully.");
       router.push("/dashboard");
     } catch (error) {
       if (isClerkAPIResponseError(error)) setError(error.errors);

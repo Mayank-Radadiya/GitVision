@@ -1,21 +1,27 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-import { FolderGit2 } from "lucide-react";
+import { FolderGit2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { GradientHeading } from "@/components/custom/gradient-heading";
 import toast from "react-hot-toast";
+import StatsCardsSection from "@/components/dashboard/stats-cards-section";
 
-// Define the Project type
+// Define the Project type with extended stats
 interface Project {
-  id: string;
   projectName: string;
+  id: string;
+  name: string;
   githubUrl: string;
   ownerId: string;
-  createdAt: string;
-  updatedAt: string;
+  commitsCount: number;
+  filesCount: number;
+  stars: number;
+  forks: number;
+  branches: number;
+  contributors: number;
 }
 
 export default function DashboardPage() {
@@ -33,7 +39,24 @@ export default function DashboardPage() {
             userId: user?.id,
           },
         });
-        setProjects(response.data.projects);
+
+        // Transform the API response to match our Project interface
+        const transformedProjects = response.data.projects.map(
+          (project: Project) => ({
+            id: project.id,
+            name: project.projectName,
+            githubUrl: project.githubUrl,
+            ownerId: project.ownerId,
+            commitsCount: project.commitsCount || 0,
+            filesCount: project.filesCount || 0,
+            stars: project.stars || 0,
+            forks: project.forks || 0,
+            branches: project.branches || 0,
+            contributors: project.contributors || 0,
+          })
+        );
+
+        setProjects(transformedProjects);
         toast.success("Projects loaded successfully!");
       } catch (error) {
         console.error("Error fetching projects:", error);
@@ -43,8 +66,10 @@ export default function DashboardPage() {
       }
     };
 
-    fetchProjects();
-  });
+    if (user?.id) {
+      fetchProjects();
+    }
+  }, [user?.id]);
 
   return (
     <div className="space-y-8 p-8">
@@ -75,34 +100,32 @@ export default function DashboardPage() {
 
       {/* Projects Summary */}
       {loading ? (
-        <div className="flex justify-center items-center">
-          <p>Loading projects...</p>
+        <div className="flex flex-col items-center justify-center min-h-[200px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+          <p className="text-muted-foreground">Loading project statistics...</p>
         </div>
       ) : projects.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
-            >
-              <h3 className="text-lg font-semibold mb-2">{project.projectName}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Created at: {new Date(project.createdAt).toLocaleDateString()}
-              </p>
-              <a
-                href={project.githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline text-sm"
-              >
-                View on GitHub
-              </a>
-            </div>
-          ))}
-        </div>
+        <>
+          {/* Show stats for the first project by default */}
+          {projects[0] && <StatsCardsSection project={projects[0]} />}
+
+          {/* Additional project information could go here */}
+          <div className="mt-10">
+            <h2 className="text-2xl font-semibold mb-6">Your Projects</h2>
+            {/* Project list component could go here */}
+          </div>
+        </>
       ) : (
-        <div className="flex justify-center items-center">
-          <p>No projects found. Add a new repository to get started!</p>
+        <div className="bg-muted/50 rounded-lg p-8 text-center">
+          <FolderGit2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-xl font-medium mb-2">No projects yet</h3>
+          <p className="text-muted-foreground max-w-md mx-auto mb-6">
+            Start by adding your first GitHub repository to analyze its
+            structure, commits and more.
+          </p>
+          <Button onClick={() => router.push("/add")} className="mx-auto">
+            Add your first repository
+          </Button>
         </div>
       )}
     </div>

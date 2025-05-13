@@ -1,123 +1,189 @@
 "use client";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  GitBranch,
-  MessagesSquare,
-  LogOut,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
-import ModeToggle from "@/components/custom/mode-toggle";
-import { useUser, SignOutButton } from "@clerk/nextjs";
-
-const routes = [
-  {
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    href: "/dashboard",
-  },
-  {
-    label: "Repository Analysis",
-    icon: GitBranch,
-    href: "/dashboard/repo-analysis",
-  },
-  {
-    label: "AI Assistant",
-    icon: MessagesSquare,
-    href: "/dashboard/chat",
-  },
-];
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
+import {
+  BarChart2,
+  HomeIcon,
+  LogOut,
+  MessageSquare,
+  PlusCircle,
+  Settings,
+  UserCircle,
+} from "lucide-react";
+import { SignOutButton, useUser } from "@clerk/nextjs";
+import ModeToggle from "../custom/mode-toggle";
 
 const Sidebar = () => {
   const pathname = usePathname();
-  const { user, isLoaded } = useUser();
+  const { user } = useUser();
+
+  const navigation = [
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: HomeIcon,
+    },
+    {
+      name: "Add Repository",
+      href: "/add",
+      icon: PlusCircle,
+    },
+    {
+      name: "Analytics",
+      href: "/analytics",
+      icon: BarChart2,
+    },
+    {
+      name: "Chat",
+      href: "/chat",
+      icon: MessageSquare,
+    },
+  ];
+
+  const secondaryNavigation = [
+    {
+      name: "Account",
+      href: "/account",
+      icon: UserCircle,
+    },
+    {
+      name: "Settings",
+      href: "/settings",
+      icon: Settings,
+    },
+  ];
 
   return (
-    <div className="flex h-full flex-col space-y-4 bg-background py-4 border-r border-border/50">
-      {/* Logo at the top */}
-      <div className="px-3 py-2 flex-1">
-        <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="group flex items-center gap-3 transition-all duration-300"
-          >
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-background via-background to-background ring-1 ring-primary/20 backdrop-blur-sm overflow-hidden shadow-lg transition-all duration-300 group-hover:shadow-primary/10">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-80"></div>
-              <Image
-                src={"/Github.svg"}
-                alt="Logo"
-                width={30}
-                height={30}
-                className="relative z-10 transition-transform duration-300 group-hover:scale-110"
-              />
-            </div>
-            <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-xl font-bold tracking-tight text-transparent">
-              Git<span className="text-primary">Vision</span>
-            </span>
-          </Link>
+    <div className="flex h-full flex-col border-r border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-950/40 backdrop-blur-sm w-64 shadow-sm transition-all">
+      <div className="flex shrink-0 items-center gap-2 p-4">
+        <Link
+          href="/"
+          className="group flex items-center gap-3 transition-all duration-300 px-5"
+        >
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-background via-background to-background ring-1 ring-primary/20 backdrop-blur-sm overflow-hidden shadow-lg transition-all duration-300 group-hover:shadow-primary/10">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-80"></div>
+            <Image
+              src={"/Github.svg"}
+              alt="Logo"
+              width={35}
+              height={35}
+              className="relative z-10 transition-transform duration-300 group-hover:scale-110"
+            />
+          </div>
+          <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-xl font-bold tracking-tight text-transparent">
+            Git<span className="text-primary">Vision</span>
+          </span>
+        </Link>
+      </div>
 
-          <ModeToggle />
-        </div>
-
-        {/* Navigation Routes */}
-        <div className="space-y-1.5 mt-10">
-          {routes.map((route) => (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:bg-muted/50 rounded-lg transition",
-                pathname === route.href
-                  ? "bg-muted text-primary/80 font-semibold"
-                  : "text-muted-foreground"
-              )}
-            >
-              <div className="flex items-center">
-                <route.icon className="h-5 w-5 mr-3" />
-                {route.label}
-              </div>
+      <div className="flex flex-col justify-between flex-1 overflow-y-auto pt-2">
+        <div className="px-2 py-4 space-y-1">
+          <p className="px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+            Application
+          </p>
+          {navigation.map((item) => (
+            <Link key={item.name} href={item.href}>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start gap-x-3 my-1 rounded-md px-3 py-5 text-sm font-medium",
+                  pathname === item.href
+                    ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0",
+                    pathname === item.href
+                      ? "text-primary"
+                      : "text-gray-500 dark:text-gray-400"
+                  )}
+                  aria-hidden="true"
+                />
+                {item.name}
+              </Button>
             </Link>
           ))}
         </div>
-      </div>
 
-      {/* User information  at the bottom*/}
-      <div className="px-3 py-2 mt-auto">
-        <div className="flex items-center gap-2 bg-accent/5 p-1 rounded-lg">
-          <div className="relative h-10 w-10">
-            {isLoaded && user?.imageUrl ? (
-              <Image
-                src={user.imageUrl}
-                alt="User avatar"
-                width={45}
-                height={45}
-                className="rounded-full object-cover"
-              />
-            ) : (
-              <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" />
-              </Avatar>
-            )}
+        <div className=" ">
+          <div className="px-2 pb-4 space-y-1 ">
+            <p className="px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+              Personal
+            </p>
+            {secondaryNavigation.map((item) => (
+              <Link key={item.name} href={item.href}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start gap-x-3 rounded-md px-3 py-5 text-sm font-medium",
+                    pathname === item.href
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900"
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5 flex-shrink-0",
+                      pathname === item.href
+                        ? "text-primary"
+                        : "text-gray-500 dark:text-gray-400"
+                    )}
+                    aria-hidden="true"
+                  />
+                  {item.name}
+                </Button>
+              </Link>
+            ))}
+
+            <div className="pt-1 border-gray-200 dark:border-gray-800">
+              <SignOutButton>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-x-3 rounded-md px-3 py-5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900"
+                >
+                  <LogOut
+                    className="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    aria-hidden="true"
+                  />
+                  Sign out
+                </Button>
+              </SignOutButton>
+            </div>
           </div>
-          <div className="flex items-center overflow-hidden">
-            <span className="text-sm text-muted-foreground truncate">
-              {isLoaded
-                ? user?.emailAddresses?.[0]?.emailAddress || "Unknown"
-                : "example.user@gmail.com"}
-            </span>
-            <SignOutButton>
-              <button
-                className="p-2 rounded-full hover:bg-muted/70 transition"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut className="size-5 text-muted-foreground" />
-              </button>
-            </SignOutButton>
+
+          <div className="flex flex-col  pt-4 pb-4 border-t border-gray-100 dark:border-gray-800">
+            {user && (
+              <div className="flex items-center gap-3 px-6 ">
+                <div className="rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+                  <img
+                    src={user.imageUrl}
+                    alt={user.fullName || "User"}
+                    className="h-9 w-9 object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {user.fullName}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {user.primaryEmailAddress?.emailAddress}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-6 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                v1.0.0
+              </span>
+              <ModeToggle />
+            </div>
           </div>
         </div>
       </div>

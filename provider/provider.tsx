@@ -15,9 +15,19 @@ const MemoizedToaster = memo(() => (
     position="bottom-right"
     toastOptions={{
       style: {
-        background: "var(--toast-bg, #333)",
-        color: "var(--toast-text, #fff)",
+        background: "var(--toast-bg, #fff)",
+        color: "var(--toast-text, #333)",
         boxShadow: "0 3px 10px rgba(0, 0, 0, 0.2)",
+        borderRadius: "8px",
+        padding: "16px",
+        fontSize: "14px",
+        fontWeight: "500",
+        lineHeight: "1.5",
+        transition: "all 0.3s ease",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        border: "1px solid rgba(255, 255, 255, 0.2)",
+        zIndex: 99,
       },
       success: {
         duration: 4000,
@@ -42,7 +52,7 @@ const Provider = ({ children }: ProviderProps) => {
       const isDark = document.documentElement.classList.contains("dark");
       document.documentElement.style.setProperty(
         "--toast-bg",
-        isDark ? "#333" : "#fff"
+        isDark ? "transparent" : "transparent"
       );
       document.documentElement.style.setProperty(
         "--toast-text",

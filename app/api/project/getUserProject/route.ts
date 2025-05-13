@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/drizzle";
-import { projectTables, userProjectsTable } from "@/drizzle/schema/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { projectTables, userProjectsTable, commitsTable, projectFiles } from "@/drizzle/schema/schema";
+import { eq, and, desc, count } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 
 export async function GET(request: NextRequest) {
@@ -67,9 +67,45 @@ export async function GET(request: NextRequest) {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    // Return the projects
+    // Get additional data for each project
+    const formattedProjects = await Promise.all(
+      allProjects.map(async (project) => {
+        // Get commit count
+        const commitResult = await db
+          .select({ count: count() })
+          .from(commitsTable)
+          .where(eq(commitsTable.projectId, project.id));
+        
+        const commitsCount = commitResult[0]?.count || 0;
+        
+        // Get file count
+        const fileResult = await db
+          .select({ count: count() })
+          .from(projectFiles)
+          .where(eq(projectFiles.projectId, project.id));
+        
+        const filesCount = fileResult[0]?.count || 0;
+
+        return {
+          id: project.id,
+          name: project.projectName,
+          githubUrl: project.githubUrl,
+          ownerId: project.ownerId,
+          commitsCount: commitsCount,
+          filesCount: filesCount,
+          stars: project.star || 0,
+          forks: project.forks || 0,
+          branches: project.totalBranches || 0,
+          contributors: project.totalContributors || 0,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        };
+      })
+    );
+
+    // Return the formatted projects
     return NextResponse.json(
-      { message: "Projects retrieved successfully", projects: allProjects },
+      { message: "Projects retrieved successfully", projects: formattedProjects },
       { status: 200 }
     );
   } catch (error) {

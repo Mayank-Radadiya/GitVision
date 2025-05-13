@@ -55,6 +55,7 @@ export function LandingHeader() {
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-50"></div>
       <nav className="container relative mx-auto flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
+          {/* Logo */}
           <Link
             href="/"
             className="group flex items-center gap-3 transition-all duration-300"
