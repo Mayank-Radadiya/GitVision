@@ -27,6 +27,7 @@ import VerifyEmail from "./verify-email";
 import { ClerkAPIError } from "@clerk/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import toast from "react-hot-toast";
+import axios from "axios";
 
 export default function SignUpForm() {
   const router = useRouter();
@@ -96,6 +97,11 @@ export default function SignUpForm() {
         toast.success("Email verified successfully.");
         await setActive({ session: result.createdSessionId });
       }
+
+      await axios.post("/api/createUser", {
+        userId: result.id,
+      });
+      toast.success("User created successfully.");
 
       router.push("/dashboard");
     } catch (error) {
@@ -353,27 +359,27 @@ export default function SignUpForm() {
               </p>
             </motion.div>
             {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-4 p-4 rounded-xl border border-destructive/30 dark:border-destructive/40 backdrop-blur-md bg-destructive/10 dark:bg-destructive/20/30 shadow-sm"
-          >
-            <h3 className="text-sm font-semibold text-destructive dark:text-destructive/90">
-              Sign In Error:
-            </h3>
-            <div className="mt-2 space-y-1 list-disc list-inside">
-              {error.map((el, index) => (
-                <div
-                  key={index}
-                  className="text-sm text-destructive/80 dark:text-destructive/80"
-                >
-                  {el.longMessage}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mt-4 p-4 rounded-xl border border-destructive/30 dark:border-destructive/40 backdrop-blur-md bg-destructive/10 dark:bg-destructive/20/30 shadow-sm"
+              >
+                <h3 className="text-sm font-semibold text-destructive dark:text-destructive/90">
+                  Sign In Error:
+                </h3>
+                <div className="mt-2 space-y-1 list-disc list-inside">
+                  {error.map((el, index) => (
+                    <div
+                      key={index}
+                      className="text-sm text-destructive/80 dark:text-destructive/80"
+                    >
+                      {el.longMessage}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
           </div>
         </>
       ) : (

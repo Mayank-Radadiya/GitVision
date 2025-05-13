@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -44,13 +45,14 @@ export default function AddRepositoryForm() {
     try {
       setIsLoading(true);
 
-      // Here you would add your API call to add the repository
-      // For example:
-      // await addRepository(data);
-
-      // Simulate API call
-      console.log("Adding repository:", data);
-
+      const response = await axios.post("/api/project/createProject", {
+        ProjectName: data.ProjectName,
+        repoUrl: data.repoUrl,
+      });
+      if (response.status !== 200) {
+        throw new Error("Failed to add repository");
+      }
+      toast.success("New project created successfully!");
       router.push("/dashboard");
     } catch (error) {
       console.error("Error adding repository:", error);
