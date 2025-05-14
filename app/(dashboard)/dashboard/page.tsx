@@ -1,7 +1,15 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-import { FolderGit2, Loader2, Plus } from "lucide-react";
+import {
+  FolderGit2,
+  GitBranch,
+  GitCommit,
+  Loader2,
+  Plus,
+  Star,
+  Users,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -9,6 +17,7 @@ import { GradientHeading } from "@/components/custom/gradient-heading";
 import toast from "react-hot-toast";
 import StatsCardsSection from "@/components/dashboard/stats-cards-section";
 import { RepositoryCard } from "@/components/dashboard/repository-card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Define the Project type with extended stats
 interface dashboardInfo {
@@ -34,8 +43,14 @@ interface userProject {
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
-  const [info, setInfo] = useState<dashboardInfo>();
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [info, setInfo] = useState<dashboardInfo>({
+    totalProjects: 0,
+    totalCommits: 0,
+    totalFiles: 0,
+    userCredits: 0,
+  });
   const [userProjects, setUserProjects] = useState<userProject[]>([]);
 
   useEffect(() => {
@@ -43,7 +58,6 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const response = await axios.get("/api/project/getDashboardInfo");
-
         const { dashboardInfo } = response.data;
 
         const userProjectsResponse = await axios.get(
@@ -58,13 +72,44 @@ export default function DashboardPage() {
         toast.error("Failed to load dashboard data. Please try again.");
       } finally {
         setLoading(false);
+
+        // Set a timeout to hide the skeleton UI after a consistent minimum time
+        setTimeout(() => {
+          setInitialLoading(false);
+        }, 1200); // Show skeleton for at least 1.2 seconds
       }
     };
 
     if (user?.id) {
       fetchProjects();
+    } else {
+      setLoading(false);
+      // Still maintain the initial skeleton even if user is not logged in
+      setTimeout(() => {
+        setInitialLoading(false);
+      }, 2000);
     }
   }, [user?.id]);
+
+  // Skeleton component for project cards
+  const ProjectCardSkeleton = () => (
+    <div className="rounded-xl border border-blue-200/30 dark:border-blue-800/30 p-5 bg-white/40 dark:bg-slate-900/40 shadow-sm">
+      <div className="flex justify-between items-start mb-4">
+        <Skeleton className="h-7 w-3/5" />
+        <Skeleton className="h-6 w-12 rounded-full" />
+      </div>
+      <Skeleton className="h-4 w-3/4 mb-4" />
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </div>
+      <div className="flex justify-between items-center mt-4">
+        <Skeleton className="h-5 w-1/4" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-8 p-8">
@@ -81,7 +126,6 @@ export default function DashboardPage() {
         </div>
 
         {/* Add Repo Button */}
-
         <button
           onClick={() => router.push("/add")}
           type="button"
@@ -97,8 +141,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Projects Summary */}
-
-      {info && <StatsCardsSection project={info} />}
+      {initialLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <StatsCardsSection project={info} />
+      )}
 
       {/* Projects List */}
       <div className="mt-8">
@@ -106,7 +157,19 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-semibold">Your Projects</h2>
         </div>
 
-        {userProjects.length > 0 ? (
+        {initialLoading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <ProjectCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : loading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <ProjectCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : userProjects.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
             {userProjects.map((project) => (
               <RepositoryCard
@@ -123,27 +186,42 @@ export default function DashboardPage() {
               />
             ))}
           </div>
-        ) : loading ? (
-          <div className="flex justify-center items-center h-64 bg-muted/30 rounded-xl border border-border/30">
-            <div className="flex flex-col items-center">
-              <Loader2 className="animate-spin h-8 w-8 text-primary mb-3" />
-              <span className="text-muted-foreground">
-                Loading your projects...
-              </span>
-            </div>
-          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 bg-muted/30 rounded-xl border border-border/30">
-            <FolderGit2 className="h-12 w-12 text-muted-foreground mb-3" />
-            <p className="text-lg font-medium">No projects found</p>
-            <p className="text-muted-foreground text-center max-w-md mt-2 mb-4">
-              You haven&apos;t added any projects yet. Add a GitHub repository
-              to start analyzing it.
+          <div className="flex flex-col items-center justify-center h-80 bg-gradient-to-br from-blue-50/30 to-purple-50/30 dark:from-blue-950/20 dark:to-purple-950/20 rounded-xl border border-blue-200/30 dark:border-blue-800/30 p-8 shadow-sm">
+            <div className="bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/40 dark:to-purple-900/40 p-4 rounded-full mb-5">
+              <FolderGit2 className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+            </div>
+
+            <h3 className="text-xl font-medium mb-2">No projects found</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-6">
+              You haven&apos;t added any GitHub repositories yet. Add one to
+              start exploring insights.
             </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 w-full max-w-2xl">
+              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
+                <GitCommit className="h-5 w-5 text-blue-500 mb-1" />
+                <span className="text-sm text-muted-foreground">
+                  Track Commits
+                </span>
+              </div>
+              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
+                <GitBranch className="h-5 w-5 text-purple-500 mb-1" />
+                <span className="text-sm text-muted-foreground">
+                  Analyze Branches
+                </span>
+              </div>
+              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
+                <Users className="h-5 w-5 text-green-500 mb-1" />
+                <span className="text-sm text-muted-foreground">
+                  View Contributors
+                </span>
+              </div>
+            </div>
+
             <Button
-              variant="default"
-              className="bg-primary hover:bg-primary/90"
               onClick={() => router.push("/add")}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-6 py-2 rounded-md transition-all duration-300 shadow-md hover:shadow-lg"
             >
               <Plus className="h-4 w-4 mr-2" /> Add Your First Project
             </Button>

@@ -23,12 +23,6 @@ import {
   Code,
 } from "lucide-react";
 import { format } from "date-fns";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Define interfaces
@@ -134,7 +128,7 @@ export default function UserProjectPage() {
           </Button>
 
           {isLoading ? (
-            <Skeleton className="h-10 w-48 mb-2" />
+            <Skeleton className="h-18 w-48 mb-2" />
           ) : (
             <GradientHeading as="h1" className="mb-2">
               {project?.projectName || "Project Details"}
@@ -142,7 +136,7 @@ export default function UserProjectPage() {
           )}
 
           {isLoading ? (
-            <Skeleton className="h-6 w-64" />
+            <Skeleton className="h-8 w-64" />
           ) : (
             <a
               href={project?.githubUrl}
@@ -165,9 +159,9 @@ export default function UserProjectPage() {
       {/* Project Stats */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -312,9 +306,6 @@ export default function UserProjectPage() {
                               <ExternalLink className="ml-1 size-3" />
                             </span>
                           </Link>
-                          <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
-                            {commit.commitHash.substring(0, 7)}
-                          </span>
                         </div>
                         <div className="mt-2 font-semibold text-foreground">
                           {getCommitTitle(commit.commitMessage)}
