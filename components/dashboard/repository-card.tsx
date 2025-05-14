@@ -63,7 +63,7 @@ export const RepositoryCard = ({
         </div>
         <Button
           size="sm"
-          onClick={() => router.push(`/repository/${id}`)}
+          onClick={() => router.push(`/dashboard/user-project/${id}`)}
           className="hover:scale-105 transition-transform"
         >
           View
