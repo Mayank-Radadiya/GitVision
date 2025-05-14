@@ -5,9 +5,7 @@ import {
   FolderGit2,
   GitBranch,
   GitCommit,
-  Loader2,
   Plus,
-  Star,
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";

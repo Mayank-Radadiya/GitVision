@@ -59,7 +59,7 @@ interface Commit {
 export default function UserProjectPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isSignedIn } = useUser();
+  const { isSignedIn } = useUser();
   const [project, setProject] = useState<ProjectDetails | null>(null);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [isLoading, setIsLoading] = useState(true);

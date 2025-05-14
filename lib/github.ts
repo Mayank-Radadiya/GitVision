@@ -14,13 +14,14 @@ function removeGitSuffix(url: string) {
 
 async function fetchWithRetry(
   url: string,
-  options: any,
+  options: Record<string, unknown> = {},
   retries = 3,
   delay = 2000
 ) {
   for (let i = 0; i < retries; i++) {
     try {
       return await axios.get(url, options);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error.response?.status === 429 && i < retries - 1) {
         console.warn(`Rate limited. Retrying in ${delay}ms...`);
