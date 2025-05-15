@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-import { FolderGit2, GitBranch, GitCommit, Plus, Users } from "lucide-react";
+import { FolderGit2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";

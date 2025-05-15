@@ -13,6 +13,7 @@ import {
   PlusCircle,
   Settings,
   UserCircle,
+  Code2Icon,
 } from "lucide-react";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import ModeToggle from "../custom/mode-toggle";
@@ -41,6 +42,11 @@ const Sidebar = () => {
       name: "Chat",
       href: "/chat",
       icon: MessageSquare,
+    },
+    {
+      name: "Github Code",
+      href: "/code-viewer",
+      icon: Code2Icon,
     },
   ];
 

@@ -1,11 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// import { GoogleGenerativeAI } from "@google/generative-ai";
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is Missing");
-}
+// if (!process.env.GEMINI_API_KEY) {
+//   throw new Error("GEMINI_API_KEY is Missing");
+// }
 
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-    model: ""
-})
+// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// // const model = genAI.getGenerativeModel({
+// //     model: ""
+// // })
