@@ -1,13 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
-import {
-  FolderGit2,
-  GitBranch,
-  GitCommit,
-  Plus,
-  Users,
-} from "lucide-react";
+import { FolderGit2, GitBranch, GitCommit, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -127,10 +121,10 @@ export default function DashboardPage() {
         <button
           onClick={() => router.push("/add")}
           type="button"
-          className="group/button relative inline-flex items-center justify-center overflow-hidden rounded-md bg-blue-500 dark:bg-blue-500/40 backdrop-blur-lg px-4 py-2 text-base font-semibold text-white transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-xl hover:shadow-blue-500/50 border border-white/20"
+          className="group/button relative inline-flex items-center justify-center overflow-hidden rounded-md bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 backdrop-blur-lg px-4 py-2 text-base font-semibold text-white transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-xl hover:shadow-blue-500/50 border border-white/20"
         >
           <div className="text-[12px] flex items-center gap-2 relative z-10">
-            <Plus /> Add New Project
+            <Plus className="h-5 w-5" /> New Project
           </div>
           <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-13deg)_translateX(-100%)] group-hover/button:duration-1000 group-hover/button:[transform:skew(-13deg)_translateX(100%)]">
             <div className="relative h-full w-10 bg-white/20" />
@@ -185,7 +179,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-80 bg-gradient-to-br from-blue-50/30 to-purple-50/30 dark:from-blue-950/20 dark:to-purple-950/20 rounded-xl border border-blue-200/30 dark:border-blue-800/30 p-8 shadow-sm">
+          <div className="flex flex-col items-center justify-center h-96 bg-gradient-to-br from-blue-50/30 to-purple-50/30 dark:from-blue-950/20 dark:to-purple-950/20 rounded-xl border border-blue-200/30 dark:border-blue-800/30 p-8 shadow-sm">
             <div className="bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/40 dark:to-purple-900/40 p-4 rounded-full mb-5">
               <FolderGit2 className="h-10 w-10 text-blue-600 dark:text-blue-400" />
             </div>
@@ -195,27 +189,6 @@ export default function DashboardPage() {
               You haven&apos;t added any GitHub repositories yet. Add one to
               start exploring insights.
             </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 w-full max-w-2xl">
-              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
-                <GitCommit className="h-5 w-5 text-blue-500 mb-1" />
-                <span className="text-sm text-muted-foreground">
-                  Track Commits
-                </span>
-              </div>
-              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
-                <GitBranch className="h-5 w-5 text-purple-500 mb-1" />
-                <span className="text-sm text-muted-foreground">
-                  Analyze Branches
-                </span>
-              </div>
-              <div className="flex flex-col items-center p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/30 bg-white/80 dark:bg-slate-900/80">
-                <Users className="h-5 w-5 text-green-500 mb-1" />
-                <span className="text-sm text-muted-foreground">
-                  View Contributors
-                </span>
-              </div>
-            </div>
 
             <Button
               onClick={() => router.push("/add")}

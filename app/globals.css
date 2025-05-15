@@ -134,7 +134,8 @@ body {
 
 /* Custom Animations */
 @keyframes pulse-slow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.7;
   }
   50% {
@@ -143,7 +144,8 @@ body {
 }
 
 @keyframes floating {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -152,7 +154,8 @@ body {
 }
 
 @keyframes noise {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 0%;
   }
   20% {

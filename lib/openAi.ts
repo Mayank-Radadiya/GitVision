@@ -1,18 +1,23 @@
 import OpenAI from "openai";
 
+// const openai = new OpenAI({
+//   baseURL: "https://openrouter.ai/api/v1",
+//   apiKey: process.env.OPENAI_API_KEY,
+//   defaultHeaders: {
+//     "HTTP-Referer": "https://gitvision.vercel.app/",
+//     "X-Title": "https://gitvision.vercel.app/",
+//   },
+// });
+
 const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENAI_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": "https://gitvision.vercel.app/",
-    "X-Title": "https://gitvision.vercel.app/",
-  },
+  apiKey: "GEMINI_API_KEY",
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
 export async function getSummaryOfDiff(diff: string) {
   try {
     const completion = await openai.chat.completions.create({
-      model: "meta-llama/llama-3.2-3b-instruct:free",
+      model: "gemini-2.0-flash",
       messages: [
         {
           role: "system",
