@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { repositoryZodSchema } from "@/zodSchema/repository.schema";
-import { createNewProject, getRepositoryFiles } from "@/lib/github";
+import { createNewProject, getCommitHashes } from "@/lib/github";
 import { auth } from "@clerk/nextjs/server";
 
+// This API route handles the creation of a new project
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
@@ -16,8 +17,10 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
+    // Validate the request body using Zod schema
     const validationResult = repositoryZodSchema.safeParse(body);
 
+    // If validation fails, return error response
     if (!validationResult.success) {
       return NextResponse.json(
         { error: validationResult.error.errors },
@@ -25,6 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract validated data
     const { ProjectName, repoUrl } = validationResult.data;
 
     // Use the createNewProject function from lib/github.ts
@@ -41,9 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get repository files and store them in the database
-    getRepositoryFiles(owner, repo, projectId);
-
+    await getCommitHashes(repoUrl, projectId);
     // Return success response with project details
     return NextResponse.json({
       success: true,

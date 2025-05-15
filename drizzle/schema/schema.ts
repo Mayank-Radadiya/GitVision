@@ -103,6 +103,7 @@ export const commitsTable = pgTable(
     AiSummary: text("ai_summary"),
     authorName: varchar("author_name", { length: 255 }).notNull(),
     authorEmail: varchar("author_email", { length: 255 }).notNull(),
+    authorAvatar: varchar("author_avatar", { length: 255 }),
     authorDate: timestamp("author_date").notNull(),
     committerName: varchar("committer_name", { length: 255 }).notNull(),
     committerEmail: varchar("committer_email", { length: 255 }).notNull(),

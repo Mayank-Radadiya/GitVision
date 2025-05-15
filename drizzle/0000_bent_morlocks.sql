@@ -5,6 +5,7 @@ CREATE TABLE "commits" (
 	"ai_summary" text,
 	"author_name" varchar(255) NOT NULL,
 	"author_email" varchar(255) NOT NULL,
+	"author_avatar" varchar(255),
 	"author_date" timestamp NOT NULL,
 	"committer_name" varchar(255) NOT NULL,
 	"committer_email" varchar(255) NOT NULL,

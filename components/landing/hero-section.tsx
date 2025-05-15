@@ -211,11 +211,11 @@ export function HeroSection() {
               className="mx-auto mb-10 max-w-md"
             >
               <form className="relative" onSubmit={handleSubmit}>
-                <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <SearchIcon className="absolute z-10 left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Paste GitHub repository URL"
-                  className="pl-9 pr-24 h-12 rounded-full border-border/60 bg-background/80 backdrop-blur-md shadow-sm focus:ring-2 focus:ring-primary/40 transition-all"
+                  className="pl-9 pr-24 h-12 rounded-full border-border/60 bg-transparent shadow-sm focus:ring-2 focus:ring-primary/40 transition-all"
                   value={repoUrl}
                   onChange={handleRepoUrlChange}
                   aria-label="GitHub repository URL"
@@ -249,7 +249,7 @@ export function HeroSection() {
               className="flex flex-col items-center justify-center gap-4 sm:flex-row"
             >
               <Link href="/sign-up" aria-label="Sign up for free access">
-                <GlowingButton className="rounded-full gap-2 group">
+                <GlowingButton className="rounded-full gap-2 group z-12">
                   Get started for free
                   <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </GlowingButton>

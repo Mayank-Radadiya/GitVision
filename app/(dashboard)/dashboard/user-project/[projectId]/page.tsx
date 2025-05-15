@@ -47,13 +47,13 @@ interface Commit {
   AiSummary: string | null;
   authorName: string;
   authorEmail: string;
+  authorAvatar?: string; // Optional avatar URL
   authorDate: string;
   committerName: string;
   committerEmail: string;
   committerDate: string;
   projectId: string;
   createdAt: string;
-  commitAuthorAvatar?: string; // Optional avatar URL
 }
 
 export default function UserProjectPage() {
@@ -138,8 +138,8 @@ export default function UserProjectPage() {
           {isLoading ? (
             <Skeleton className="h-8 w-64" />
           ) : (
-            <a
-              href={project?.githubUrl}
+            <Link
+              href={project ? project.githubUrl : "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground flex items-center gap-1 hover:text-primary transition-colors mb-4"
@@ -151,7 +151,7 @@ export default function UserProjectPage() {
                   ""
                 )}
               </span>
-            </a>
+            </Link>
           )}
         </div>
       </div>
@@ -281,7 +281,7 @@ export default function UserProjectPage() {
                     <>
                       <div className="relative mt-4 flex h-8 w-8 flex-none items-center justify-center bg-background rounded-full ring-1 ring-border">
                         <Image
-                          src={commit.commitAuthorAvatar || placeholderAvatar}
+                          src={commit.authorAvatar || placeholderAvatar}
                           alt={`${commit.authorName}'s avatar`}
                           className="size-8 rounded-full"
                           width={32}
@@ -295,9 +295,10 @@ export default function UserProjectPage() {
                             href={`${project?.githubUrl.replace(
                               /\.git$/,
                               ""
-                            )}/commit/${commit.commitHash}`}
+                            )}/commit/main`}
                             className="py-0.5 text-xs leading-5 text-muted-foreground"
                           >
+                            {/*  */}
                             <span className="font-medium text-foreground">
                               {commit.authorName}
                             </span>{" "}

@@ -73,7 +73,6 @@ export async function GET(request: NextRequest) {
       createdAt: commit.createdAt.toISOString(),
     }));
 
-    
     return NextResponse.json(
       {
         message: "Project commits retrieved successfully",
