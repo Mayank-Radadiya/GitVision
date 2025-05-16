@@ -16,6 +16,10 @@ const openai = new OpenAI({
 
 export async function getSummaryOfDiff(diff: string) {
   try {
+    if (!diff) {
+      console.warn("No diff provided for summary.");
+      return "No diff provided"; // Improved fallback message
+    }
     const completion = await openai.chat.completions.create({
       model: "gemini-2.0-flash",
       messages: [

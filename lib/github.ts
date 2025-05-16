@@ -1,6 +1,10 @@
+"use server";
 import { Octokit } from "octokit";
 import { db } from "@/drizzle";
 import { commitsTable, projectTables } from "@/drizzle/schema/schema";
+import axios from "axios";
+import { eq, and } from "drizzle-orm";
+import { aISummariesCommit } from "./gemini";
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
@@ -8,6 +12,29 @@ const octokit = new Octokit({
 
 function removeGitSuffix(url: string) {
   return url.endsWith(".git") ? url.slice(0, -4) : url;
+}
+
+async function fetchWithRetry(
+  url: string,
+  options: Record<string, unknown> = {},
+  retries = 3,
+  delay = 2000
+) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios.get(url, options);
+      // eslint-disable-next-line
+    } catch (error: any) {
+      if (error.response?.status === 429 && i < retries - 1) {
+        console.warn(`Rate limited. Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Max retries reached");
 }
 
 // Function to get commit hashes from a GitHub repository and store them in the database
@@ -272,6 +299,90 @@ export async function getRepositoryFiles(
     return codeFiles;
   } catch (error) {
     console.error("Error fetching repository files:", error);
+    throw error;
+  }
+}
+
+export async function getAiSummaryOfCommit(
+  githubUrl: string,
+  commitHash: string,
+  projectId: string,
+  commitId?: string
+) {
+  try {
+    // First check if the commit exists in our database
+    const existingCommit = await db
+      .select()
+      .from(commitsTable)
+      .where(
+        commitId
+          ? eq(commitsTable.id, commitId)
+          : and(
+              eq(commitsTable.commitHash, commitHash),
+              eq(commitsTable.projectId, projectId)
+            )
+      )
+      .limit(1);
+
+    if (!existingCommit || existingCommit.length === 0) {
+      throw new Error("Commit not found in database");
+    }
+
+    // Use the commit hash from the database if we have it
+    const commitHashToUse = existingCommit[0].commitHash || commitHash;
+
+    // Parse GitHub URL to get owner and repo
+    const GithubUrl = removeGitSuffix(githubUrl);
+    const [owner, repo] = GithubUrl.split("/").slice(-2);
+
+    if (!owner || !repo) {
+      throw new Error("Invalid GitHub URL.");
+    }
+
+    console.log(`Fetching diff for commit ${commitHashToUse}...`);
+
+    // Get the diff with retry mechanism
+    const { data } = await fetchWithRetry(
+      `https://github.com/${owner}/${repo}/commit/${commitHashToUse}.diff`,
+      {
+        headers: {
+          Accept: "application/vnd.github.v3.diff",
+          "User-Agent": "GitVision App (https://gitvision.vercel.app/)",
+        },
+      },
+      3, // 3 retries
+      3000 // 3 seconds delay between retries
+    );
+
+    // If diff data is too large, truncate it
+    const truncatedData =
+      data.length > 10000
+        ? data.substring(0, 10000) + "\n\n[diff truncated due to size]"
+        : data;
+
+    // Add delay before making OpenAI API call to avoid rate limiting
+    // await new Promise((resolve) => setTimeout(resolve, 500));
+
+    console.log(`Generating AI summary for commit ${commitHashToUse}...`);
+
+    // Get AI summary
+    // const aiSummary = await getSummaryOfDiff(truncatedData);
+    const aiSummary = await aISummariesCommit(truncatedData);
+
+    if (!aiSummary) {
+      return "😥 Sorry, something went wrong. No summary available.";
+    }
+
+    // Update the AI summary in the database
+    await db
+      .update(commitsTable)
+      .set({ AiSummary: aiSummary })
+      .where(eq(commitsTable.id, existingCommit[0].id));
+
+    console.log(`Updated AI summary for commit ${commitHashToUse}`);
+    return aiSummary;
+  } catch (error) {
+    console.error("Error fetching AI summary of diff:", error);
     throw error;
   }
 }

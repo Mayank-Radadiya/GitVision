@@ -4,7 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { memo, useEffect, useState } from "react";
-
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 interface ProviderProps {
   children: React.ReactNode;
 }
@@ -41,6 +41,7 @@ const MemoizedToaster = memo(() => (
 MemoizedToaster.displayName = "MemoizedToaster";
 
 const Provider = ({ children }: ProviderProps) => {
+  const queryClient = new QueryClient();
   // Using this to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
 
@@ -72,21 +73,23 @@ const Provider = ({ children }: ProviderProps) => {
 
   return (
     <ClerkProvider>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem
-        enableColorScheme
-        disableTransitionOnChange={false}
-      >
-        {/* Only render UI when mounted to prevent hydration mismatch */}
-        {mounted && (
-          <>
-            <MemoizedToaster />
-            {children}
-          </>
-        )}
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          enableColorScheme
+          disableTransitionOnChange={false}
+        >
+          {/* Only render UI when mounted to prevent hydration mismatch */}
+          {mounted && (
+            <>
+              <MemoizedToaster />
+              {children}
+            </>
+          )}
+        </ThemeProvider>
+      </QueryClientProvider>
     </ClerkProvider>
   );
 };
