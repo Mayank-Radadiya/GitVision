@@ -281,8 +281,7 @@ export default function SignUpForm() {
                         </p>
                       )}
                     </div>
-                    {/* This is required for Smart CAPTCHA */}
-                    <div id="clerk-captcha" className="mt-5" />
+
                     <Button
                       type="submit"
                       disabled={isLoading}
@@ -368,6 +367,9 @@ export default function SignUpForm() {
                   Privacy Policy
                 </Link>
               </p>
+
+              {/* This is required for Smart CAPTCHA */}
+              <div id="clerk-captcha" className="mt-5" />
             </motion.div>
           </div>
         </>

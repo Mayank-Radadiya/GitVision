@@ -1,4 +1,4 @@
-import {  NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/drizzle";
 import { usersTable } from "@/drizzle/schema/schema";
 import { eq } from "drizzle-orm";
@@ -27,13 +27,18 @@ export async function POST() {
       .where(eq(usersTable.email, email))
       .limit(1);
 
-    // If user exists, return appropriate response
-    if (existingUser.length > 0) {
-      return NextResponse.json(
-        { error: "User with this email already exists", user: existingUser[0] },
-        { status: 409 }
-      );
-    }
+    // If user exists, then update the user
+    const updatedUser = await db
+      .update(usersTable)
+      .set({
+        name: name || "unknown", // Use provided name or default
+        email: email, // Add the email field
+        credits: 100, // Default credits
+        isProUser: false, // Default to free user
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.email, email))
+      .returning();
 
     // If user doesn't exist, create a new user
     const newUser = await db
@@ -51,7 +56,10 @@ export async function POST() {
 
     // Return success response with the created user
     return NextResponse.json(
-      { message: "User created successfully", user: newUser[0] },
+      {
+        message: "User created successfully",
+        user: newUser[0] ? newUser[0] : updatedUser[0],
+      },
       { status: 201 }
     );
   } catch (error) {
