@@ -18,19 +18,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "../ui/label";
 import CustomToggleButton from "../custom/mode-toggle";
 import { useRouter } from "next/navigation";
-import { useSignUp } from "@clerk/nextjs";
+import { useSignUp, useUser } from "@clerk/nextjs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { signUpZodSchema } from "@/zodSchema/signUp.schema";
-import VerifyEmail from "./verify-email";
 import { ClerkAPIError } from "@clerk/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import toast from "react-hot-toast";
 import axios from "axios";
 
+import dynamic from "next/dynamic";
+import { Loader } from "../custom/Loader";
+const VerifyEmail = dynamic(() => import("./verify-email"), {
+  loading: () => <Loader />,
+});
+
 export default function SignUpForm() {
   const router = useRouter();
+  //  Basic state management
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] =
@@ -40,7 +46,7 @@ export default function SignUpForm() {
   const [emailCode, setEmailCode] = useState(["", "", "", "", "", ""]);
   const { signUp, isLoaded, setActive } = useSignUp();
 
-  // Form
+  // react-hook-form setup
   const {
     register,
     handleSubmit,
@@ -54,6 +60,7 @@ export default function SignUpForm() {
     resolver: zodResolver(signUpZodSchema),
   });
 
+  // Function to handle sign up when user submits the form and generate email verification code
   const handleSignUp = async (data: z.infer<typeof signUpZodSchema>) => {
     if (!isLoaded) return;
 
@@ -84,23 +91,29 @@ export default function SignUpForm() {
     }
   };
 
+  // Verification function to handle email verification and create new user
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     if (!isLoaded) return;
     try {
+      // Check if the email code is valid
       const result = await signUp?.attemptEmailAddressVerification({
         code: emailCode.join(""),
       });
 
+      // check if the verification was successful
       if (result?.status === "complete") {
         await setActive({ session: result.createdSessionId });
         toast.success("Email verified successfully.");
       }
 
+      // if the verification was successful, create a new user in the database
       await axios.post("/api/auth/createNewUser");
-
       toast.success("User created successfully.");
+      setVerifying(false);
+
+      // Redirect to the dashboard after successful verification
       router.push("/dashboard");
     } catch (error) {
       if (isClerkAPIResponseError(error)) setError(error.errors);
@@ -356,28 +369,6 @@ export default function SignUpForm() {
                 </Link>
               </p>
             </motion.div>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="mt-4 p-4 rounded-xl border border-destructive/30 dark:border-destructive/40 backdrop-blur-md bg-destructive/10 dark:bg-destructive/20/30 shadow-sm"
-              >
-                <h3 className="text-sm font-semibold text-destructive dark:text-destructive/90">
-                  Sign In Error:
-                </h3>
-                <div className="mt-2 space-y-1 list-disc list-inside">
-                  {error.map((el, index) => (
-                    <div
-                      key={index}
-                      className="text-sm text-destructive/80 dark:text-destructive/80"
-                    >
-                      {el.longMessage}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
           </div>
         </>
       ) : (

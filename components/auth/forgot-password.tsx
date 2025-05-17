@@ -23,7 +23,6 @@ import { useRouter } from "next/navigation";
 import { useSignIn } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
-
 export default function ForgotPassword() {
   const router = useRouter();
   const emailRef = useRef<HTMLInputElement>(null);
@@ -156,10 +155,10 @@ export default function ForgotPassword() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending link...
+                    Sending Code...
                   </>
                 ) : (
-                  "Send reset link"
+                  "Send reset code"
                 )}
               </Button>
             </form>

@@ -1,4 +1,4 @@
-import SignInForm from "@/components/auth/signi-In-form";
+import SignInForm from "@/components/auth/sign-In-form";
 import { NextPage } from "next";
 
 const Page: NextPage = ({}) => {

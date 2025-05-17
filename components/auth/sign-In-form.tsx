@@ -24,7 +24,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
 import { useRouter } from "next/navigation";
-
 import { useSignIn } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
@@ -148,7 +147,7 @@ export default function SignInForm() {
                   type="email"
                   placeholder="name@example.com"
                   required
-                  className="h-11 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
+                  className="h-11 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors mt-1.5"
                   aria-invalid={!!errors.email}
                 />
                 {errors.email && (

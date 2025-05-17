@@ -212,7 +212,7 @@ export default function ResetPassword() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter new password"
                     required
-                    className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
+                    className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors mt-1.5"
                     aria-invalid={!!errors.password}
                   />
                   <Button
@@ -248,7 +248,7 @@ export default function ResetPassword() {
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Confirm new password"
                     required
-                    className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors"
+                    className="h-11 pr-10 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors mt-1.5"
                     aria-invalid={!!errors.confirmPassword}
                   />
                   <Button
