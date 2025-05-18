@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { repositoryZodSchema } from "@/zodSchema/repository.schema";
-import { createNewProject, getCommitHashes } from "@/lib/github";
+import {
+  createNewProject,
+  getCommitHashes,
+  getRepositoryFiles,
+} from "@/lib/github";
 import { auth } from "@clerk/nextjs/server";
 
 // This API route handles the creation of a new project
@@ -45,7 +49,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await getCommitHashes(repoUrl, projectId);
+    // store commit hashes and files in the database without await
+    getCommitHashes(repoUrl, projectId);
+    // get files from the repository and store them in the database
+    // This function should be called without await to avoid blocking
+    getRepositoryFiles(owner, repo, projectId);
+
     // Return success response with project details
     return NextResponse.json({
       success: true,

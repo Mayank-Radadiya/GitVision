@@ -71,6 +71,9 @@ export default function UserProjectPage() {
   const [generatingCommitId, setGeneratingCommitId] = useState<string | null>(
     null
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCommits, setTotalCommits] = useState(0);
 
   const { mutate: AiSummary } = useMutation({
     mutationFn: ({
@@ -131,6 +134,36 @@ export default function UserProjectPage() {
     return truncateMessage(firstLine, 100);
   };
 
+  // Function to fetch commits with pagination
+  const fetchCommits = async (page = 1) => {
+    try {
+      setIsLoading(true);
+      const commitsResponse = await axios.get(
+        `/api/project/getProjectCommits?projectId=${params.projectId}&limit=10&page=${page}`
+      );
+      setCommits(commitsResponse.data.commits);
+      setTotalPages(commitsResponse.data.pagination.totalPages);
+      setTotalCommits(commitsResponse.data.pagination.total);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error("Error fetching commits:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    fetchCommits(page);
+    // Scroll to top of commit section
+    const commitSection = document.getElementById("commits-section");
+    if (commitSection) {
+      commitSection.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   useEffect(() => {
     if (!isSignedIn) {
       return;
@@ -146,11 +179,8 @@ export default function UserProjectPage() {
         );
         setProject(projectResponse.data.project);
 
-        // Fetch commits
-        const commitsResponse = await axios.get(
-          `/api/project/getProjectCommits?projectId=${params.projectId}&limit=10`
-        );
-        setCommits(commitsResponse.data.commits);
+        // Fetch commits with pagination
+        await fetchCommits(currentPage);
       } catch (error) {
         console.error("Error fetching project data:", error);
       } finally {
@@ -329,7 +359,7 @@ export default function UserProjectPage() {
       </div>
 
       {/* Recent Commits with AI Summary */}
-      <div className="mt-8 max-w-screen-2xl mx-auto ">
+      <div id="commits-section" className="mt-8 max-w-screen-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-semibold">Recent Commits</h2>
           <div className="text-sm text-muted-foreground flex items-center gap-2">
@@ -461,6 +491,72 @@ export default function UserProjectPage() {
                 );
               })}
             </ul>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex justify-center">
+                <div className="inline-flex items-center gap-1 rounded-md border border-muted bg-background px-3 py-2 shadow-sm">
+                  {/* First Page */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    aria-label="First page"
+                  >
+                    <span className="sr-only">First</span>«
+                  </Button>
+
+                  {/* Prev Page */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    aria-label="Previous page"
+                  >
+                    <span className="sr-only">Previous</span>←
+                  </Button>
+
+                  {/* Page Info */}
+                  <span className="px-2 text-sm font-medium text-muted-foreground">
+                    Page <span className="text-foreground">{currentPage}</span>{" "}
+                    of <span className="text-foreground">{totalPages}</span>
+                  </span>
+
+                  {/* Next Page */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    aria-label="Next page"
+                  >
+                    <span className="sr-only">Next</span>→
+                  </Button>
+
+                  {/* Last Page */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                    aria-label="Last page"
+                  >
+                    <span className="sr-only">Last</span>»
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Commit count info */}
+            <div className="text-xs text-muted-foreground text-center mt-4">
+              Showing {commits.length} of {totalCommits} commits
+            </div>
           </div>
         ) : (
           <>

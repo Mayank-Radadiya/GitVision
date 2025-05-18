@@ -5,7 +5,7 @@ import {
   projectTables,
   userProjectsTable,
 } from "@/drizzle/schema/schema";
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, or, count } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 
 export async function GET(request: NextRequest) {
@@ -14,7 +14,11 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get("projectId");
     const limit = searchParams.get("limit")
       ? parseInt(searchParams.get("limit")!)
-      : 30;
+      : 10;
+    const page = searchParams.get("page")
+      ? parseInt(searchParams.get("page")!)
+      : 1;
+    const offset = (page - 1) * limit;
 
     // Get the authenticated user from the Clerk session
     const { userId } = await auth();
@@ -57,13 +61,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get project commits
+    // Get total number of commits for pagination
+    const commitsCountResult = await db
+      .select({ count: count() })
+      .from(commitsTable)
+      .where(eq(commitsTable.projectId, projectId));
+
+    const totalCommits = commitsCountResult[0]?.count || 0;
+
+    // Get project commits with pagination
     const commits = await db
       .select()
       .from(commitsTable)
       .where(eq(commitsTable.projectId, projectId))
       .orderBy(desc(commitsTable.authorDate))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
     // Format dates to strings
     const formattedCommits = commits.map((commit) => ({
@@ -77,6 +90,12 @@ export async function GET(request: NextRequest) {
       {
         message: "Project commits retrieved successfully",
         commits: formattedCommits,
+        pagination: {
+          total: totalCommits,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCommits / limit),
+        },
       },
       { status: 200 }
     );
