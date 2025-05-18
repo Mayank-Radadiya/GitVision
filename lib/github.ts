@@ -25,8 +25,17 @@ async function fetchWithRetry(
       return await axios.get(url, options);
       // eslint-disable-next-line
     } catch (error: any) {
-      if (error.response?.status === 429 && i < retries - 1) {
-        console.warn(`Rate limited. Retrying in ${delay}ms...`);
+      // Retry on rate limits (429) or temporary failures (404, 500, 502, 503, 504)
+      if (
+        (error.response?.status === 429 ||
+          error.response?.status === 404 ||
+          error.response?.status >= 500) &&
+        i < retries - 1
+      ) {
+        const statusCode = error.response?.status;
+        console.warn(
+          `Request failed with status ${statusCode}. Retrying in ${delay}ms...`
+        );
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2; // Exponential backoff
       } else {
@@ -341,32 +350,133 @@ export async function getAiSummaryOfCommit(
 
     console.log(`Fetching diff for commit ${commitHashToUse}...`);
 
-    // Get the diff with retry mechanism
-    const { data } = await fetchWithRetry(
-      `https://github.com/${owner}/${repo}/commit/${commitHashToUse}.diff`,
-      {
-        headers: {
-          Accept: "application/vnd.github.v3.diff",
-          "User-Agent": "GitVision App (https://gitvision.vercel.app/)",
-        },
+    // Extract commit message for fallback scenario
+    const commitMessage =
+      existingCommit[0].commitMessage || "No message available";
+    let diffData = "";
+
+    // Define all methods to try for fetching diff data
+    const fetchMethods = [
+      // Method 1: Raw diff URL with retry
+      async () => {
+        const { data } = await fetchWithRetry(
+          `https://github.com/${owner}/${repo}/commit/${commitHashToUse}.diff`,
+          {
+            headers: {
+              Accept: "application/vnd.github.v3.diff",
+              "User-Agent": "GitVision App (https://gitvision.vercel.app/)",
+            },
+          },
+          3,
+          3000
+        );
+        return data;
       },
-      3, // 3 retries
-      3000 // 3 seconds delay between retries
-    );
 
-    // If diff data is too large, truncate it
+      // if the first method fails, try the second method
+      // Method 2: GitHub API with diff media type
+      async () => {
+        try {
+          const response = await octokit.request(
+            "GET /repos/{owner}/{repo}/commits/{commit_sha}",
+            {
+              owner,
+              repo,
+              commit_sha: commitHashToUse,
+              headers: {
+                accept: "application/vnd.github.v3.diff",
+              },
+            }
+          );
+
+          if (typeof response.data === "string") {
+            return response.data;
+          } else if (response.data && response.data.files) {
+            return response.data.files
+              .map((file: any) => {
+                const fileHeader =
+                  file.status === "renamed"
+                    ? `diff --git a/${file.previous_filename || "unknown"} b/${
+                        file.filename
+                      }\n`
+                    : `diff --git a/${file.filename} b/${file.filename}\n`;
+
+                return `${fileHeader}${file.patch || ""}`;
+              })
+              .join("\n\n");
+          }
+          throw new Error("Unexpected response format");
+        } catch (err) {
+          // Try one more variation of the API call
+          const { data } = await octokit.request(
+            "GET /repos/{owner}/{repo}/commits/{commit_sha}",
+            {
+              owner,
+              repo,
+              commit_sha: commitHashToUse,
+            }
+          );
+
+          if (data && data.files) {
+            return data.files
+              .map((file: any) => {
+                const fileHeader =
+                  file.status === "renamed"
+                    ? `diff --git a/${file.previous_filename || "unknown"} b/${
+                        file.filename
+                      }\n`
+                    : `diff --git a/${file.filename} b/${file.filename}\n`;
+
+                return `${fileHeader}${file.patch || ""}`;
+              })
+              .join("\n\n");
+          }
+          throw new Error("Could not extract diff data from response");
+        }
+      },
+    ];
+
+    // Try each method in sequence until one works
+    for (let i = 0; i < fetchMethods.length; i++) {
+      try {
+        diffData = await fetchMethods[i]();
+        if (
+          diffData &&
+          typeof diffData === "string" &&
+          diffData.trim().length > 0
+        ) {
+          break; // We got valid data, stop trying other methods
+        }
+      } catch (err) {
+        console.warn(
+          `Method ${i + 1} failed:`,
+          err instanceof Error ? err.message : "Unknown error"
+        );
+        // Continue to next method if this one failed
+      }
+    }
+
+    // If all methods failed, use commit message as fallback
+    if (
+      !diffData ||
+      typeof diffData !== "string" ||
+      diffData.trim().length === 0
+    ) {
+      console.warn(
+        "All methods to fetch diff failed, using commit message as fallback"
+      );
+      diffData = `Commit: ${commitHashToUse}\nMessage: ${commitMessage}\n\nNo diff data available.`;
+    }
+
+    // Truncate if needed
     const truncatedData =
-      data.length > 10000
-        ? data.substring(0, 10000) + "\n\n[diff truncated due to size]"
-        : data;
-
-    // Add delay before making OpenAI API call to avoid rate limiting
-    // await new Promise((resolve) => setTimeout(resolve, 500));
+      diffData.length > 10000
+        ? diffData.substring(0, 10000) + "\n\n[diff truncated due to size]"
+        : diffData;
 
     console.log(`Generating AI summary for commit ${commitHashToUse}...`);
 
     // Get AI summary
-    // const aiSummary = await getSummaryOfDiff(truncatedData);
     const aiSummary = await aISummariesCommit(truncatedData);
 
     if (!aiSummary) {
@@ -383,6 +493,7 @@ export async function getAiSummaryOfCommit(
     return aiSummary;
   } catch (error) {
     console.error("Error fetching AI summary of diff:", error);
-    throw error;
+    // Return a user-friendly error message instead of throwing
+    return "😥 Could not generate AI summary. Please try again later.";
   }
 }

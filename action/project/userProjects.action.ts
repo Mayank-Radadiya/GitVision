@@ -1,6 +1,8 @@
-"use client";
+"use server";
 
-import axios from "axios";
+import { db } from "@/drizzle";
+import { projectTables, userProjectsTable } from "@/drizzle/schema/schema";
+import { eq, desc, or } from "drizzle-orm";
 
 export interface UserProject {
   id: string;
@@ -27,12 +29,42 @@ export const getUserProjects = async (
   }
 
   try {
-    const response = await axios.get(
-      `/api/project/getUserProject?userId=${userId}`
-    );
-    const { userProjects } = response.data;
+    // Get user projects (both owned and collaborative)
+    const userProjects = await db
+      .select({
+        id: projectTables.id,
+        projectName: projectTables.projectName,
+        githubUrl: projectTables.githubUrl,
+        star: projectTables.star,
+        forks: projectTables.forks,
+        totalCommits: projectTables.totalCommits,
+        totalBranches: projectTables.totalBranches,
+        totalContributors: projectTables.totalContributors,
+        createdAt: projectTables.createdAt,
+        updatedAt: projectTables.updatedAt,
+      })
+      .from(projectTables)
+      .leftJoin(
+        userProjectsTable,
+        eq(userProjectsTable.projectId, projectTables.id)
+      )
+      .where(
+        or(
+          eq(projectTables.ownerId, userId),
+          eq(userProjectsTable.userId, userId)
+        )
+      )
+      .orderBy(desc(projectTables.createdAt));
 
-    return userProjects || [];
+    // Format dates to strings
+    const formattedProjects = userProjects.map((project) => ({
+      ...project,
+      createdAt: project.createdAt.toISOString(),
+      updatedAt: project.updatedAt.toISOString(),
+    }));
+
+    // Return the projects
+    return formattedProjects;
   } catch (error) {
     console.error("Error fetching user projects:", error);
     throw new Error("Failed to fetch user projects");

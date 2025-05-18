@@ -13,46 +13,31 @@ export const aISummariesCommit = async (diff: string) => {
   // https//github.com/OwnerName/repoName/commit/commitHash/diff
   //https://github.com/Mayank-Radadiya/Sundown-Studio/commit/5c18b1c3e7efacd7e621f7a9aaeeedbd55ac2211.diff
   const response = await model.generateContent([
-    `You are an expert programmer, and you are trying to summarize a git diff.
-    Reminders about the git diff format:
-    For every file, there are a few metadata lines, like (for example):
-    \`\`\`
-    diff --git a/lib/index.js b/lib/index.js
-    index aadf691..bfef603 100644
-    --- a/lib/index.js
-    +++ b/lib/index.js
-    \`\`\`
-    This means that \`lib/index.js\` was modified in this commit. Note that this is only an example.
-    Then there is a specifier of the lines that were modified.
-    A line starting with \`+\` means it was added.
-    A line that starting with \`-\` means that line was deleted.
-    A line that starts with neither \`+\` nor \`-\` is code given for context and better understanding.
-    It is not part of the diff.
-    [...]
-    EXAMPLE SUMMARY COMMENTS:
-    \`\`\`
-    Your summary should do more than list what was added or removed — it should explain:
+    `You are an expert software engineer reviewing a Git diff. Your task is to generate a clear, structured summary of the changes.
 
-    1. **What was changed** (e.g., variables, functions, modules, logic, syntax)  
-    2. **Where it was changed** (file names, functions, components, etc.)  
-    3. **Why the change was made** (bug fix, performance improvement, feature addition, refactor, etc.)  
-    4. **How the behavior changed** (previous vs. new behavior)  
-    5. **Impact of the change** (on user experience, performance, readability, or maintainability)
+🔹 Git diff format reminders:
+- File changes start like:
+  diff --git a/path/file.js b/path/file.js
+- Lines beginning with \`+\` were **added
+- Lines beginning with \`-\` were --removed
+- Other lines are for ->context only
 
-    * Raised the amount of returned recordings from \`10\` to \`100\` [packages/server/recordings_api.ts], [packages/server/constants.ts]
-    * Fixed a typo in the github action name [.github/workflows/gpt-commit-summarizer.yml]
-    * Moved the \`octokit\` initialization to a separate file [src/octokit.ts], [src/index.ts]
-    * Added an OpenAI API for completions [packages/utils/apis/openai.ts]
-    * Lowered numeric tolerance for test files
-    \`\`\`
-    Most commits will have less comments than this examples list.
-    The last comment does not include the file names,
-    because there were more than two relevant files in the hypothetical commit.
-    Do not include parts of the example in your summary.
-    It is given only as an example of appropriate comments.`,
-    `Please summaries the following diff file: 
-      \n\n ${diff}
-      `,
+🔹 Your summary should include:
+1. What changed** – functions, logic, variables, structure, etc.
+2. Where it changed** – file names, modules, functions, or components
+3. Why it changed** – purpose of the change (bug fix, feature, refactor, etc.)
+4. How behavior changed** – describe before vs after if relevant
+5. Impact** – performance, readability, usability, maintainability, etc.
+
+🔹 Example format (do not copy this into your summary):
+* Increased max recordings returned from 10 to 100 [server/api.ts, constants.ts]
+* Fixed typo in GitHub workflow [.github/workflows/build.yml]
+* Moved Octokit setup to separate module [src/octokit.ts, src/index.ts]
+
+Now summarize the following Git diff:
+
+${diff}
+`,
   ]);
   return response.response.text();
 };
