@@ -392,21 +392,25 @@ export async function getAiSummaryOfCommit(
           if (typeof response.data === "string") {
             return response.data;
           } else if (response.data && response.data.files) {
-            return response.data.files
-              .map((file: any) => {
-                const fileHeader =
-                  file.status === "renamed"
-                    ? `diff --git a/${file.previous_filename || "unknown"} b/${
-                        file.filename
-                      }\n`
-                    : `diff --git a/${file.filename} b/${file.filename}\n`;
+            return (
+              response.data.files
+                // eslint-disable-next-line
+                .map((file: any) => {
+                  const fileHeader =
+                    file.status === "renamed"
+                      ? `diff --git a/${
+                          file.previous_filename || "unknown"
+                        } b/${file.filename}\n`
+                      : `diff --git a/${file.filename} b/${file.filename}\n`;
 
-                return `${fileHeader}${file.patch || ""}`;
-              })
-              .join("\n\n");
+                  return `${fileHeader}${file.patch || ""}`;
+                })
+                .join("\n\n")
+            );
           }
           throw new Error("Unexpected response format");
         } catch (err) {
+          console.warn("Method 2 failed, trying method 3...", err);
           // Try one more variation of the API call
           const { data } = await octokit.request(
             "GET /repos/{owner}/{repo}/commits/{commit_sha}",
@@ -418,18 +422,21 @@ export async function getAiSummaryOfCommit(
           );
 
           if (data && data.files) {
-            return data.files
-              .map((file: any) => {
-                const fileHeader =
-                  file.status === "renamed"
-                    ? `diff --git a/${file.previous_filename || "unknown"} b/${
-                        file.filename
-                      }\n`
-                    : `diff --git a/${file.filename} b/${file.filename}\n`;
+            return (
+              data.files
+                // eslint-disable-next-line
+                .map((file: any) => {
+                  const fileHeader =
+                    file.status === "renamed"
+                      ? `diff --git a/${
+                          file.previous_filename || "unknown"
+                        } b/${file.filename}\n`
+                      : `diff --git a/${file.filename} b/${file.filename}\n`;
 
-                return `${fileHeader}${file.patch || ""}`;
-              })
-              .join("\n\n");
+                  return `${fileHeader}${file.patch || ""}`;
+                })
+                .join("\n\n")
+            );
           }
           throw new Error("Could not extract diff data from response");
         }
