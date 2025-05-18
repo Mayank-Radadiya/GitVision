@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ const navigation = [
   { name: "Contact", href: "#footer" },
 ];
 
-export function LandingHeader() {
+function LandingHeader() {
   const { user } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -205,3 +205,5 @@ export function LandingHeader() {
     </header>
   );
 }
+
+export default memo(LandingHeader);

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { db } from "@/drizzle";
+"use server";
+
+import { auth } from "@clerk/nextjs/server";
 import {
   usersTable,
   projectTables,
@@ -8,20 +9,21 @@ import {
   userProjectsTable,
 } from "@/drizzle/schema/schema";
 import { eq, or, count, sql } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { db } from "@/drizzle";
 
-export async function GET() {
+interface dashboardInfo {
+  totalProjects: number;
+  totalCommits: number;
+  totalFiles: number;
+  userCredits: number;
+}
+
+export async function getUserDashboardInfo(): Promise<dashboardInfo> {
   try {
-    // Get the authenticated user from the Clerk session
     const { userId } = await auth();
-
     if (!userId) {
-      return NextResponse.json(
-        {
-          error:
-            "Unauthorized. Please sign in to access your dashboard information.",
-        },
-        { status: 401 }
+      throw new Error(
+        "Unauthorized. Please sign in to access your dashboard information."
       );
     }
 
@@ -54,10 +56,10 @@ export async function GET() {
         or(
           eq(projectTables.ownerId, userId),
           sql`EXISTS (
-            SELECT 1 FROM ${userProjectsTable}
-            WHERE ${userProjectsTable.projectId} = ${projectTables.id}
-            AND ${userProjectsTable.userId} = ${userId}
-          )`
+                SELECT 1 FROM ${userProjectsTable}
+                WHERE ${userProjectsTable.projectId} = ${projectTables.id}
+                AND ${userProjectsTable.userId} = ${userId}
+              )`
         )
       );
 
@@ -72,10 +74,10 @@ export async function GET() {
         or(
           eq(projectTables.ownerId, userId),
           sql`EXISTS (
-            SELECT 1 FROM ${userProjectsTable}
-            WHERE ${userProjectsTable.projectId} = ${projectTables.id}
-            AND ${userProjectsTable.userId} = ${userId}
-          )`
+                SELECT 1 FROM ${userProjectsTable}
+                WHERE ${userProjectsTable.projectId} = ${projectTables.id}
+                AND ${userProjectsTable.userId} = ${userId}
+              )`
         )
       );
 
@@ -91,23 +93,15 @@ export async function GET() {
     const totalFiles = Number(filesQuery[0]?.count || 0);
     const userCredits = Number(userCreditsQuery[0]?.credits || 0);
 
-    return NextResponse.json(
-      {
-        message: "Dashboard information retrieved successfully",
-        dashboardInfo: {
-          totalProjects,
-          totalCommits,
-          totalFiles,
-          userCredits,
-        },
-      },
-      { status: 200 }
-    );
+    return {
+      totalProjects,
+      totalCommits,
+      totalFiles,
+      userCredits,
+    };
+    
   } catch (error) {
-    console.error("Error fetching dashboard information:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch dashboard information" },
-      { status: 500 }
-    );
+    console.error("Error fetching user dashboard info:", error);
+    throw new Error("Failed to fetch user dashboard info");
   }
 }

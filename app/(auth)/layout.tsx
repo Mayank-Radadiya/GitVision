@@ -16,7 +16,7 @@ export default function AuthLayout({
     if (isLoaded && user) {
       router.push("/dashboard");
     }
-  }, [isLoaded, user]);
+  }, [isLoaded, user, router]);
 
   if (!isLoaded) return <Loader />; // optional: show a loader
 

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { TwitterIcon, GithubIcon, LinkedinIcon, MailIcon } from "lucide-react";
 import Image from "next/image";
+import { memo } from "react";
 
-export function Footer() {
+function Footer() {
   return (
     <footer
       id="footer"
@@ -109,3 +110,5 @@ export function Footer() {
     </footer>
   );
 }
+
+export default memo(Footer);

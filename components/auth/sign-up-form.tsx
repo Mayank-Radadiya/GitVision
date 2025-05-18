@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "../ui/label";
 import CustomToggleButton from "../custom/mode-toggle";
 import { useRouter } from "next/navigation";
-import { useSignUp, useUser } from "@clerk/nextjs";
+import { useSignUp } from "@clerk/nextjs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";

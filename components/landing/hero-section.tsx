@@ -92,7 +92,7 @@ const GitHubBadge = ({ className = "" }) => (
   </motion.div>
 );
 
-export function HeroSection() {
+function HeroSection() {
   const [repoUrl, setRepoUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFloatingElements, setShowFloatingElements] = useState(false);
@@ -345,3 +345,5 @@ export function HeroSection() {
     </LazyMotion>
   );
 }
+
+export default memo(HeroSection);

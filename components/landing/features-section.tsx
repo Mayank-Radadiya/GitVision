@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, memo } from "react";
 import { motion, useInView } from "framer-motion";
 import {
   GitBranchIcon,
@@ -71,7 +71,7 @@ const features = [
   },
 ];
 
-export function FeaturesSection() {
+function FeaturesSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -215,3 +215,5 @@ export function FeaturesSection() {
     </section>
   );
 }
+
+export default memo(FeaturesSection);

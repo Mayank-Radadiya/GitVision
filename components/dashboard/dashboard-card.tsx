@@ -1,8 +1,8 @@
-import React from "react";
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { memo } from "react";
 
 interface DashboardCardProps {
   number: number;
@@ -126,4 +126,4 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   );
 };
 
-export default DashboardCard;
+export default memo(DashboardCard);

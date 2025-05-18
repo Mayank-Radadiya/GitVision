@@ -21,11 +21,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { repositoryZodSchema } from "@/zodSchema/repository.schema";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
-export default function AddRepositoryForm() {
+export default function CreateNewProjectForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
+  const queryClient = useQueryClient();
   // Form
   const {
     register,
@@ -53,6 +54,10 @@ export default function AddRepositoryForm() {
         throw new Error("Failed to add repository");
       }
       toast.success("New project created successfully!");
+
+      await queryClient.refetchQueries({ queryKey: ["dashboardInfo"] });
+      await queryClient.refetchQueries({ queryKey: ["userProjects"] });
+
       router.push("/dashboard");
     } catch (error) {
       console.error("Error adding repository:", error);

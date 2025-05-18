@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, memo } from "react";
 import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,7 +78,7 @@ const plans = [
   },
 ];
 
-export function PricingSection() {
+function PricingSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -108,7 +108,6 @@ export function PricingSection() {
 
   return (
     <section id="pricing" ref={ref} className="py-10 relative overflow-hidden">
-
       {/* Content container */}
       <div className="container max-w-7xl mx-auto px-4">
         <motion.div
@@ -260,3 +259,5 @@ export function PricingSection() {
     </section>
   );
 }
+
+export default memo(PricingSection);

@@ -252,7 +252,7 @@ const Page = () => {
                 variant="outline"
                 className="w-full"
                 onClick={() =>
-                  (window.location.href = "/dashboard/add-repository")
+                  (window.location.href = "/dashboard/create-project")
                 }
               >
                 Add New Repository

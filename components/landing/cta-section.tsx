@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, memo } from "react"
 import Link from "next/link"
 import { motion, useInView } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { SparklesCore } from "../animation/sparkles"
 import { GlowingButton } from "../custom/glowing-button"
 
 
-export function CtaSection() {
+ function CtaSection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: "-100px" })
 
@@ -70,3 +70,6 @@ export function CtaSection() {
     </section>
   )
 }
+
+
+export default memo(CtaSection)

@@ -3,8 +3,12 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "react-hot-toast";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+
 interface ProviderProps {
   children: React.ReactNode;
 }
@@ -20,6 +24,7 @@ const MemoizedToaster = memo(() => (
         boxShadow: "0 3px 10px rgba(0, 0, 0, 0.2)",
         borderRadius: "8px",
         padding: "6px",
+        paddingLeft: "10px",
         fontSize: "15px",
         fontWeight: "500",
         lineHeight: "1.5",
@@ -41,9 +46,40 @@ const MemoizedToaster = memo(() => (
 MemoizedToaster.displayName = "MemoizedToaster";
 
 const Provider = ({ children }: ProviderProps) => {
-  const queryClient = new QueryClient();
+  // Create a client
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000, // 5 minutes
+            gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime in v4)
+            refetchOnWindowFocus: false,
+            retry: (failureCount, error) => {
+              // Retry network errors but not others
+              if (error instanceof Error && "isAxiosError" in error) {
+                // Retry network errors up to 3 times
+                return failureCount < 3;
+              }
+              return false; // Don't retry other errors
+            },
+          },
+        },
+      })
+  );
+
   // Using this to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
+
+  // Create storage persister
+  const [persistor] = useState(() => {
+    if (typeof window === "undefined") return;
+
+    return createSyncStoragePersister({
+      storage: window.localStorage,
+      key: "GITVISION_REACT_QUERY_CACHE",
+    });
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -73,7 +109,27 @@ const Provider = ({ children }: ProviderProps) => {
 
   return (
     <ClerkProvider>
-      <QueryClientProvider client={queryClient}>
+      {mounted && persistor ? (
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: persistor,
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          }}
+        >
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            enableColorScheme
+            disableTransitionOnChange={false}
+          >
+            <MemoizedToaster />
+            {children}
+            <ReactQueryDevtools initialIsOpen={false} />
+          </ThemeProvider>
+        </PersistQueryClientProvider>
+      ) : (
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -81,15 +137,10 @@ const Provider = ({ children }: ProviderProps) => {
           enableColorScheme
           disableTransitionOnChange={false}
         >
-          {/* Only render UI when mounted to prevent hydration mismatch */}
-          {mounted && (
-            <>
-              <MemoizedToaster />
-              {children}
-            </>
-          )}
+          {/* Empty placeholder while client initializes */}
+          <div style={{ visibility: "hidden" }}></div>
         </ThemeProvider>
-      </QueryClientProvider>
+      )}
     </ClerkProvider>
   );
 };

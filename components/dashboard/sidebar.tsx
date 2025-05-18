@@ -30,7 +30,7 @@ const Sidebar = () => {
     },
     {
       name: "Add Repository",
-      href: "/add",
+      href: "/dashboard/create-project",
       icon: PlusCircle,
     },
     {

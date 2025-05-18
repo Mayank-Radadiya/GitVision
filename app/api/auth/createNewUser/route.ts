@@ -21,7 +21,7 @@ export async function POST() {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
     // Check if user already exists with the provided email
-    const existingUser = await db
+     await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.email, email))
