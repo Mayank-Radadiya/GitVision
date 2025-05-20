@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation } from "@tanstack/react-query";
 import { getAiSummaryOfCommit } from "@/lib/github";
 import { StatItem } from "../_components/StatItem";
-import NoCommitFound from "./NoCommitFound";
+import NoCommitFound from "../_components/NoCommitFound";
 
 // Define interfaces
 interface ProjectDetails {

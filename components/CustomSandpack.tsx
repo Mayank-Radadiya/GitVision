@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import {
   SandpackProvider,
   SandpackLayout,
@@ -8,9 +8,10 @@ import {
   SandpackFileExplorer,
 } from "@codesandbox/sandpack-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { dracula } from "@codesandbox/sandpack-themes";
 
 interface CustomSandpackProps {
-  projectId?: string;
+  projectId: string;
 }
 
 const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
@@ -93,32 +94,32 @@ const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
     );
   }
 
-  // // Custom loading animation elements
-  // const loadingIndicator = (
-  //   <div className="sp-loading">
-  //     <div className="sp-loading-content">
-  //       <div>Loading code files...</div>
-  //       <div>
-  //         <span className="sp-loading-dot"></span>
-  //         <span className="sp-loading-dot"></span>
-  //         <span className="sp-loading-dot"></span>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
-
   return (
-    <div className="w-full min-h-[500px] border rounded-md overflow-hidden gitvision-code-viewer">
-      <SandpackProvider files={files} theme="dark" template="vanilla">
-        <SandpackLayout>
-          <SandpackFileExplorer style={{ height: "80vh" }} />
+    <div className="w-full min-h-[500px] border rounded-md overflow-hidden gitvision-code-viewer bg-muted">
+      <SandpackProvider files={files} theme={dracula} template="vanilla">
+        <SandpackLayout className="flex border-t">
+          <SandpackFileExplorer
+            style={{
+              height: "85vh",
+              padding: "0.75rem",
+              borderRight: "1px solid #1e293b", // slate-800
+              overflowY: "auto",
+              fontSize: "15px",
+              fontFamily: "'Fira Code', monospace",
+            }}
+          />
           <SandpackCodeEditor
             showLineNumbers
             readOnly
             showTabs={false}
             wrapContent
-            style={{ height: "80vh" }}
-            className="custom-editor"
+            style={{
+              height: "85vh",
+              padding: "1rem",
+              overflow: "auto",
+              fontFamily: "'Fira Code', monospace",
+            }}
+            className="rounded-none border-none bg-transparent"
           />
         </SandpackLayout>
       </SandpackProvider>
@@ -126,4 +127,4 @@ const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
   );
 };
 
-export default CustomSandpack;
+export default memo(CustomSandpack);

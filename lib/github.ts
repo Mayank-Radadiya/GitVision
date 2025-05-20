@@ -192,7 +192,7 @@ export async function createNewProject(
 export async function getRepositoryFiles(
   owner: string,
   repo: string,
-  projectId?: string
+  projectId: string
 ) {
   try {
     // Step 1: Get the default branch
@@ -226,7 +226,6 @@ export async function getRepositoryFiles(
       recursive: "1",
     });
 
-    // Step 4: Filter out ignored files and directories
     const ignoredPatterns = [
       /^node_modules\//,
       /^dist\//,
@@ -234,6 +233,7 @@ export async function getRepositoryFiles(
       /^\.next\//,
       /^\.nuxt\//,
       /^out\//,
+      /^public\//,
       /^coverage\//,
       /^\.vscode\//,
       /^\.idea\//,
@@ -253,59 +253,90 @@ export async function getRepositoryFiles(
       /^__pycache__\//,
       /\.pyc$/,
       /^\.turbo\//,
+
+      // Media files
+      /\.(png|jpe?g|gif|svg|webp|bmp|ico)$/i, // image files
+      /\.(mp4|mov|avi|mkv|webm|flv|wmv)$/i, // video files
+      /\.(mp3|wav|ogg|m4a)$/i, // audio files
+      /\.(zip|tar|gz|rar|7z)$/i, // compressed archives
     ];
-    // Step 4: Filter only code files
-    const codeFiles = tree.filter((item) => {
-      if (item.type !== "blob") return false;
-      if (!item.path) return false;
 
-      // Exclude if matches any ignored pattern
-      return !ignoredPatterns.some((pattern) => pattern.test(item.path));
-    });
+    // Import database modules
+    const { db } = await import("@/drizzle");
+    const { projectFiles } = await import("@/drizzle/schema/schema");
 
-    // If projectId is provided, store files in database
-    if (projectId) {
-      const fileDataForDb = [];
+    // Step 4: Filter files that are NOT in the ignore list
+    const filesToProcess = tree.filter(
+      (item) =>
+        item.type === "blob" &&
+        item.path &&
+        !ignoredPatterns.some((pattern) => pattern.test(item.path!))
+    );
 
-      // Process each file to prepare for database insertion
-      for (const file of codeFiles) {
+    const storedFiles = [];
+    const batchSize = 10; // Process files in batches to avoid memory issues
+    const fileBatches = [];
+
+    // Create batches of files
+    for (let i = 0; i < filesToProcess.length; i += batchSize) {
+      fileBatches.push(filesToProcess.slice(i, i + batchSize));
+    }
+
+    // Process each batch
+    for (const [batchIndex, batch] of fileBatches.entries()) {
+      console.log(
+        `Processing batch ${batchIndex + 1} of ${fileBatches.length}...`
+      );
+
+      const batchPromises = batch.map(async (file) => {
         try {
+          if (!file.sha || !file.path) {
+            console.warn("File missing sha or path:", file);
+            return null;
+          }
+
           // Get file content
           const { data: blob } = await octokit.rest.git.getBlob({
             owner,
             repo,
-            file_sha: file.sha!,
+            file_sha: file.sha,
           });
 
+          // Decode content from base64
           const content = Buffer.from(blob.content, "base64").toString("utf-8");
 
-          // Add file data to array for database insertion
-          fileDataForDb.push({
-            fileName: file.path || "unknown",
-            code: content,
-            projectId: projectId,
-          });
-        } catch (err) {
-          console.error(`Error processing file ${file.path}:`, err);
-          // Continue with other files even if one fails
-        }
-      }
+          // Store in database
+          const [newFile] = await db
+            .insert(projectFiles)
+            .values({
+              fileName: file.path,
+              code: content,
+              projectId: projectId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning();
 
-      // Insert file data into database in batches to avoid overwhelming the database
-      if (fileDataForDb.length > 0) {
-        // Import the projectFiles table
-        const { projectFiles } = await import("@/drizzle/schema/schema");
-
-        // Insert in batches of 20 to avoid overwhelming the database
-        const batchSize = 20;
-        for (let i = 0; i < fileDataForDb.length; i += batchSize) {
-          const batch = fileDataForDb.slice(i, i + batchSize);
-          await db.insert(projectFiles).values(batch);
+          return {
+            id: newFile.id,
+            path: file.path,
+            size: file.size,
+            sha: file.sha,
+          };
+        } catch (error) {
+          console.error(`Error processing file ${file.path}:`, error);
+          return null;
         }
-      }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      storedFiles.push(...batchResults.filter(Boolean));
     }
 
-    return codeFiles;
+    console.log(
+      `Successfully stored ${storedFiles.length} files in the database`
+    );
+    return storedFiles;
   } catch (error) {
     console.error("Error fetching repository files:", error);
     throw error;
