@@ -15,7 +15,6 @@
   "dependencies": {
     "@clerk/nextjs": "^6.19.1",
     "@codesandbox/sandpack-react": "^2.20.0",
-    "@codesandbox/sandpack-themes": "^2.0.21",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.0.1",
     "@neondatabase/serverless": "^1.0.0",

@@ -6,7 +6,7 @@ const CreateNewProjectForm = dynamic(
   {
     loading: () => (
       <div className="flex h-screen flex-col justify-center items-center">
-        <Skeleton className="h-[450px]  w-full max-w-md relative z-10" />
+        <Skeleton className="h-[475px]  border border-white/30 w-full max-w-md relative z-10" />
       </div>
     ),
   }

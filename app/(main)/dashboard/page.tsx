@@ -62,7 +62,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSkeleton(false);
-    }, 2500); // Show skeleton for 2.5 seconds
+    }, 1000); // Show skeleton for 1 seconds
 
     return () => clearTimeout(timer);
   }, []);

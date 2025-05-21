@@ -189,7 +189,7 @@ export default function UserProjectPage() {
     };
 
     fetchProjectDetails();
-  }, [params.projectId, isSignedIn]);
+  }, [isSignedIn, params.projectId, currentPage, fetchCommits]);
 
   return (
     <div className="space-y-8 p-8 bg-gradient-to-b from-background to-background/70">

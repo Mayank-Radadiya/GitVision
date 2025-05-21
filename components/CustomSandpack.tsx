@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
+import { memo } from "react";
 import {
   SandpackProvider,
   SandpackLayout,
@@ -8,85 +8,71 @@ import {
   SandpackFileExplorer,
 } from "@codesandbox/sandpack-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { dracula } from "@codesandbox/sandpack-themes";
+import { useQuery } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 
 interface CustomSandpackProps {
   projectId: string;
 }
 
+// Fetch function that we can reuse and that React Query will call
+const fetchProjectFiles = async (projectId: string) => {
+  if (!projectId) {
+    throw new Error("Project ID is required");
+  }
+
+  const response = await fetch(
+    `/api/project/getProjectFiles?projectId=${projectId}`
+  );
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to fetch project files");
+  }
+
+  return data;
+};
+
 const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
-  const [files, setFiles] = useState<
-    Record<string, { code: string; readOnly: boolean }>
-  >({
-    "/App.js": {
-      code: "// No files loaded yet or project not specified",
-      readOnly: true,
-    },
+  const { theme } = useTheme();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["projectFiles", projectId],
+    queryFn: () => fetchProjectFiles(projectId),
+    enabled: !!projectId, // Only run the query if we have a projectId
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchProjectFiles = async () => {
-      if (!projectId) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `/api/project/getProjectFiles?projectId=${projectId}`
-        );
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch project files");
-        }
-
-        if (Object.keys(data.sandpackFiles).length === 0) {
-          setFiles({
-            "/App.js": {
-              code: "// No files found for this project",
-              readOnly: true,
-            },
-          });
-        } else {
-          setFiles(data.sandpackFiles);
-        }
-      } catch (err) {
-        console.error("Error fetching project files:", err);
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        setFiles({
+  // Prepare files for SandpackProvider
+  const files =
+    data?.sandpackFiles && Object.keys(data.sandpackFiles).length > 0
+      ? data.sandpackFiles
+      : {
           "/App.js": {
-            code: `// Error loading files: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }`,
+            code: error
+              ? `// Error loading files: ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`
+              : "// No files found for this project",
             readOnly: true,
           },
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProjectFiles();
-  }, [projectId]);
+        };
 
   if (isLoading) {
     return (
-      <div className="w-full min-h-[400px] p-4 space-y-4">
+      <div className="w-full min-h-[400px] p-2 space-y-3">
         <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-[300px] w-full" />
+        <Skeleton className="h-[670px] w-full" />
       </div>
     );
   }
 
   if (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
     return (
       <div className="w-full min-h-[400px] p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-        <p className="text-red-600 dark:text-red-400">Error: {error}</p>
+        <p className="text-red-600 dark:text-red-400">Error: {errorMessage}</p>
         <p className="mt-2">
           Please try again or check if you have access to this project.
         </p>
@@ -95,12 +81,26 @@ const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
   }
 
   return (
-    <div className="w-full min-h-[500px] border rounded-md overflow-hidden gitvision-code-viewer bg-muted">
-      <SandpackProvider files={files} theme={dracula} template="vanilla">
-        <SandpackLayout className="flex border-t">
+    <div className="w-full min-h-[500px] rounded-md overflow-hidden">
+      <SandpackProvider
+        files={files}
+        theme={theme === "dark" ? "dark" : "light"}
+        template="vanilla"
+      >
+        <SandpackLayout
+          className="flex border-t"
+          style={{
+            height: "80vh",
+            width: "100vw",
+            fontFamily: "monospace",
+          }}
+        >
           <SandpackFileExplorer
+            initialCollapsedFolder={["src", "public", "app", "components"]}
+            autoHiddenFiles
             style={{
-              height: "85vh",
+              height: "80vh",
+              width: "30vw",
               padding: "0.75rem",
               borderRight: "1px solid #1e293b", // slate-800
               overflowY: "auto",
@@ -110,14 +110,13 @@ const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
           />
           <SandpackCodeEditor
             showLineNumbers
-            readOnly
+            showReadOnly
             showTabs={false}
-            wrapContent
             style={{
-              height: "85vh",
+              height: "80vh",
               padding: "1rem",
               overflow: "auto",
-              fontFamily: "'Fira Code', monospace",
+              fontFamily: "monospace",
             }}
             className="rounded-none border-none bg-transparent"
           />

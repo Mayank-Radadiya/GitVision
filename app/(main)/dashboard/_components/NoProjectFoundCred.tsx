@@ -12,8 +12,8 @@ const NoProjectFoundCred = () => {
       <div className="flex flex-col items-center justify-center min-h-[400px] bg-background rounded-2xl border border-dashed border-muted-foreground/30 p-8 sm:p-10 shadow-sm transition-all hover:border-muted-foreground/50">
         {/* Icon with Glow Ring */}
         <div className="mb-8 relative flex items-center justify-center">
-          <div className="absolute inset-0 bg-gradient-to-tr from-blue-400/20 to-purple-400/20 blur-xl rounded-full scale-125" />
-          <div className="relative z-10 p-5 bg-white/30 dark:bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-tr from-blue-400/20 to-purple-400/20 blur-xl rounded-full scale-110" />
+          <div className="relative z-10 p-5 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-full flex items-center justify-center">
             <FolderGit2 className="h-14 w-14 text-blue-600 dark:text-blue-400 animate-pulse" />
           </div>
         </div>
@@ -32,6 +32,7 @@ const NoProjectFoundCred = () => {
         {/* Buttons */}
         <div className="flex flex-col w-[300px] relative">
           <Button
+            variant="outline"
             onClick={() => router.push("/dashboard/create-project")}
             className="group  w-full gap-2 transition-all hover:shadow-md active:scale-[0.98]"
             aria-label="Connect a new repository (Recommended)"
