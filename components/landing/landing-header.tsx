@@ -48,8 +48,8 @@ function LandingHeader() {
       className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
         isScrolled
-          ? "bg-background/90 backdrop-blur-xl border-b shadow-sm"
-          : "bg-transparent border-transparent"
+          ? "bg-background/20 backdrop-blur-md  shadow-sm"
+          : "bg-transparent"
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-50"></div>
@@ -115,7 +115,7 @@ function LandingHeader() {
               <>
                 <div className="flex items-center gap-2.5">
                   <Link href="/dashboard">
-                    <GlowingButton className="rounded-full shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/70 px-5 h-9 font-medium">
+                    <GlowingButton className="rounded-full shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/70 px-5 h-9 font-medium text-white">
                       Dashboard
                     </GlowingButton>
                   </Link>

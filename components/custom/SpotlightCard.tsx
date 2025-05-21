@@ -108,7 +108,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
           : "transform 0.5s ease-out",
         ...getBorderGlowStyles(),
       }}
-      className={`relative ${borderRadius} overflow-hidden bg-gradient-to-br from-neutral-950/70 to-neutral-900/70 backdrop-blur-md transition-all duration-300 p-8 ${className}`}
+      className={`relative ${borderRadius} overflow-hidden dark:bg-gradient-to-br from-neutral-950/70 to-neutral-900/70 bg-card backdrop-blur-md transition-all duration-300 p-8 ${className}`}
     >
       {/* Spotlight effect */}
       <div

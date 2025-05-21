@@ -43,16 +43,6 @@ const floatingAnimation = {
 // Memoize static components for better performance
 const MemoizedSparklesCore = memo(SparklesCore);
 
-// Pulsing gradient effect component
-const PulsingGradient = memo(() => (
-  <div className="absolute inset-0 overflow-hidden">
-    <div className="absolute -left-1/4 top-0 h-[600px] w-[600px] rounded-full bg-gradient-to-r from-primary/20 to-purple-500/20 blur-[120px] dark:from-primary/30 dark:to-purple-600/30 animate-pulse-slow"></div>
-    <div className="absolute -right-1/4 bottom-0 h-[600px] w-[600px] rounded-full bg-gradient-to-r from-blue-500/20 to-primary/20 blur-[120px] dark:from-blue-600/30 dark:to-primary/30 animate-pulse-slow animation-delay-2000"></div>
-    <div className="absolute left-1/3 top-1/3 h-[300px] w-[300px] rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 blur-[120px] dark:from-cyan-500/30 dark:to-blue-500/30 animate-pulse-slow animation-delay-4000"></div>
-  </div>
-));
-PulsingGradient.displayName = "PulsingGradient";
-
 // interface AnimatedStatProps {
 //   label: string;
 //   value: string;
@@ -100,7 +90,7 @@ function HeroSection() {
   // Parallax effect for hero image
   const { scrollY } = useScroll();
   const y = useTransform(scrollY, [0, 500], [0, 50]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
+  // const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
   // Show floating elements after a delay
   useEffect(() => {
@@ -139,9 +129,6 @@ function HeroSection() {
       <section className="relative overflow-hidden bg-grid-small-black/[0.2] dark:bg-grid-small-white/[0.05] pt-32 pb-24 min-h-screen flex flex-col justify-center">
         <div className="absolute inset-0 bg-grid-small-black/[0.15] dark:bg-grid-small-white/[0.05]"></div>
         <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
-
-        {/* Enhanced gradient background with animation */}
-        <PulsingGradient />
 
         {/* Radial gradient for the container to give a faded look */}
         <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
@@ -249,7 +236,7 @@ function HeroSection() {
               className="flex flex-col items-center justify-center gap-4 sm:flex-row"
             >
               <Link href="/sign-up" aria-label="Sign up for free access">
-                <GlowingButton className="rounded-full gap-2 group z-12">
+                <GlowingButton className="rounded-full gap-2 group z-12 text-white">
                   Get started for free
                   <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </GlowingButton>
@@ -281,7 +268,7 @@ function HeroSection() {
           </div>
 
           <motion.div
-            style={{ y, opacity }}
+            style={{ y }}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, delay: 0.4 }}
@@ -325,7 +312,6 @@ function HeroSection() {
                   height={650}
                   alt="GitVision Dashboard Preview"
                   className="rounded-lg shadow-sm transition-all duration-700 group-hover:scale-[1.02] group-hover:brightness-105"
-                  priority
                   sizes="(max-width: 1023px) 100vw, 1250px"
                 />
                 {/* Grid overlay for subtle texture */}

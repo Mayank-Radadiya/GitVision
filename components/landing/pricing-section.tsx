@@ -146,7 +146,7 @@ function PricingSection() {
                     : "rgba(245, 158, 11, 0.3)"
                 }
                 className={cn(
-                  "h-full flex flex-col shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden custom-spotlight-card  ",
+                  "h-full flex flex-col shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden custom-spotlight-card ",
                   plan.accent === "blue"
                     ? "border border-blue-700/30 dark:border-blue-500/30"
                     : plan.accent === "purple"
