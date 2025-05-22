@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/drizzle";
-import { projectTables, userProjectsTable } from "@/drizzle/schema/schema";
-import { eq, or } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { projectTables } from "@/drizzle/schema/schema";
+import { eq } from "drizzle-orm";
 
+/**
+ * GET handler for retrieving project details by ID
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const projectId = searchParams.get("projectId");
-
-    // Get the authenticated user from the Clerk session
-    const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please sign in to access project details." },
-        { status: 401 }
-      );
-    }
 
     if (!projectId) {
       return NextResponse.json(
@@ -26,47 +18,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get project details, checking that the user has access to this project (either as owner or collaborator)
-    const projectResult = await db
-      .select({
-        id: projectTables.id,
-        projectName: projectTables.projectName,
-        githubUrl: projectTables.githubUrl,
-        star: projectTables.star,
-        forks: projectTables.forks,
-        totalCommits: projectTables.totalCommits,
-        totalBranches: projectTables.totalBranches,
-        totalContributors: projectTables.totalContributors,
-        createdAt: projectTables.createdAt,
-        updatedAt: projectTables.updatedAt,
-        ownerId: projectTables.ownerId,
-      })
+    // Fetch project by id
+    const project = await db
+      .select()
       .from(projectTables)
-      .leftJoin(
-        userProjectsTable,
-        eq(userProjectsTable.projectId, projectTables.id)
-      )
-      .where(
-        eq(projectTables.id, projectId) &&
-          or(
-            eq(projectTables.ownerId, userId),
-            eq(userProjectsTable.userId, userId)
-          )
-      )
+      .where(eq(projectTables.id, projectId))
       .limit(1);
 
-    if (!projectResult || projectResult.length === 0) {
-      return NextResponse.json(
-        { error: "Project not found or you don't have access to it" },
-        { status: 404 }
-      );
+    if (!project || project.length === 0) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Format dates to strings
     const formattedProject = {
-      ...projectResult[0],
-      createdAt: projectResult[0].createdAt.toISOString(),
-      updatedAt: projectResult[0].updatedAt.toISOString(),
+      ...project[0],
+      createdAt: project[0].createdAt.toISOString(),
+      updatedAt: project[0].updatedAt.toISOString(),
     };
 
     return NextResponse.json(

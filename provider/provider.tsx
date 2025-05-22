@@ -64,6 +64,12 @@ const Provider = ({ children }: ProviderProps) => {
               return false; // Don't retry other errors
             },
           },
+          mutations: {
+            // Make sure mutations handle errors properly
+            onError: (err) => {
+              console.error("Mutation error:", err);
+            },
+          },
         },
       })
   );
