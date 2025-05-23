@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Code,
 } from "lucide-react";
-import CustomSandpack from "@/components/CustomSandpack";
+import CustomSandpack from "@/components/custom/CustomSandpack";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
