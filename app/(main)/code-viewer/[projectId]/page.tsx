@@ -126,11 +126,6 @@ export default function CodeViewerPage() {
           <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-100 dark:border-blue-800/50 shadow-sm animate-pulse">
             <div className="h-10 w-3/4 bg-blue-200 dark:bg-blue-800/40 rounded mb-4"></div>
             <div className="h-5 w-1/2 bg-blue-100 dark:bg-blue-900/40 rounded mb-4"></div>
-            <div className="flex gap-2">
-              <div className="h-6 w-20 bg-amber-100 dark:bg-amber-900/40 rounded"></div>
-              <div className="h-6 w-20 bg-green-100 dark:bg-green-900/40 rounded"></div>
-              <div className="h-6 w-28 bg-purple-100 dark:bg-purple-900/40 rounded"></div>
-            </div>
           </div>
         </div>
 

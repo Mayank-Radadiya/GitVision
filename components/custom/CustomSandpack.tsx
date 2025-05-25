@@ -112,6 +112,8 @@ const CustomSandpack = ({ projectId }: CustomSandpackProps) => {
             showLineNumbers
             showReadOnly
             showTabs={false}
+            wrapContent={true}
+            initMode="user-visible"
             style={{
               height: "80vh",
               padding: "1rem",

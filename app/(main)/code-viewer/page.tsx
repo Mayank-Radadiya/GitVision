@@ -1,6 +1,18 @@
 "use client";
 
-import RepoList from "@/components/code-viewer/repo-selector";
+import { Loader } from "@/components/custom/Loader";
+import dynamic from "next/dynamic";
+
+const RepoList = dynamic(
+  () => import("@/components/code-viewer/repo-selector"),
+  {
+    loading: () => (
+      <>
+        <Loader />
+      </>
+    ),
+  }
+);
 
 export default function CodeViewerPage() {
   return (
