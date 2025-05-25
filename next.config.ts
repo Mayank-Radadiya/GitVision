@@ -1,6 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: true, // Helps catch issues early (dev only)
+  experimental: {
+    staleTimes: {
+      static: 30 * 1000,
+      dynamic: 10 * 1000,
+    },
+    serverActions: {
+      bodySizeLimit: 1024 * 1024, // 1MB limit (example)
+    },
+  },
+
   images: {
     remotePatterns: [
       {
@@ -16,6 +27,9 @@ const nextConfig: NextConfig = {
         hostname: "avatars.githubusercontent.com",
       },
     ],
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production", // Remove console logs in prod
   },
 };
 

@@ -13,12 +13,34 @@ import {
   PanelRight,
   Bot,
   Sparkles,
-  LucideIcon,
   ArrowDown,
   MessageSquareText,
 } from "lucide-react";
 import ChatSidebar from "@/components/chat/chat-sidebar";
 import { AnimatePresence, motion } from "framer-motion";
+import SuggestedPrompt from "@/components/chat/suggested-prompt";
+import styles from "./typing-animation.module.css";
+import { useUser } from "@clerk/nextjs";
+
+// Typing animation component for AI responses
+const TypingAnimation = () => {
+  return (
+    <div className="flex justify-start">
+      <div className="flex gap-3 max-w-[80%]">
+        <Avatar className="h-8 w-8 mt-1">
+          <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Bot className="h-5 w-5" />
+          </div>
+        </Avatar>
+        <div className="rounded-lg px-4 py-4 shadow-sm bg-muted rounded-tl-none min-w-[60px] flex">
+          <span className={styles.typingDot}></span>
+          <span className={styles.typingDot}></span>
+          <span className={styles.typingDot}></span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const suggestedPrompts = [
   {
@@ -45,16 +67,23 @@ const suggestedPrompts = [
 
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } =
-    useChat();
+    useChat({
+      api: "/api/chat/ai",
+      onError: (error) => {
+        console.error("Chat API error:", error);
+      },
+    });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or when loading state changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   // Handle scroll events to show/hide scroll-to-bottom button
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -162,15 +191,23 @@ export default function ChatPage() {
                             }`}
                           >
                             <Avatar className="h-8 w-8 mt-1">
-                              <div
-                                className={`flex h-full w-full items-center justify-center rounded-full text-sm ${
-                                  message.role === "user"
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-primary/10 text-primary"
-                                }`}
-                              >
-                                {message.role === "user" ? "You" : "AI"}
-                              </div>
+                              {message.role === "user" ? (
+                                user?.imageUrl ? (
+                                  <img
+                                    src={user.imageUrl}
+                                    alt="User"
+                                    className="h-full w-full rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
+                                    You
+                                  </div>
+                                )
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-primary">
+                                  <Bot className="h-5 w-5" />
+                                </div>
+                              )}
                             </Avatar>
                             <div
                               className={`rounded-lg px-4 py-2 shadow-sm ${
@@ -187,6 +224,18 @@ export default function ChatPage() {
                         </motion.div>
                       ))}
                     </AnimatePresence>
+
+                    {/* AI typing animation */}
+                    {isLoading && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <TypingAnimation />
+                      </motion.div>
+                    )}
+
                     <div ref={messagesEndRef} />
                   </div>
                 )}
@@ -263,37 +312,5 @@ export default function ChatPage() {
         />
       )}
     </div>
-  );
-}
-
-interface SuggestedPromptProps {
-  title: string;
-  prompt: string;
-  icon: LucideIcon;
-  onClick: () => void;
-}
-
-function SuggestedPrompt({
-  title,
-  prompt,
-  icon: Icon,
-  onClick,
-}: SuggestedPromptProps) {
-  return (
-    <Button
-      variant="outline"
-      className="flex flex-col items-start h-24 p-4 border-muted/50 bg-background shadow-sm hover:bg-muted/10 hover:border-primary/20 transition-all"
-      onClick={onClick}
-    >
-      <div className="flex flex-col justify-between h-full">
-        <div className="flex items-center mb-1 text-primary">
-          <Icon className="h-4 w-4 mr-2" />
-          <span className="font-medium">{title}</span>
-        </div>
-        <p className="text-sm text-muted-foreground whitespace-normal break-words">
-          {prompt}
-        </p>
-      </div>
-    </Button>
   );
 }
