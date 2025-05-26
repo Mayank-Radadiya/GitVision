@@ -4,10 +4,10 @@ import {
   varchar,
   text,
   boolean,
-  primaryKey,
   index,
   uuid,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -45,28 +45,6 @@ export const projectTables = pgTable(
   (table) => {
     return {
       ownerIdIdx: index("owner_id_idx").on(table.ownerId),
-    };
-  }
-);
-
-// User to Projects relation (for collaborators)
-export const userProjectsTable = pgTable(
-  "user_projects",
-  {
-    userId: varchar("user_id", { length: 255 })
-      .notNull()
-      .references(() => usersTable.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projectTables.id, { onDelete: "cascade" }),
-    role: varchar("role", { length: 50 }).notNull().default("viewer"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => {
-    return {
-      pk: primaryKey(table.userId, table.projectId),
-      userIdIdx: index("user_projects_user_id_idx").on(table.userId),
-      projectIdIdx: index("user_projects_project_id_idx").on(table.projectId),
     };
   }
 );
@@ -120,3 +98,25 @@ export const commitsTable = pgTable(
     };
   }
 );
+
+export const chatHistoryTable = pgTable("chat_history", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projectTables.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull().default("New Chat"),
+  messages: jsonb("messages").notNull().default([]), // Store array of messages here
+  // Store the message in this format:
+  //   [
+  //   { "role": "user", "content": "Hello!" },
+  //   { "role": "Ai", "content": "Hi, how can I help you?" }
+  // ]
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

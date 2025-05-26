@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/drizzle";
-import { projectTables, userProjectsTable } from "@/drizzle/schema/schema";
+import { projectTables } from "@/drizzle/schema/schema";
 import { auth } from "@clerk/nextjs/server";
 import { eq, desc, or } from "drizzle-orm";
 
@@ -32,16 +32,8 @@ export async function fetchAllUserProject(senderId: string) {
         updatedAt: projectTables.updatedAt,
       })
       .from(projectTables)
-      .leftJoin(
-        userProjectsTable,
-        eq(userProjectsTable.projectId, projectTables.id)
-      )
-      .where(
-        or(
-          eq(projectTables.ownerId, userId),
-          eq(userProjectsTable.userId, userId)
-        )
-      )
+
+      .where(or(eq(projectTables.ownerId, userId)))
       .orderBy(desc(projectTables.createdAt));
 
     // return userProjects

@@ -6,7 +6,6 @@ import {
   projectTables,
   projectFiles,
   commitsTable,
-  userProjectsTable,
 } from "@/drizzle/schema/schema";
 import { eq, or, count, sql } from "drizzle-orm";
 import { db } from "@/drizzle";
@@ -34,16 +33,8 @@ export async function getUserDashboardInfo(): Promise<dashboardInfo> {
         count: count(projectTables.id),
       })
       .from(projectTables)
-      .leftJoin(
-        userProjectsTable,
-        eq(userProjectsTable.projectId, projectTables.id)
-      )
-      .where(
-        or(
-          eq(projectTables.ownerId, userId),
-          eq(userProjectsTable.userId, userId)
-        )
-      );
+
+      .where(or(eq(projectTables.ownerId, userId)));
 
     // 2. Get total number of commits saved by the user
     const commitsQuery = await db
@@ -51,17 +42,7 @@ export async function getUserDashboardInfo(): Promise<dashboardInfo> {
         count: count(commitsTable.id),
       })
       .from(commitsTable)
-      .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
-      .where(
-        or(
-          eq(projectTables.ownerId, userId),
-          sql`EXISTS (
-                SELECT 1 FROM ${userProjectsTable}
-                WHERE ${userProjectsTable.projectId} = ${projectTables.id}
-                AND ${userProjectsTable.userId} = ${userId}
-              )`
-        )
-      );
+      .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id));
 
     // 3. Get total number of files saved by the user
     const filesQuery = await db
@@ -69,17 +50,7 @@ export async function getUserDashboardInfo(): Promise<dashboardInfo> {
         count: count(projectFiles.id),
       })
       .from(projectFiles)
-      .innerJoin(projectTables, eq(projectFiles.projectId, projectTables.id))
-      .where(
-        or(
-          eq(projectTables.ownerId, userId),
-          sql`EXISTS (
-                SELECT 1 FROM ${userProjectsTable}
-                WHERE ${userProjectsTable.projectId} = ${projectTables.id}
-                AND ${userProjectsTable.userId} = ${userId}
-              )`
-        )
-      );
+      .innerJoin(projectTables, eq(projectFiles.projectId, projectTables.id));
 
     // 4. Get user's total credits
     const userCreditsQuery = await db
@@ -99,7 +70,6 @@ export async function getUserDashboardInfo(): Promise<dashboardInfo> {
       totalFiles,
       userCredits,
     };
-    
   } catch (error) {
     console.error("Error fetching user dashboard info:", error);
     throw new Error("Failed to fetch user dashboard info");

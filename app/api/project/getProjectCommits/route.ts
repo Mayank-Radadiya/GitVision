@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/drizzle";
-import {
-  commitsTable,
-  projectTables,
-  userProjectsTable,
-} from "@/drizzle/schema/schema";
+import { commitsTable, projectTables } from "@/drizzle/schema/schema";
 import { eq, desc, or, count } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 
@@ -41,16 +37,9 @@ export async function GET(request: NextRequest) {
     const userProject = await db
       .select()
       .from(projectTables)
-      .leftJoin(
-        userProjectsTable,
-        eq(userProjectsTable.projectId, projectTables.id)
-      )
+
       .where(
-        eq(projectTables.id, projectId) &&
-          or(
-            eq(projectTables.ownerId, userId),
-            eq(userProjectsTable.userId, userId)
-          )
+        eq(projectTables.id, projectId) && or(eq(projectTables.ownerId, userId))
       )
       .limit(1);
 
