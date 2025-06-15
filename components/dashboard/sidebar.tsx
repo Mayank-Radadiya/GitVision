@@ -64,7 +64,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="flex h-full flex-col border-r border-gray-200 dark:border-[#1F1F23] bg-white/95 dark:bg-[#0F0F12] backdrop-blur-sm w-64 shadow-sm transition-all">
+    <div className="flex h-full flex-col border-r border-gray-200 dark:border-[#1F1F23] bg-white/95 dark:bg-sidebar/80 backdrop-blur-sm w-64 shadow-sm transition-all">
       <div className="flex shrink-0 items-center gap-2 p-4">
         <Link
           href="/"

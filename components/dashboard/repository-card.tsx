@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Card } from "../ui/card";
 import IconHolder from "./IconHolder";
+import Link from "next/link";
 
 interface RepositoryCardProps {
   id: string;
@@ -50,7 +51,7 @@ export const RepositoryCard = ({
           <h2 className="text-xl font-semibold text-foreground group-hover:text-primary mb-1">
             {projectName}
           </h2>
-          <a
+          <Link
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -60,7 +61,7 @@ export const RepositoryCard = ({
             <span className="truncate max-w-[250px]">
               {githubUrl.replace(/^https?:\/\/(www\.)?github\.com\//, "")}
             </span>
-          </a>
+          </Link>
         </div>
         <Button
           size="sm"

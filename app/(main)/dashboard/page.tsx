@@ -111,7 +111,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-8 p-8 ">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         {/* Heading & Description */}
@@ -126,11 +126,14 @@ export default function DashboardPage() {
 
         {/* Add Project Button */}
         <button
+          className="relative inline-flex group"
           onClick={() => router.push("/dashboard/create-project")}
           type="button"
-          className="inline-flex items-center justify-center rounded-md bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 text-white font-semibold transition-all hover:shadow-lg"
         >
-          <Plus className="h-5 w-5 mr-2" /> New Project
+          <div className="absolute transitiona-all duration-1000 opacity-50 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg filter group-hover:opacity-100 group-hover:-inset-1 group-hover:duration-200"></div>
+          <div className="relative inline-flex items-center justify-center px-5 py-2 text-base font-bold text-white transition-all duration-200 bg-gray-900 border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 rounded">
+            New Project
+          </div>
         </button>
       </div>
 
