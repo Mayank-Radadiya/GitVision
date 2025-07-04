@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  BarChart2,
   HomeIcon,
   LogOut,
   MessageSquare,
@@ -32,11 +31,6 @@ const Sidebar = () => {
       name: "Add Repository",
       href: "/dashboard/create-project",
       icon: PlusCircle,
-    },
-    {
-      name: "Analytics",
-      href: "/analytics",
-      icon: BarChart2,
     },
     {
       name: "Chat",

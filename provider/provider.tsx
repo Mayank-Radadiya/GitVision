@@ -3,9 +3,8 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "react-hot-toast";
-import { memo, useEffect, useState, useRef } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { memo, useEffect, useState } from "react";
+import { QueryClient } from "@tanstack/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 
@@ -132,7 +131,6 @@ const Provider = ({ children }: ProviderProps) => {
           >
             <MemoizedToaster />
             {children}
-            <ReactQueryDevtools initialIsOpen={false} />
           </ThemeProvider>
         </PersistQueryClientProvider>
       ) : (

@@ -1,6 +1,5 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
