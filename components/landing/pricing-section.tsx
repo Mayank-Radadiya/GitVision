@@ -155,12 +155,6 @@ function PricingSection() {
                   plan.popular ? "border-primary/50 relative" : ""
                 )}
               >
-                {plan.popular && (
-                  <div className="absolute top-4 right-4 bg-primary text-white text-xs font-semibold px-2 py-1 rounded-full">
-                    Most Popular
-                  </div>
-                )}
-
                 <CardHeader className="pb-8 flex flex-col items-center text-center space-y-2">
                   <div
                     className={cn(
@@ -205,6 +199,11 @@ function PricingSection() {
                       </span>
                     )}
                   </div>
+                  {plan.popular && (
+                    <div className="absolute top-17 right-12  bg-primary text-white text-xs font-semibold px-2 py-1 rounded-full">
+                      Most Popular
+                    </div>
+                  )}
                 </CardHeader>
 
                 <CardContent className="flex-grow pb-0">
