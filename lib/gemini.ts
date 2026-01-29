@@ -96,7 +96,7 @@ ${diff}
 Remember: Your summary should help developers understand this commit in 30 seconds or less. Be clear, specific, and focus on what matters.`,
     ]);
     return response.response.text();
-  } catch (error: any) {
+  } catch (error:any) {
     // Handle specific error types
     if (error?.status === 429) {
       console.error("Gemini API quota exceeded:", error.message);

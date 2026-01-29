@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Image from "next/image";
 import {
   Loader2,
   Send,
@@ -196,7 +197,9 @@ export default function ChatPage() {
                             <Avatar className="h-8 w-8 mt-1">
                               {message.role === "user" ? (
                                 user?.imageUrl ? (
-                                  <img
+                                  <Image
+                                    width={32}
+                                    height={32}
                                     src={user.imageUrl}
                                     alt="User"
                                     className="h-full w-full rounded-full object-cover"

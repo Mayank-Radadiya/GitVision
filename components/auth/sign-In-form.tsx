@@ -23,12 +23,10 @@ import { signInZodSchema } from "@/zodSchema/signIn.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
-import { useRouter } from "next/navigation";
 import { useSignIn } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
 export default function SignInForm() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<ClerkAPIError[]>();
