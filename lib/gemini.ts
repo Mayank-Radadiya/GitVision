@@ -96,16 +96,17 @@ ${diff}
 Remember: Your summary should help developers understand this commit in 30 seconds or less. Be clear, specific, and focus on what matters.`,
     ]);
     return response.response.text();
-  } catch (error:any) {
+  } catch (error: unknown) {
     // Handle specific error types
-    if (error?.status === 429) {
-      console.error("Gemini API quota exceeded:", error.message);
+    const err = error as { status?: number; message?: string };
+    if (err?.status === 429) {
+      console.error("Gemini API quota exceeded:", err.message);
       return "⏳ AI summary temporarily unavailable due to API quota limits. Please try again later.";
-    } else if (error?.status === 404) {
-      console.error("Gemini model not found:", error.message);
+    } else if (err?.status === 404) {
+      console.error("Gemini model not found:", err.message);
       return "⚠️ AI model not available. Please contact support or check your API configuration.";
-    } else if (error?.message?.includes("quota")) {
-      console.error("Gemini API quota issue:", error.message);
+    } else if (err?.message?.includes("quota")) {
+      console.error("Gemini API quota issue:", err.message);
       return "⏳ AI summary quota exceeded. Please try again in 24 hours.";
     } else {
       console.error("Error generating AI summary:", error);
