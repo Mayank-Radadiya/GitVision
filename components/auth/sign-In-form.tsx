@@ -59,10 +59,8 @@ export default function SignInForm() {
       });
 
       if (signInAttempt.status === "complete") {
-        setActive({ session: signInAttempt.createdSessionId });
+        await setActive({ session: signInAttempt.createdSessionId });
         toast.success("Sign in successful!");
-        // Redirect to the dashboard or home page
-        router.push("/dashboard");
       } else {
         console.error(JSON.stringify(signInAttempt, null, 2));
         toast.error("Invalid credentials. Please try again.");
