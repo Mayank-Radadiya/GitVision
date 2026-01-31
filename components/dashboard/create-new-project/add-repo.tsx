@@ -1,167 +1,229 @@
 "use client";
 
-import { useState } from "react";
+/**
+ * =============================================================================
+ * CREATE NEW PROJECT FORM
+ * =============================================================================
+ *
+ * Production-ready form for adding GitHub repositories.
+ *
+ * ARCHITECTURE:
+ * - add-repo.tsx (this file) - Main orchestrator
+ * - add-repo.constants.ts - Types, steps, animations
+ * - add-repo.utils.ts - URL parsing, helpers
+ * - components/
+ *   ├── FormHeader.tsx - Animated header
+ *   ├── ProgressSteps.tsx - Step indicator
+ *   ├── ProjectNameField.tsx - Name input
+ *   ├── RepositoryUrlField.tsx - URL input with preview
+ *   ├── SubmitButton.tsx - Submit button
+ *   └── InfoCards.tsx - Feature highlights
+ *
+ * @module components/dashboard/create-new-project
+ */
+
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Loader2, GitBranch } from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { repositoryZodSchema } from "@/zodSchema/repository.schema";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
+// Local imports
+import { FormData, CARD_ANIMATION } from "./add-repo.constants";
+import { extractRepoInfo, delay } from "./add-repo.utils";
+import {
+  FormHeader,
+  ProgressSteps,
+  ProjectNameField,
+  RepositoryUrlField,
+  SubmitButton,
+  InfoCards,
+} from "./components";
+
+/**
+ * Main form component for creating a new project
+ */
 export default function CreateNewProjectForm() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const queryClient = useQueryClient();
-  // Form
+
+  // State
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [repoPreview, setRepoPreview] = useState<{
+    owner: string;
+    repo: string;
+  } | null>(null);
+
+  // Form setup
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm<z.infer<typeof repositoryZodSchema>>({
+    watch,
+    formState: { errors, isValid, dirtyFields },
+  } = useForm<FormData>({
     defaultValues: {
       ProjectName: "",
       repoUrl: "",
     },
     resolver: zodResolver(repositoryZodSchema),
+    mode: "onChange",
   });
 
-  const handleAddRepository = async (
-    data: z.infer<typeof repositoryZodSchema>
-  ) => {
+  // Watch URL for preview
+  const repoUrl = watch("repoUrl");
+
+  useEffect(() => {
+    if (repoUrl && !errors.repoUrl) {
+      const info = extractRepoInfo(repoUrl);
+      setRepoPreview(info);
+    } else {
+      setRepoPreview(null);
+    }
+  }, [repoUrl, errors.repoUrl]);
+
+  /**
+   * Handle form submission
+   */
+  const handleAddRepository = async (data: FormData) => {
     try {
       setIsLoading(true);
+      setCurrentStep(2);
+
+      // Simulate validation
+      await delay(800);
+      setCurrentStep(3);
 
       const response = await axios.post("/api/project/createProject", {
         ProjectName: data.ProjectName,
         repoUrl: data.repoUrl,
       });
+
       if (response.status !== 200) {
         throw new Error("Failed to add repository");
       }
-      toast.success("New project created successfully!");
 
+      toast.success("Repository added successfully!", {
+        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+      });
+
+      // Refetch dashboard data
       await queryClient.refetchQueries({ queryKey: ["dashboardInfo"] });
       await queryClient.refetchQueries({ queryKey: ["userProjects"] });
 
-      router.push("/dashboard");
+      // Redirect with animation delay
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 500);
     } catch (error) {
       console.error("Error adding repository:", error);
-      toast.error("Failed to add repository. Please try again.");
+      setCurrentStep(1);
+      toast.error("Failed to add repository. Please try again.", {
+        icon: <AlertCircle className="h-4 w-4 text-rose-500" />,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background relative overflow-hidden">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="w-full max-w-md relative z-10"
-      >
-        <Card className="border hover:border-white/30 transition-all duration-500 shadow-xl backdrop-blur-sm bg-background/50">
-          <CardHeader className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <GitBranch className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl font-bold bg-gradient-to-br from-foreground via-foreground to-foreground/80 bg-clip-text text-transparent">
-                  Add Repository
-                </CardTitle>
-                <CardDescription className="text-muted-foreground/90">
-                  Connect a GitHub repository to analyze
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <form
-              className="space-y-4"
-              onSubmit={handleSubmit(handleAddRepository)}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="repoName">Project Name</Label>
-                <Input
-                  id="repoName"
-                  type="text"
-                  {...register("ProjectName")}
-                  placeholder="my-awesome-project"
-                  className="h-11 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors mt-1.5"
-                  aria-invalid={!!errors.ProjectName}
-                />
-                {errors.ProjectName?.message && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.ProjectName.message}
-                  </p>
-                )}
-              </div>
+    <div className="min-h-screen p-6 lg:p-8">
+      <div className="mx-auto max-w-2xl">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/dashboard")}
+            className="mb-6 gap-2 hover:bg-accent/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </motion.div>
 
-              <div className="space-y-2">
-                <Label htmlFor="repoUrl">GitHub Repository URL</Label>
-                <Input
-                  id="repoUrl"
-                  type="url"
-                  {...register("repoUrl")}
-                  placeholder="https://github.com/username/repository.git"
-                  className="h-11 bg-background/50 backdrop-blur-sm hover:border-primary/50 focus:border-primary transition-colors mt-1.5"
-                  aria-invalid={!!errors.repoUrl}
-                />
-                {errors.repoUrl?.message && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.repoUrl.message}
-                  </p>
-                )}
-              </div>
+        {/* Main Card */}
+        <motion.div {...CARD_ANIMATION} className="group">
+          <div
+            className={cn(
+              // Base styles
+              "relative overflow-hidden rounded-3xl border",
+              // Glassmorphism
+              "bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl",
+              // Border & Shadow
+              "border-border/50",
+              "shadow-2xl shadow-black/10 dark:shadow-black/40",
+              "hover:shadow-primary/5 transition-shadow duration-500",
+            )}
+          >
+            {/* Gradient Accents */}
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 opacity-60 blur-3xl" />
+            <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 opacity-40 blur-3xl" />
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="h-10 w-full rounded-md shadow-md hover:shadow-lg transition-shadow duration-300 bg-gradient-to-r from-primary to-primary/90 font-medium relative overflow-hidden group mt-4"
+            {/* Content */}
+            <div className="relative z-10 p-8 lg:p-10">
+              {/* Header */}
+              <FormHeader />
+
+              {/* Progress Steps */}
+              <ProgressSteps currentStep={currentStep} />
+
+              {/* Form */}
+              <form
+                onSubmit={handleSubmit(handleAddRepository)}
+                className="space-y-6"
               >
-                {/* Background shimmer effects */}
-                <span className="absolute top-0 w-12 h-full bg-white/20 transform translate-x-[-100%] skew-x-[-20deg] group-hover:translate-x-[750%] transition-transform duration-2000"></span>
-                <span className="absolute top-0 -left-5 w-12 h-full bg-white/20 transform translate-x-[-100%] skew-x-[-20deg] group-hover:translate-x-[350%] transition-transform duration-3000"></span>
+                {/* Project Name Field */}
+                <ProjectNameField
+                  register={register}
+                  errors={errors}
+                  isDirty={!!dirtyFields.ProjectName}
+                  isLoading={isLoading}
+                />
 
-                {/* Button content */}
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding Repository...
-                  </>
-                ) : (
-                  "Add Repository"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4 pt-0">
-            <div className="text-sm text-muted-foreground mt-4">
-              <p>
-                Adding a repository will allow GitVision to analyze your code
-                and provide insights about your project&apos;s structure,
-                dependencies, and more.
-              </p>
+                {/* Repository URL Field */}
+                <RepositoryUrlField
+                  register={register}
+                  errors={errors}
+                  isDirty={!!dirtyFields.repoUrl}
+                  isLoading={isLoading}
+                  repoPreview={repoPreview}
+                />
+
+                {/* Submit Button */}
+                <SubmitButton
+                  isLoading={isLoading}
+                  isValid={isValid}
+                  currentStep={currentStep}
+                />
+              </form>
+
+              {/* Info Cards */}
+              <InfoCards />
             </div>
-          </CardFooter>
-        </Card>
-      </motion.div>
+
+            {/* Bottom Gradient Line */}
+            <div
+              className={cn(
+                "absolute bottom-0 left-0 right-0 h-1",
+                "bg-gradient-to-r from-primary via-violet-500 to-primary",
+                "opacity-0 transition-opacity duration-500",
+                isValid && !isLoading && "opacity-100",
+              )}
+            />
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

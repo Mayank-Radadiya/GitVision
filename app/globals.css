@@ -4,7 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 body {
-  transition: background-color 0.4s, color 0.3s;
+  transition:
+    background-color 0.4s,
+    color 0.3s;
 }
 
 /* Typing animation styles */
@@ -234,4 +236,29 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 150px;
+}
+
+/* Glass Sidebar Effect */
+.glass-sidebar {
+  background: linear-gradient(
+    135deg,
+    oklch(from var(--background) l c h / 0.9) 0%,
+    oklch(from var(--background) l c h / 0.95) 100%
+  );
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.05),
+    0 2px 4px -2px rgb(0 0 0 / 0.05),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+}
+
+.dark .glass-sidebar {
+  background: linear-gradient(
+    135deg,
+    oklch(from var(--background) l c h / 0.85) 0%,
+    oklch(from var(--background) l c h / 0.9) 100%
+  );
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.2),
+    0 2px 4px -2px rgb(0 0 0 / 0.15),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.03);
 }

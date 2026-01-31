@@ -1,30 +1,30 @@
+/**
+ * =============================================================================
+ * PROJECT CARD SKELETON
+ * =============================================================================
+ *
+ * Loading skeleton that matches the new compact repository card layout.
+ */
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { memo } from "react";
 
 const ProjectCardSkeleton = () => (
-  <div className="relative rounded-2xl h-64 border border-border p-5 bg-white/50 dark:bg-card shadow-sm space-y-4 overflow-hidden group hover:shadow-md transition-all duration-300">
-    {/* Title + Icon */}
-    <div className="flex justify-between items-center">
-      <Skeleton className="h-7 w-2/3 rounded-md" />
-      <Skeleton className="h-8 w-8 rounded-full" />
-    </div>
+  <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/50 p-4">
+    {/* Avatar Skeleton */}
+    <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
 
-    {/* Subtitle */}
-    <Skeleton className="h-4 w-3/5 rounded-md mt-2" />
-
-    {/* Stats Row */}
-    <div className="grid grid-cols-2 gap-3 mt-6">
-      <div className="space-y-4">
-        <Skeleton className="h-6 w-56  rounded-md" />
-        <Skeleton className="h-6 w-56  rounded-md" />
-        <Skeleton className="h-6 w-56  rounded-md" />
-      </div>
-      <div className="space-y-4">
-        <Skeleton className="h-6 w-56  rounded-md" />
-        <Skeleton className="h-6 w-56  rounded-md" />
-        <Skeleton className="h-6 w-56  rounded-md" />
+    {/* Content */}
+    <div className="flex-1 space-y-2">
+      <Skeleton className="h-5 w-48 rounded" />
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-3 w-32 rounded" />
+        <Skeleton className="h-3 w-24 rounded" />
       </div>
     </div>
+
+    {/* Arrow */}
+    <Skeleton className="h-5 w-5 shrink-0 rounded" />
   </div>
 );
 

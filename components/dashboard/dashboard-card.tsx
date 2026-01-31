@@ -1,16 +1,129 @@
+"use client";
+
+/**
+ * =============================================================================
+ * PREMIUM DASHBOARD STAT CARD
+ * =============================================================================
+ *
+ * A premium stat card component for displaying key metrics with:
+ * - Glassmorphism effect with backdrop blur
+ * - Animated count-up numbers
+ * - Gradient icon backgrounds with subtle glow
+ * - Smooth hover animations
+ * - Optional trend indicator
+ *
+ * @module components/dashboard/dashboard-card
+ */
+
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
-import { motion } from "framer-motion";
-import { memo } from "react";
+import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { memo, useEffect, useState } from "react";
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface DashboardCardProps {
+  /** The numeric value to display */
   number: number;
+  /** Card title/label */
   name: string;
+  /** Lucide icon component */
   icon: LucideIcon;
-  color?: string;
+  /** Color theme for the card */
+  color?: "blue" | "green" | "purple" | "amber" | "rose" | "indigo" | "cyan";
+  /** Descriptive subtitle */
   description?: string;
+  /** Optional trend percentage (positive = up, negative = down) */
+  trend?: number;
 }
+
+// =============================================================================
+// COLOR CONFIGURATION
+// =============================================================================
+
+const colorConfig = {
+  blue: {
+    gradient: "from-blue-500 to-blue-600",
+    glow: "shadow-blue-500/25",
+    border: "border-blue-500/20 hover:border-blue-500/40",
+    accent: "bg-blue-500/10",
+    text: "text-blue-600 dark:text-blue-400",
+  },
+  green: {
+    gradient: "from-emerald-500 to-emerald-600",
+    glow: "shadow-emerald-500/25",
+    border: "border-emerald-500/20 hover:border-emerald-500/40",
+    accent: "bg-emerald-500/10",
+    text: "text-emerald-600 dark:text-emerald-400",
+  },
+  purple: {
+    gradient: "from-violet-500 to-violet-600",
+    glow: "shadow-violet-500/25",
+    border: "border-violet-500/20 hover:border-violet-500/40",
+    accent: "bg-violet-500/10",
+    text: "text-violet-600 dark:text-violet-400",
+  },
+  amber: {
+    gradient: "from-amber-500 to-orange-500",
+    glow: "shadow-amber-500/25",
+    border: "border-amber-500/20 hover:border-amber-500/40",
+    accent: "bg-amber-500/10",
+    text: "text-amber-600 dark:text-amber-400",
+  },
+  rose: {
+    gradient: "from-rose-500 to-pink-600",
+    glow: "shadow-rose-500/25",
+    border: "border-rose-500/20 hover:border-rose-500/40",
+    accent: "bg-rose-500/10",
+    text: "text-rose-600 dark:text-rose-400",
+  },
+  indigo: {
+    gradient: "from-indigo-500 to-indigo-600",
+    glow: "shadow-indigo-500/25",
+    border: "border-indigo-500/20 hover:border-indigo-500/40",
+    accent: "bg-indigo-500/10",
+    text: "text-indigo-600 dark:text-indigo-400",
+  },
+  cyan: {
+    gradient: "from-cyan-500 to-teal-500",
+    glow: "shadow-cyan-500/25",
+    border: "border-cyan-500/20 hover:border-cyan-500/40",
+    accent: "bg-cyan-500/10",
+    text: "text-cyan-600 dark:text-cyan-400",
+  },
+};
+
+// =============================================================================
+// ANIMATED COUNTER COMPONENT
+// =============================================================================
+
+/**
+ * Animated number that counts up from 0 to the target value
+ */
+function AnimatedCounter({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    const controls = animate(0, value, {
+      duration: 1.5,
+      ease: "easeOut",
+      onUpdate: (latest) => {
+        setDisplayValue(Math.round(latest));
+      },
+    });
+
+    return () => controls.stop();
+  }, [value]);
+
+  return <>{displayValue.toLocaleString()}</>;
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 const DashboardCard: React.FC<DashboardCardProps> = ({
   number,
@@ -18,107 +131,103 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   icon: Icon,
   color = "blue",
   description,
+  trend,
 }) => {
-  const colorClasses = {
-    blue: "from-blue-500/20 to-blue-400/10 text-blue-700 dark:text-blue-400",
-    green:
-      "from-green-500/20 to-green-400/10 text-green-700 dark:text-green-400",
-    purple:
-      "from-purple-500/20 to-purple-400/10 text-purple-700 dark:text-purple-400",
-    amber:
-      "from-amber-500/20 to-amber-400/10 text-amber-700 dark:text-amber-400",
-    rose: "from-rose-500/20 to-rose-400/10 text-rose-700 dark:text-rose-400",
-    indigo:
-      "from-indigo-500/20 to-indigo-400/10 text-indigo-700 dark:text-indigo-400",
-    cyan: "from-cyan-500/20 to-cyan-400/10 text-cyan-700 dark:text-cyan-400",
-  };
-
-  const iconBgClasses = {
-    blue: "bg-gradient-to-br from-blue-600 to-blue-400 text-white",
-    green: "bg-gradient-to-br from-green-600 to-green-400 text-white",
-    purple: "bg-gradient-to-br from-purple-600 to-purple-400 text-white",
-    amber: "bg-gradient-to-br from-amber-600 to-amber-400 text-white",
-    rose: "bg-gradient-to-br from-rose-600 to-rose-400 text-white",
-    indigo: "bg-gradient-to-br from-indigo-600 to-indigo-400 text-white",
-    cyan: "bg-gradient-to-br from-cyan-600 to-cyan-400 text-white",
-  };
-
-  const borderColorClasses = {
-    blue: "border-blue-200 dark:border-blue-800/30",
-    green: "border-green-200 dark:border-green-800/30",
-    purple: "border-purple-200 dark:border-purple-800/30",
-    amber: "border-amber-200 dark:border-amber-800/30",
-    rose: "border-rose-200 dark:border-rose-800/30",
-    indigo: "border-indigo-200 dark:border-indigo-800/30",
-    cyan: "border-cyan-200 dark:border-cyan-800/30",
-  };
-
-  const bottomGradientClasses = {
-    blue: "bg-gradient-to-r from-blue-500 to-blue-300",
-    green: "bg-gradient-to-r from-green-500 to-green-300",
-    purple: "bg-gradient-to-r from-purple-500 to-purple-300",
-    amber: "bg-gradient-to-r from-amber-500 to-amber-300",
-    rose: "bg-gradient-to-r from-rose-500 to-rose-300",
-    indigo: "bg-gradient-to-r from-indigo-500 to-indigo-300",
-    cyan: "bg-gradient-to-r from-cyan-500 to-cyan-300",
-  };
+  const config = colorConfig[color];
 
   return (
     <motion.div
-      whileHover={{
-        scale: 1.02,
-        transition: { duration: 0.2 },
-      }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      whileHover={{ y: -4 }}
+      className="group"
     >
       <Card
         className={cn(
-          "overflow-hidden border rounded-xl hover:shadow-lg transition-all duration-300 backdrop-blur-sm min-h-[160px]",
-          "bg-gradient-to-br dark:bg-gray-900/70",
-          "relative group",
-          colorClasses[color as keyof typeof colorClasses],
-          borderColorClasses[color as keyof typeof borderColorClasses]
+          // Base styles
+          "relative overflow-hidden rounded-2xl border p-6",
+          // Glassmorphism
+          "bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl",
+          // Border with color theme
+          config.border,
+          // Shadow and hover effects
+          "shadow-lg shadow-black/5 dark:shadow-black/20",
+          "hover:shadow-xl transition-all duration-300",
         )}
       >
-        <div className="absolute inset-0 bg-white/90 dark:bg-gray-900/90 z-0"></div>
+        {/* Gradient Accent Background */}
+        <div
+          className={cn(
+            "absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-20 blur-3xl transition-opacity duration-300 group-hover:opacity-40",
+            `bg-gradient-to-br ${config.gradient}`,
+          )}
+        />
 
-        <div className="relative z-10 p-5">
-          <div className="flex justify-between items-start">
+        {/* Content Container */}
+        <div className="relative z-10">
+          {/* Header Row */}
+          <div className="flex items-start justify-between gap-4">
+            {/* Title & Description */}
             <div className="space-y-1">
-              <h2 className="font-semibold text-gray-800 dark:text-gray-100">
+              <h3 className="text-sm font-medium text-muted-foreground">
                 {name}
-              </h2>
+              </h3>
               {description && (
-                <p className="text-xs text-muted-foreground  leading-snug">
+                <p className="text-xs text-muted-foreground/70">
                   {description}
                 </p>
               )}
             </div>
 
+            {/* Icon with Gradient Background & Glow */}
             <div
               className={cn(
-                "rounded-lg w-12 h-12 flex items-center justify-center shadow-md",
-                "transition-all duration-300",
-                iconBgClasses[color as keyof typeof iconBgClasses]
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                "bg-gradient-to-br text-white",
+                config.gradient,
+                "shadow-lg",
+                config.glow,
+                "transition-transform duration-300 group-hover:scale-110",
               )}
             >
-              <Icon className="size-6" />
+              <Icon className="h-6 w-6" />
             </div>
           </div>
 
-          <div className="mt-6">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {number.toLocaleString()}
-            </p>
+          {/* Number Display */}
+          <div className="mt-4 flex items-end gap-3">
+            <span className="text-4xl font-bold tracking-tight text-foreground">
+              <AnimatedCounter value={number} />
+            </span>
+
+            {/* Trend Indicator */}
+            {trend !== undefined && (
+              <div
+                className={cn(
+                  "mb-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                  trend >= 0
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+                )}
+              >
+                {trend >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )}
+                <span>{Math.abs(trend)}%</span>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Bottom Gradient Line */}
         <div
           className={cn(
-            "absolute bottom-0 left-0 right-0 h-1 z-10 transition-all duration-300 group-hover:h-1.5",
-            bottomGradientClasses[color as keyof typeof bottomGradientClasses]
+            "absolute bottom-0 left-0 right-0 h-1",
+            "bg-gradient-to-r opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+            config.gradient,
           )}
         />
       </Card>

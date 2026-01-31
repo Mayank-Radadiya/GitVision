@@ -1,9 +1,21 @@
 "use client";
 
+/**
+ * =============================================================================
+ * DASHBOARD PAGE
+ * =============================================================================
+ *
+ * Main dashboard with improved layout:
+ * - Clean header with greeting and action button
+ * - Stats overview in a modern bento-style grid
+ * - Projects list with better visual hierarchy
+ *
+ * @module app/(main)/dashboard/page
+ */
+
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { GradientHeading } from "@/components/custom/gradient-heading";
 import toast from "react-hot-toast";
 import StatsCardsSection from "@/components/dashboard/stats-cards-section";
 import { useQuery } from "@tanstack/react-query";
@@ -12,14 +24,17 @@ import { getUserProjects } from "@/action/project/userProjects.action";
 import ProjectCardSkeleton from "./_components/ProjectCardSkeleton";
 import NoProjectFoundCred from "./_components/NoProjectFoundCred";
 import dynamic from "next/dynamic";
+import { Plus, FolderGit2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
 
 // Dynamically import RepositoryCard with loading fallback
 const RepositoryCard = dynamic(
   () =>
-    import("@/components/dashboard/repository-card").then(
-      (mod) => mod.RepositoryCard
+    import("@/components/dashboard/RepositoryCard").then(
+      (mod) => mod.RepositoryCard,
     ),
-  { ssr: false }
+  { ssr: false },
 );
 
 export default function DashboardPage() {
@@ -35,7 +50,7 @@ export default function DashboardPage() {
   } = useQuery({
     queryKey: ["dashboardInfo"],
     queryFn: getUserDashboardInfo,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -57,12 +72,11 @@ export default function DashboardPage() {
   // Combined loading state
   const isLoading = isInfoLoading || isProjectsLoading;
 
-  // Set a timer to ensure skeleton is shown for minimum 2.5 seconds
+  // Set a timer for skeleton display
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSkeleton(false);
-    }, 500); // Show skeleton for 1 seconds
-
+    }, 500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -73,12 +87,14 @@ export default function DashboardPage() {
     }
   }, [isInfoError, isProjectsError]);
 
-  // Determine what to render in the projects section
+  // Get first name for greeting
+  const firstName = user?.firstName || "there";
+
+  // Render projects content
   const renderProjectsContent = () => {
-    // Always show skeleton if we're in the initial loading timer
     if (showSkeleton || isLoading) {
       return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
             <ProjectCardSkeleton key={i} />
           ))}
@@ -86,22 +102,27 @@ export default function DashboardPage() {
       );
     }
 
-    // Show projects if available, otherwise show no projects message
     return userProjects.length > 0 ? (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {userProjects.map((project) => (
-          <RepositoryCard
+      <div className="space-y-3">
+        {userProjects.map((project, index) => (
+          <motion.div
             key={project.id}
-            id={project.id}
-            projectName={project.projectName}
-            githubUrl={project.githubUrl}
-            star={project.star}
-            forks={project.forks}
-            totalCommits={project.totalCommits}
-            totalBranches={project.totalBranches}
-            totalContributors={project.totalContributors}
-            createdAt={project.createdAt}
-          />
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+          >
+            <RepositoryCard
+              id={project.id}
+              projectName={project.projectName}
+              githubUrl={project.githubUrl}
+              star={project.star}
+              forks={project.forks}
+              totalCommits={project.totalCommits}
+              totalBranches={project.totalBranches}
+              totalContributors={project.totalContributors}
+              createdAt={project.createdAt}
+            />
+          </motion.div>
         ))}
       </div>
     ) : (
@@ -110,38 +131,72 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8 p-8 ">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        {/* Heading & Description */}
-        <div className="text-center sm:text-left">
-          <GradientHeading as="h1" className="mb-2">
-            Dashboard
-          </GradientHeading>
-          <p className="text-muted-foreground">
-            View and manage your GitHub repository analyses
-          </p>
-        </div>
+    <div className="min-h-screen">
+      {/* Header Section */}
+      <div className="border-b border-border/40 bg-gradient-to-b from-background to-muted/20">
+        <div className="px-6 py-8 lg:px-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            {/* Greeting */}
+            <div>
+              <motion.h1
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-3xl font-bold tracking-tight text-foreground"
+              >
+                Welcome back, {firstName}
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="mt-1 text-muted-foreground"
+              >
+                Here&apos;s an overview of your repositories
+              </motion.p>
+            </div>
 
-        {/* Add Project Button */}
-        <button
-          className="relative inline-flex group"
-          onClick={() => router.push("/dashboard/create-project")}
-          type="button"
-        >
-          <div className="absolute transitiona-all duration-1000 opacity-50 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg filter group-hover:opacity-100 group-hover:-inset-1 group-hover:duration-200"></div>
-          <div className="relative inline-flex items-center justify-center px-5 py-2 text-base font-bold text-white transition-all duration-200 bg-gray-900 border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 rounded">
-            New Project
+            {/* New Project Button */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Button
+                onClick={() => router.push("/dashboard/create-project")}
+                className="gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
+              >
+                <Plus className="h-4 w-4" />
+                New Project
+              </Button>
+            </motion.div>
           </div>
-        </button>
+
+          {/* Stats Cards */}
+          <div className="mt-8">
+            <StatsCardsSection project={info} />
+          </div>
+        </div>
       </div>
 
-      {/* Dashboard Stats */}
-      <StatsCardsSection project={info} />
+      {/* Projects Section */}
+      <div className="px-6 py-8 lg:px-8">
+        {/* Section Header */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <FolderGit2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              Your Projects
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {userProjects.length}{" "}
+              {userProjects.length === 1 ? "repository" : "repositories"}
+            </p>
+          </div>
+        </div>
 
-      {/* Projects List */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-semibold mb-6">Your Projects</h2>
+        {/* Projects List */}
         {renderProjectsContent()}
       </div>
     </div>

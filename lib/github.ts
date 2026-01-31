@@ -1,173 +1,612 @@
 "use server";
+
 import { Octokit } from "octokit";
 import { db } from "@/drizzle";
 import { commitsTable, projectTables } from "@/drizzle/schema/schema";
-import axios from "axios";
+import axios, { AxiosRequestConfig } from "axios";
 import { eq, and } from "drizzle-orm";
 import { aISummariesCommit } from "./gemini";
+
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
+/**
+ * GitHub repository information extracted from URL
+ */
+interface GitHubRepoInfo {
+  owner: string;
+  repo: string;
+}
+
+/**
+ * Commit data structure for database insertion
+ */
+interface CommitData {
+  commitHash: string;
+  commitMessage: string;
+  authorName: string;
+  authorAvatar: string;
+  authorEmail: string;
+  authorDate: Date;
+  committerName: string;
+  committerEmail: string;
+  committerDate: Date;
+  projectId: string;
+}
+
+/**
+ * Project statistics from GitHub
+ */
+interface ProjectStats {
+  stars: number;
+  forks: number;
+  totalBranches: number;
+  totalContributors: number;
+  totalCommits: number;
+}
+
+/**
+ * Options for fetchWithRetry function
+ */
+interface FetchOptions {
+  retries?: number;
+  baseDelay?: number;
+  timeout?: number;
+}
+
+/**
+ * File information returned from repository file processing
+ */
+interface FileInfo {
+  id: string;
+  path: string;
+  size: number | undefined;
+  sha: string;
+}
+
+/**
+ * Result of project creation
+ */
+interface CreateProjectResult {
+  projectId: string;
+}
+
+// ============================================================================
+// CUSTOM ERROR CLASSES
+// ============================================================================
+
+/**
+ * Base error class for all GitHub-related errors
+ */
+class GitHubError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public statusCode: number = 500,
+    public details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "GitHubError";
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+/**
+ * Error thrown when input validation fails
+ */
+class GitHubValidationError extends GitHubError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, "GITHUB_VALIDATION_ERROR", 400, details);
+    this.name = "GitHubValidationError";
+  }
+}
+
+/**
+ * Error thrown when GitHub API returns an error
+ */
+class GitHubAPIError extends GitHubError {
+  constructor(
+    message: string,
+    statusCode: number,
+    details?: Record<string, unknown>,
+  ) {
+    super(message, "GITHUB_API_ERROR", statusCode, details);
+    this.name = "GitHubAPIError";
+  }
+}
+
+/**
+ * Error thrown when GitHub API rate limit is exceeded
+ */
+class GitHubRateLimitError extends GitHubError {
+  constructor(message: string = "GitHub API rate limit exceeded") {
+    super(message, "GITHUB_RATE_LIMIT", 429);
+    this.name = "GitHubRateLimitError";
+  }
+}
+
+/**
+ * Error thrown when a resource is not found
+ */
+class GitHubNotFoundError extends GitHubError {
+  constructor(resource: string, identifier: string) {
+    super(`${resource} not found`, "GITHUB_NOT_FOUND", 404, {
+      resource,
+      identifier,
+    });
+    this.name = "GitHubNotFoundError";
+  }
+}
+
+// ============================================================================
+// CONFIGURATION CONSTANTS
+// ============================================================================
+
+/**
+ * GitHub API and processing configuration
+ */
+const GITHUB_CONFIG = {
+  /** Items to fetch per page from GitHub API */
+  DEFAULT_PER_PAGE: 100,
+  /** Maximum number of retry attempts for failed requests */
+  MAX_RETRIES: 3,
+  /** Base delay in milliseconds for retry backoff */
+  BASE_RETRY_DELAY: 2000,
+  /** Maximum delay in milliseconds for retry backoff */
+  MAX_RETRY_DELAY: 10000,
+  /** Number of commits to batch for database insertion */
+  COMMIT_BATCH_SIZE: 10,
+  /** Number of files to process in parallel */
+  FILE_BATCH_SIZE: 10,
+  /** Maximum length of diff data to process */
+  DIFF_MAX_LENGTH: 10000,
+  /** Request timeout in milliseconds */
+  REQUEST_TIMEOUT: 30000,
+} as const;
+
+/**
+ * HTTP status codes that should trigger a retry
+ */
+const RETRYABLE_STATUS_CODES = [404, 429, 500, 502, 503, 504] as const;
+
+/**
+ * Default values for missing GitHub data
+ */
+const DEFAULTS = {
+  AVATAR: "https://via.placeholder.com/150",
+  EMAIL: "unknown@example.com",
+  NAME: "Unknown",
+} as const;
+
+/**
+ * File patterns to ignore when fetching repository files
+ */
+const IGNORED_FILE_PATTERNS = [
+  // Build and dependency directories
+  /^node_modules\//,
+  /^dist\//,
+  /^build\//,
+  /^\\.next\//,
+  /^\\.nuxt\//,
+  /^out\//,
+  /^vendor\//,
+
+  // Cache and temp directories
+  /^coverage\//,
+  /^\\.cache\//,
+  /^\\.turbo\//,
+  /^__pycache__\//,
+  /^env\//,
+
+  // IDE directories
+  /^\\.vscode\//,
+  /^\\.idea\//,
+  /^\\.angular\//,
+  /^\\.jest\//,
+
+  // Log files and directories
+  /^logs?\//,
+  /^storage\/logs\//,
+  /\\.log$/i,
+
+  // Test snapshots
+  /^__snapshots__\//,
+
+  // Environment and config
+  /\\.env(\\..*)?$/i,
+  /\\.DS_Store$/,
+  /\\.eslintcache$/,
+  /\\.prettiercache$/,
+
+  // Binary and media files
+  /\\.(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?|heic|heif)$/i,
+  /\\.(mp4|mov|avi|mkv|webm|flv|wmv|m4v|3gp|mpg|mpeg)$/i,
+  /\\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i,
+  /\\.(zip|tar|gz|rar|7z|bz2|xz|dmg|iso)$/i,
+  /\\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i,
+  /\\.(woff2?|ttf|eot|otf)$/i,
+  /\\.pyc$/,
+] as const;
+
+// ============================================================================
+// OCTOKIT INSTANCE
+// ============================================================================
+
+if (!process.env.GITHUB_TOKEN) {
+  throw new Error("GITHUB_TOKEN environment variable is required");
+}
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 });
 
-function removeGitSuffix(url: string) {
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Removes the .git suffix from a GitHub URL if present
+ * @param url - GitHub URL to clean
+ * @returns URL without .git suffix
+ */
+function removeGitSuffix(url: string): string {
   return url.endsWith(".git") ? url.slice(0, -4) : url;
 }
 
-async function fetchWithRetry(
-  url: string,
-  options: Record<string, unknown> = {},
-  retries = 3,
-  delay = 2000
-) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await axios.get(url, options);
-      // eslint-disable-next-line
-    } catch (error: any) {
-      // Retry on rate limits (429) or temporary failures (404, 500, 502, 503, 504)
-      if (
-        (error.response?.status === 429 ||
-          error.response?.status === 404 ||
-          error.response?.status >= 500) &&
-        i < retries - 1
-      ) {
-        const statusCode = error.response?.status;
-        console.warn(
-          `Request failed with status ${statusCode}. Retrying in ${delay}ms...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2; // Exponential backoff
-      } else {
-        throw error;
-      }
-    }
+/**
+ * Validates and parses a GitHub URL to extract owner and repository name
+ * @param githubUrl - GitHub repository URL
+ * @returns Object containing owner and repo
+ * @throws {GitHubValidationError} If URL is invalid or missing required parts
+ */
+function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
+  if (!githubUrl || typeof githubUrl !== "string") {
+    throw new GitHubValidationError(
+      "GitHub URL is required and must be a string",
+      {
+        provided: githubUrl,
+      },
+    );
   }
-  throw new Error("Max retries reached");
+
+  const cleanUrl = removeGitSuffix(githubUrl.trim());
+  const parts = cleanUrl.split("/");
+  const owner = parts[parts.length - 2];
+  const repo = parts[parts.length - 1];
+
+  if (!owner || !repo || owner.trim() === "" || repo.trim() === "") {
+    throw new GitHubValidationError(
+      "Invalid GitHub URL format. Expected format: https://github.com/owner/repo",
+      { url: githubUrl },
+    );
+  }
+
+  return { owner: owner.trim(), repo: repo.trim() };
 }
 
-// Function to get commit hashes from a GitHub repository and store them in the database
-export const getCommitHashes = async (githubUrl: string, projectId: string) => {
-  const GithubUrl = removeGitSuffix(githubUrl);
-  const [owner, repo] = GithubUrl.split("/").slice(-2);
+/**
+ * Fetches data from a URL with automatic retry logic and exponential backoff
+ * @param url - URL to fetch
+ * @param options - Axios request configuration
+ * @param retries - Maximum number of retry attempts
+ * @param delay - Base delay in milliseconds between retries
+ * @returns Axios response
+ * @throws {GitHubAPIError} If all retry attempts fail
+ */
+async function fetchWithRetry(
+  url: string,
+  options: AxiosRequestConfig = {},
+  retries: number = GITHUB_CONFIG.MAX_RETRIES,
+  delay: number = GITHUB_CONFIG.BASE_RETRY_DELAY,
+) {
+  let lastError: Error | null = null;
 
-  if (!owner || !repo) {
-    throw new Error("Invalid GitHub URL.");
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await axios.get(url, {
+        ...options,
+        timeout: options.timeout || GITHUB_CONFIG.REQUEST_TIMEOUT,
+      });
+    } catch (error: unknown) {
+      lastError = error as Error;
+      const axiosError = error as {
+        response?: { status?: number };
+        message?: string;
+      };
+      const statusCode = axiosError.response?.status;
+
+      // Check if error is retryable
+      const isRetryable =
+        statusCode &&
+        RETRYABLE_STATUS_CODES.includes(
+          statusCode as (typeof RETRYABLE_STATUS_CODES)[number],
+        );
+
+      if (isRetryable && attempt < retries - 1) {
+        const waitTime = Math.min(
+          delay * Math.pow(2, attempt),
+          GITHUB_CONFIG.MAX_RETRY_DELAY,
+        );
+
+        console.warn(
+          `[GitHub] Request failed with status ${statusCode}. Retrying in ${waitTime}ms... (Attempt ${attempt + 1}/${retries})`,
+          { url, statusCode },
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      // If not retryable or out of retries, throw
+      if (statusCode === 429) {
+        throw new GitHubRateLimitError();
+      } else if (statusCode === 404) {
+        throw new GitHubNotFoundError("Resource", url);
+      } else if (statusCode && statusCode >= 400) {
+        throw new GitHubAPIError(
+          `GitHub API request failed: ${axiosError.message || "Unknown error"}`,
+          statusCode,
+          { url, attempt: attempt + 1 },
+        );
+      }
+
+      throw error;
+    }
   }
 
+  throw new GitHubAPIError(
+    `Max retries (${retries}) reached for URL: ${url}`,
+    500,
+    { lastError: lastError?.message },
+  );
+}
+
+/**
+ * Creates a CommitData object from GitHub API commit data
+ * @param commit - Commit data from GitHub API
+ * @param projectId - Project ID to associate with the commit
+ * @returns Formatted commit data for database insertion
+ */
+function createCommitData(commit: any, projectId: string): CommitData {
+  return {
+    commitHash: commit.sha,
+    commitMessage: commit.commit.message || "",
+    authorName: commit.commit.author?.name || DEFAULTS.NAME,
+    authorAvatar: commit.author?.avatar_url || DEFAULTS.AVATAR,
+    authorEmail: commit.commit.author?.email || DEFAULTS.EMAIL,
+    authorDate: commit.commit.author?.date
+      ? new Date(commit.commit.author.date)
+      : new Date(),
+    committerName: commit.commit.committer?.name || DEFAULTS.NAME,
+    committerEmail: commit.commit.committer?.email || DEFAULTS.EMAIL,
+    committerDate: commit.commit.committer?.date
+      ? new Date(commit.commit.committer.date)
+      : new Date(),
+    projectId,
+  };
+}
+
+/**
+ * Logs structured information with consistent formatting
+ * @param level - Log level (info, warn, error)
+ * @param message - Log message
+ * @param meta - Additional metadata
+ */
+function log(
+  level: "info" | "warn" | "error",
+  message: string,
+  meta?: Record<string, unknown>,
+): void {
+  const timestamp = new Date().toISOString();
+  const logData = { timestamp, level, message, ...meta };
+
+  switch (level) {
+    case "error":
+      console.error(`[GitHub:Error] ${message}`, meta || "");
+      break;
+    case "warn":
+      console.warn(`[GitHub:Warn] ${message}`, meta || "");
+      break;
+    default:
+      console.log(`[GitHub:Info] ${message}`, meta || "");
+  }
+}
+
+// ============================================================================
+// EXPORTED FUNCTIONS
+// ============================================================================
+
+/**
+ * Fetches all commit hashes from a GitHub repository and stores them in the database
+ *
+ * This function retrieves all commits from a GitHub repository using pagination,
+ * processes them in batches, and stores them in the database. It handles errors
+ * gracefully and provides detailed logging throughout the process.
+ *
+ * @param githubUrl - Full GitHub repository URL (e.g., https://github.com/owner/repo)
+ * @param projectId - UUID of the project to associate commits with
+ * @returns Total number of commits stored in the database
+ *
+ * @throws {GitHubValidationError} If the GitHub URL is invalid
+ * @throws {GitHubAPIError} If the GitHub API request fails
+ * @throws {Error} If database operations fail
+ *
+ * @example
+ * const commitCount = await getCommitHashes(
+ *   "https://github.com/vercel/next.js",
+ *   "123e4567-e89b-12d3-a456-426614174000"
+ * );
+ * console.log(`Stored ${commitCount} commits`);
+ */
+export const getCommitHashes = async (
+  githubUrl: string,
+  projectId: string,
+): Promise<number> => {
   try {
+    // Validate and parse GitHub URL
+    const { owner, repo } = parseGitHubUrl(githubUrl);
+
+    log("info", "Fetching commits from GitHub", { owner, repo, projectId });
+
+    // Fetch all commits using pagination
     const commits = await octokit.paginate(octokit.rest.repos.listCommits, {
       owner,
       repo,
-      per_page: 100, // Get more commits per page for efficiency
+      per_page: GITHUB_CONFIG.DEFAULT_PER_PAGE,
     });
 
-    // Process commits and prepare for database insertion
-    const commitDataForDb = [];
+    log("info", `Fetched ${commits.length} commits from GitHub`, {
+      owner,
+      repo,
+      count: commits.length,
+    });
 
-    // Process commits for database insertion
-    for (const commit of commits) {
-      commitDataForDb.push({
-        commitHash: commit.sha,
-        commitMessage: commit.commit.message,
-        authorName: commit.commit.author?.name || "Unknown",
-        authorAvatar:
-          commit.author?.avatar_url || "https://via.placeholder.com/150",
-        authorEmail: commit.commit.author?.email || "unknown@example.com",
-        authorDate: commit.commit.author?.date
-          ? new Date(commit.commit.author.date)
-          : new Date(),
-        committerName: commit.commit.committer?.name || "Unknown",
-        committerEmail: commit.commit.committer?.email || "unknown@example.com",
-        committerDate: commit.commit.committer?.date
-          ? new Date(commit.commit.committer.date)
-          : new Date(),
-        projectId: projectId, // Link commits to the project
-      });
+    // Process commits in batches
+    const batchSize = GITHUB_CONFIG.COMMIT_BATCH_SIZE;
+    let totalStored = 0;
 
-      // Optional: Save to database every few commits to avoid losing progress
-      if (commitDataForDb.length % 10 === 0 && commitDataForDb.length > 0) {
-        console.log(
-          `Saving batch of ${commitDataForDb.length} commits to database...`
-        );
-        await db.insert(commitsTable).values(commitDataForDb.slice(-10));
+    for (let i = 0; i < commits.length; i += batchSize) {
+      const batch = commits.slice(i, i + batchSize);
+      const commitDataForDb = batch.map((commit) =>
+        createCommitData(commit, projectId),
+      );
+
+      try {
+        await db.insert(commitsTable).values(commitDataForDb);
+        totalStored += commitDataForDb.length;
+
+        log("info", `Stored batch of commits`, {
+          batchNumber: Math.floor(i / batchSize) + 1,
+          batchSize: commitDataForDb.length,
+          totalStored,
+        });
+      } catch (dbError) {
+        log("error", `Failed to store commit batch`, {
+          batchNumber: Math.floor(i / batchSize) + 1,
+          error: dbError instanceof Error ? dbError.message : "Unknown error",
+        });
+        throw dbError;
       }
     }
 
-    // Insert any remaining commit data into the database
-    if (commitDataForDb.length > 0) {
-      console.log(
-        `Saving final batch of ${
-          commitDataForDb.length % 10 || commitDataForDb.length
-        } commits to database...`
-      );
-      await db
-        .insert(commitsTable)
-        .values(
-          commitDataForDb.slice(
-            -(commitDataForDb.length % 10 || commitDataForDb.length)
-          )
-        );
+    log("info", "Successfully stored all commits", {
+      owner,
+      repo,
+      totalCommits: totalStored,
+    });
+
+    return totalStored;
+  } catch (error) {
+    if (
+      error instanceof GitHubValidationError ||
+      error instanceof GitHubAPIError
+    ) {
+      throw error;
     }
 
-    return commitDataForDb.length; // Return the number of commits stored
-  } catch (error) {
-    console.error("Error fetching or storing commits:", error);
-    throw error;
+    log("error", "Error fetching or storing commits", {
+      githubUrl,
+      projectId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    throw new GitHubError(
+      "Failed to fetch and store commits",
+      "COMMIT_FETCH_ERROR",
+      500,
+      { originalError: error instanceof Error ? error.message : String(error) },
+    );
   }
 };
 
+/**
+ * Creates a new project in the database with GitHub repository information
+ *
+ * Fetches repository metadata from GitHub (stars, forks, branches, contributors, commits)
+ * and creates a new project entry in the database with this information.
+ *
+ * @param url - GitHub repository URL
+ * @param projectName - Name for the project
+ * @param userId - ID of the user creating the project
+ * @returns Object containing the created project's ID
+ *
+ * @throws {GitHubValidationError} If inputs are invalid
+ * @throws {GitHubAPIError} If GitHub API requests fail
+ * @throws {Error} If database operation fails
+ *
+ * @example
+ * const result = await createNewProject(
+ *   "https://github.com/vercel/next.js",
+ *   "Next.js Framework",
+ *   "user_123"
+ * );
+ * console.log(`Created project with ID: ${result.projectId}`);
+ */
 export async function createNewProject(
   url: string,
   projectName: string,
-  userId: string
-): Promise<{ projectId: string }> {
+  userId: string,
+): Promise<CreateProjectResult> {
   try {
-    // remove .git suffix if present
-    const GithubUrl = removeGitSuffix(url);
-    // Extract owner and repo from the URL
-    const [owner, repo] = GithubUrl.split("/").slice(-2);
-
-    if (!owner || !repo) {
-      throw new Error("Invalid GitHub URL.");
+    // Validate inputs
+    if (
+      !projectName ||
+      typeof projectName !== "string" ||
+      projectName.trim() === ""
+    ) {
+      throw new GitHubValidationError(
+        "Project name is required and must be a non-empty string",
+      );
     }
 
-    // Get stars & forks
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+      throw new GitHubValidationError(
+        "User ID is required and must be a non-empty string",
+      );
+    }
+
+    // Parse and validate GitHub URL
+    const { owner, repo } = parseGitHubUrl(url);
+
+    log("info", "Creating new project", { owner, repo, projectName, userId });
+
+    // Fetch repository data
     const { data: repoData } = await octokit.rest.repos.get({ owner, repo });
 
-    // Get branches
+    // Fetch branches with pagination
     const branches = await octokit.paginate(octokit.rest.repos.listBranches, {
       owner,
       repo,
-      per_page: 100,
+      per_page: GITHUB_CONFIG.DEFAULT_PER_PAGE,
     });
 
-    // Get contributors
+    // Fetch contributors with pagination
     const contributors = await octokit.paginate(
       octokit.rest.repos.listContributors,
       {
         owner,
         repo,
-        per_page: 100,
-      }
+        per_page: GITHUB_CONFIG.DEFAULT_PER_PAGE,
+      },
     );
 
-    // Get commits (latest commit list to count total)
+    // Fetch commits with pagination
     const commits = await octokit.paginate(octokit.rest.repos.listCommits, {
       owner,
       repo,
-      per_page: 100,
+      per_page: GITHUB_CONFIG.DEFAULT_PER_PAGE,
     });
 
     // Create project in database
     const [newProject] = await db
       .insert(projectTables)
       .values({
-        projectName: projectName || repoData.name,
+        projectName: projectName.trim() || repoData.name,
         githubUrl: url,
         ownerId: userId,
-        star: repoData.stargazers_count,
-        forks: repoData.forks_count,
+        star: repoData.stargazers_count || 0,
+        forks: repoData.forks_count || 0,
         totalBranches: branches.length,
         totalContributors: contributors.length,
         totalCommits: commits.length,
@@ -180,22 +619,87 @@ export async function createNewProject(
       throw new Error("Failed to create project in database");
     }
 
+    log("info", "Successfully created project", {
+      projectId: newProject.id,
+      projectName: newProject.projectName,
+      stats: {
+        stars: newProject.star,
+        forks: newProject.forks,
+        branches: newProject.totalBranches,
+        contributors: newProject.totalContributors,
+        commits: newProject.totalCommits,
+      },
+    });
+
     return {
       projectId: newProject.id,
     };
-  } catch (err) {
-    console.error("Error creating new project:", err);
-    throw err;
+  } catch (error) {
+    if (
+      error instanceof GitHubValidationError ||
+      error instanceof GitHubAPIError ||
+      error instanceof GitHubRateLimitError
+    ) {
+      throw error;
+    }
+
+    log("error", "Error creating new project", {
+      url,
+      projectName,
+      userId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    throw new GitHubError(
+      "Failed to create project",
+      "PROJECT_CREATE_ERROR",
+      500,
+      { originalError: error instanceof Error ? error.message : String(error) },
+    );
   }
 }
 
+/**
+ * Fetches all files from a GitHub repository and stores them in the database
+ *
+ * Retrieves the complete file tree from the repository's default branch,
+ * filters out ignored files (node_modules, build artifacts, media files, etc.),
+ * and stores the file content in the database in batches for efficiency.
+ *
+ * @param owner - GitHub repository owner
+ * @param repo - GitHub repository name
+ * @param projectId - UUID of the project to associate files with
+ * @returns Array of stored file information
+ *
+ * @throws {GitHubValidationError} If inputs are invalid
+ * @throws {GitHubAPIError} If GitHub API requests fail
+ * @throws {Error} If database operations fail
+ *
+ * @example
+ * const files = await getRepositoryFiles("vercel", "next.js", "project-uuid");
+ * console.log(`Stored ${files.length} files`);
+ */
 export async function getRepositoryFiles(
   owner: string,
   repo: string,
-  projectId: string
-) {
+  projectId: string,
+): Promise<FileInfo[]> {
   try {
-    // Step 1: Get the default branch
+    // Validate inputs
+    if (!owner || !repo || !projectId) {
+      throw new GitHubValidationError(
+        "Owner, repo, and projectId are required",
+        {
+          owner,
+          repo,
+          projectId,
+        },
+      );
+    }
+
+    log("info", "Fetching repository files", { owner, repo, projectId });
+
+    // Get the default branch
     const {
       data: { default_branch },
     } = await octokit.rest.repos.get({
@@ -203,7 +707,7 @@ export async function getRepositoryFiles(
       repo,
     });
 
-    // Step 2: Get the latest commit to get the tree SHA
+    // Get the latest commit to get the tree SHA
     const {
       data: {
         commit: {
@@ -216,7 +720,7 @@ export async function getRepositoryFiles(
       ref: default_branch,
     });
 
-    // Step 3: Get the full tree recursively
+    // Get the full tree recursively
     const {
       data: { tree },
     } = await octokit.rest.git.getTree({
@@ -226,72 +730,46 @@ export async function getRepositoryFiles(
       recursive: "1",
     });
 
-    const ignoredPatterns = [
-      /^node_modules\//,
-      /^dist\//,
-      /^build\//,
-      /^\.next\//,
-      /^\.nuxt\//,
-      /^out\//,
-      /^public\//,
-      /^coverage\//,
-      /^\.vscode\//,
-      /^\.idea\//,
-      /^logs?\//,
-      /^__snapshots__\//,
-      /\.log$/i,
-      /\.env(\..*)?$/i,
-      /\.DS_Store$/,
-      /^\.cache\//,
-      /\.eslintcache$/,
-      /\.prettiercache$/,
-      /^vendor\//,
-      /^\.angular\//,
-      /^\.jest\//,
-      /^storage\/logs\//,
-      /^env\//,
-      /^__pycache__\//,
-      /\.pyc$/,
-      /^\.turbo\//,
-
-      // Media files
-      /\.(png|jpe?g|gif|svg|webp|bmp|ico)$/i, // image files
-      /\.(mp4|mov|avi|mkv|webm|flv|wmv)$/i, // video files
-      /\.(mp3|wav|ogg|m4a)$/i, // audio files
-      /\.(zip|tar|gz|rar|7z)$/i, // compressed archives
-    ];
-
-    // Import database modules
+    // Import database modules dynamically
     const { db } = await import("@/drizzle");
     const { projectFiles } = await import("@/drizzle/schema/schema");
 
-    // Step 4: Filter files that are NOT in the ignore list
+    // Filter files that are NOT in the ignore list
     const filesToProcess = tree.filter(
       (item) =>
         item.type === "blob" &&
         item.path &&
-        !ignoredPatterns.some((pattern) => pattern.test(item.path!))
+        !IGNORED_FILE_PATTERNS.some((pattern) => pattern.test(item.path!)),
     );
 
-    const storedFiles = [];
-    const batchSize = 10; // Process files in batches to avoid memory issues
-    const fileBatches = [];
+    log("info", `Filtered ${filesToProcess.length} files to process`, {
+      totalFiles: tree.length,
+      processableFiles: filesToProcess.length,
+    });
+
+    const storedFiles: FileInfo[] = [];
+    const batchSize = GITHUB_CONFIG.FILE_BATCH_SIZE;
 
     // Create batches of files
+    const fileBatches: (typeof filesToProcess)[] = [];
     for (let i = 0; i < filesToProcess.length; i += batchSize) {
       fileBatches.push(filesToProcess.slice(i, i + batchSize));
     }
 
     // Process each batch
     for (const [batchIndex, batch] of fileBatches.entries()) {
-      console.log(
-        `Processing batch ${batchIndex + 1} of ${fileBatches.length}...`
+      log(
+        "info",
+        `Processing file batch ${batchIndex + 1}/${fileBatches.length}`,
+        {
+          batchSize: batch.length,
+        },
       );
 
       const batchPromises = batch.map(async (file) => {
         try {
           if (!file.sha || !file.path) {
-            console.warn("File missing sha or path:", file);
+            log("warn", "File missing sha or path, skipping", { file });
             return null;
           }
 
@@ -302,8 +780,33 @@ export async function getRepositoryFiles(
             file_sha: file.sha,
           });
 
-          // Decode content from base64
-          const content = Buffer.from(blob.content, "base64").toString("utf-8");
+          // Decode content from base64 and check if it's valid UTF-8
+          let content: string;
+          try {
+            const buffer = Buffer.from(blob.content, "base64");
+            content = buffer.toString("utf-8");
+
+            // Check if the decoded content contains null bytes (binary file indicator)
+            if (content.includes("\0")) {
+              log("warn", `Skipping binary file ${file.path}`, {
+                path: file.path,
+              });
+              return null;
+            }
+          } catch (decodeError) {
+            log(
+              "warn",
+              `Skipping file with invalid UTF-8 encoding: ${file.path}`,
+              {
+                path: file.path,
+                error:
+                  decodeError instanceof Error
+                    ? decodeError.message
+                    : "Unknown error",
+              },
+            );
+            return null;
+          }
 
           // Store in database
           const [newFile] = await db
@@ -324,33 +827,94 @@ export async function getRepositoryFiles(
             sha: file.sha,
           };
         } catch (error) {
-          console.error(`Error processing file ${file.path}:`, error);
+          log("error", `Error processing file ${file.path}`, {
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
           return null;
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
-      storedFiles.push(...batchResults.filter(Boolean));
+      storedFiles.push(...(batchResults.filter(Boolean) as FileInfo[]));
     }
 
-    console.log(
-      `Successfully stored ${storedFiles.length} files in the database`
+    log(
+      "info",
+      `Successfully stored ${storedFiles.length} files in the database`,
+      {
+        owner,
+        repo,
+        projectId,
+        totalFiles: storedFiles.length,
+      },
     );
+
     return storedFiles;
   } catch (error) {
-    console.error("Error fetching repository files:", error);
-    throw error;
+    if (
+      error instanceof GitHubValidationError ||
+      error instanceof GitHubAPIError
+    ) {
+      throw error;
+    }
+
+    log("error", "Error fetching repository files", {
+      owner,
+      repo,
+      projectId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    throw new GitHubError(
+      "Failed to fetch repository files",
+      "FILE_FETCH_ERROR",
+      500,
+      { originalError: error instanceof Error ? error.message : String(error) },
+    );
   }
 }
 
+/**
+ * Generates an AI summary for a specific commit by fetching its diff and processing it
+ *
+ * This function retrieves the commit diff from GitHub using multiple fallback methods,
+ * truncates if necessary, and sends it to an AI service for summary generation.
+ * The generated summary is stored in the database for future reference.
+ *
+ * @param githubUrl - Full GitHub repository URL
+ * @param commitHash - SHA hash of the commit
+ * @param projectId - UUID of the project
+ * @param commitId - Optional UUID of the commit record in database
+ * @returns AI-generated summary of the commit
+ *
+ * @throws {GitHubValidationError} If inputs are invalid
+ * @throws {GitHubNotFoundError} If commit is not found in database
+ *
+ * @example
+ * const summary = await getAiSummaryOfCommit(
+ *   "https://github.com/vercel/next.js",
+ *   "abc123...",
+ *   "project-uuid"
+ * );
+ * console.log(summary);
+ */
 export async function getAiSummaryOfCommit(
   githubUrl: string,
   commitHash: string,
   projectId: string,
-  commitId?: string
-) {
+  commitId?: string,
+): Promise<string> {
   try {
-    // First check if the commit exists in our database
+    // Validate inputs
+    if (!commitHash || typeof commitHash !== "string") {
+      throw new GitHubValidationError("Commit hash is required");
+    }
+
+    if (!projectId || typeof projectId !== "string") {
+      throw new GitHubValidationError("Project ID is required");
+    }
+
+    // Check if the commit exists in our database
     const existingCommit = await db
       .select()
       .from(commitsTable)
@@ -359,122 +923,105 @@ export async function getAiSummaryOfCommit(
           ? eq(commitsTable.id, commitId)
           : and(
               eq(commitsTable.commitHash, commitHash),
-              eq(commitsTable.projectId, projectId)
-            )
+              eq(commitsTable.projectId, projectId),
+            ),
       )
       .limit(1);
 
     if (!existingCommit || existingCommit.length === 0) {
-      throw new Error("Commit not found in database");
+      throw new GitHubNotFoundError("Commit", commitId || commitHash);
     }
 
-    // Use the commit hash from the database if we have it
-    const commitHashToUse = existingCommit[0].commitHash || commitHash;
+    const commitRecord = existingCommit[0];
+    const commitHashToUse = commitRecord.commitHash || commitHash;
 
-    // Parse GitHub URL to get owner and repo
-    const GithubUrl = removeGitSuffix(githubUrl);
-    const [owner, repo] = GithubUrl.split("/").slice(-2);
+    // Parse GitHub URL
+    const { owner, repo } = parseGitHubUrl(githubUrl);
 
-    if (!owner || !repo) {
-      throw new Error("Invalid GitHub URL.");
-    }
+    log("info", `Fetching diff for commit ${commitHashToUse}`, { owner, repo });
 
-    console.log(`Fetching diff for commit ${commitHashToUse}...`);
-
-    // Extract commit message for fallback scenario
-    const commitMessage =
-      existingCommit[0].commitMessage || "No message available";
+    // Extract commit message for fallback
+    const commitMessage = commitRecord.commitMessage || "No message available";
     let diffData = "";
 
-    // Define all methods to try for fetching diff data
-    const fetchMethods = [
-      // Method 1: Raw diff URL with retry
-      async () => {
-        const { data } = await fetchWithRetry(
-          `https://github.com/${owner}/${repo}/commit/${commitHashToUse}.diff`,
+    // Method 1: Try raw diff URL with retry
+    const fetchMethod1 = async (): Promise<string> => {
+      const { data } = await fetchWithRetry(
+        `https://github.com/${owner}/${repo}/commit/${commitHashToUse}.diff`,
+        {
+          headers: {
+            Accept: "application/vnd.github.v3.diff",
+            "User-Agent": "GitVision App (https://gitvision.vercel.app/)",
+          },
+        },
+        3,
+        3000,
+      );
+      return data;
+    };
+
+    // Method 2: Try GitHub API with diff media type
+    const fetchMethod2 = async (): Promise<string> => {
+      try {
+        const response = await octokit.request(
+          "GET /repos/{owner}/{repo}/commits/{commit_sha}",
           {
+            owner,
+            repo,
+            commit_sha: commitHashToUse,
             headers: {
-              Accept: "application/vnd.github.v3.diff",
-              "User-Agent": "GitVision App (https://gitvision.vercel.app/)",
+              accept: "application/vnd.github.v3.diff",
             },
           },
-          3,
-          3000
         );
-        return data;
-      },
 
-      // if the first method fails, try the second method
-      // Method 2: GitHub API with diff media type
-      async () => {
-        try {
-          const response = await octokit.request(
-            "GET /repos/{owner}/{repo}/commits/{commit_sha}",
-            {
-              owner,
-              repo,
-              commit_sha: commitHashToUse,
-              headers: {
-                accept: "application/vnd.github.v3.diff",
-              },
-            }
-          );
-
-          if (typeof response.data === "string") {
-            return response.data;
-          } else if (response.data && response.data.files) {
-            return (
-              response.data.files
-                // eslint-disable-next-line
-                .map((file: any) => {
-                  const fileHeader =
-                    file.status === "renamed"
-                      ? `diff --git a/${
-                          file.previous_filename || "unknown"
-                        } b/${file.filename}\n`
-                      : `diff --git a/${file.filename} b/${file.filename}\n`;
-
-                  return `${fileHeader}${file.patch || ""}`;
-                })
-                .join("\n\n")
-            );
-          }
-          throw new Error("Unexpected response format");
-        } catch (err) {
-          console.warn("Method 2 failed, trying method 3...", err);
-          // Try one more variation of the API call
-          const { data } = await octokit.request(
-            "GET /repos/{owner}/{repo}/commits/{commit_sha}",
-            {
-              owner,
-              repo,
-              commit_sha: commitHashToUse,
-            }
-          );
-
-          if (data && data.files) {
-            return (
-              data.files
-                // eslint-disable-next-line
-                .map((file: any) => {
-                  const fileHeader =
-                    file.status === "renamed"
-                      ? `diff --git a/${
-                          file.previous_filename || "unknown"
-                        } b/${file.filename}\n`
-                      : `diff --git a/${file.filename} b/${file.filename}\n`;
-
-                  return `${fileHeader}${file.patch || ""}`;
-                })
-                .join("\n\n")
-            );
-          }
-          throw new Error("Could not extract diff data from response");
+        if (typeof response.data === "string") {
+          return response.data;
+        } else if (response.data && (response.data as any).files) {
+          return (response.data as any).files
+            .map((file: any) => {
+              const fileHeader =
+                file.status === "renamed"
+                  ? `diff --git a/${file.previous_filename || "unknown"} b/${file.filename}\n`
+                  : `diff --git a/${file.filename} b/${file.filename}\n`;
+              return `${fileHeader}${file.patch || ""}`;
+            })
+            .join("\n\n");
         }
-      },
-    ];
+        throw new Error("Unexpected response format");
+      } catch (err) {
+        log("warn", "Method 2 failed, trying method 3", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
 
-    // Try each method in sequence until one works
+        // Try one more variation of the API call
+        const { data } = await octokit.request(
+          "GET /repos/{owner}/{repo}/commits/{commit_sha}",
+          {
+            owner,
+            repo,
+            commit_sha: commitHashToUse,
+          },
+        );
+
+        if (data && (data as any).files) {
+          return (data as any).files
+            .map((file: any) => {
+              const fileHeader =
+                file.status === "renamed"
+                  ? `diff --git a/${file.previous_filename || "unknown"} b/${file.filename}\n`
+                  : `diff --git a/${file.filename} b/${file.filename}\n`;
+              return `${fileHeader}${file.patch || ""}`;
+            })
+            .join("\n\n");
+        }
+        throw new Error("Could not extract diff data from response");
+      }
+    };
+
+    // Try each method in sequence
+    const fetchMethods = [fetchMethod1, fetchMethod2];
+
     for (let i = 0; i < fetchMethods.length; i++) {
       try {
         diffData = await fetchMethods[i]();
@@ -483,14 +1030,12 @@ export async function getAiSummaryOfCommit(
           typeof diffData === "string" &&
           diffData.trim().length > 0
         ) {
-          break; // We got valid data, stop trying other methods
+          break;
         }
       } catch (err) {
-        console.warn(
-          `Method ${i + 1} failed:`,
-          err instanceof Error ? err.message : "Unknown error"
-        );
-        // Continue to next method if this one failed
+        log("warn", `Diff fetch method ${i + 1} failed`, {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     }
 
@@ -500,19 +1045,21 @@ export async function getAiSummaryOfCommit(
       typeof diffData !== "string" ||
       diffData.trim().length === 0
     ) {
-      console.warn(
-        "All methods to fetch diff failed, using commit message as fallback"
+      log(
+        "warn",
+        "All methods to fetch diff failed, using commit message as fallback",
       );
       diffData = `Commit: ${commitHashToUse}\nMessage: ${commitMessage}\n\nNo diff data available.`;
     }
 
     // Truncate if needed
     const truncatedData =
-      diffData.length > 10000
-        ? diffData.substring(0, 10000) + "\n\n[diff truncated due to size]"
+      diffData.length > GITHUB_CONFIG.DIFF_MAX_LENGTH
+        ? diffData.substring(0, GITHUB_CONFIG.DIFF_MAX_LENGTH) +
+          "\n\n[diff truncated due to size]"
         : diffData;
 
-    console.log(`Generating AI summary for commit ${commitHashToUse}...`);
+    log("info", `Generating AI summary for commit ${commitHashToUse}`);
 
     // Get AI summary
     const aiSummary = await aISummariesCommit(truncatedData);
@@ -525,12 +1072,26 @@ export async function getAiSummaryOfCommit(
     await db
       .update(commitsTable)
       .set({ AiSummary: aiSummary })
-      .where(eq(commitsTable.id, existingCommit[0].id));
+      .where(eq(commitsTable.id, commitRecord.id));
 
-    console.log(`Updated AI summary for commit ${commitHashToUse}`);
+    log("info", `Updated AI summary for commit ${commitHashToUse}`);
+
     return aiSummary;
   } catch (error) {
-    console.error("Error fetching AI summary of diff:", error);
+    if (
+      error instanceof GitHubValidationError ||
+      error instanceof GitHubNotFoundError
+    ) {
+      throw error;
+    }
+
+    log("error", "Error fetching AI summary of diff", {
+      githubUrl,
+      commitHash,
+      projectId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
     // Return a user-friendly error message instead of throwing
     return "😥 Could not generate AI summary. Please try again later.";
   }
