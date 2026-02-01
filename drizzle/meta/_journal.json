@@ -8,6 +8,20 @@
       "when": 1748231899556,
       "tag": "0000_violet_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769862846543,
+      "tag": "0001_rag_support",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769914965495,
+      "tag": "0002_good_dracula",
+      "breakpoints": true
     }
   ]
 }

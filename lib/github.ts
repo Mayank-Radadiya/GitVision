@@ -6,6 +6,7 @@ import { commitsTable, projectTables } from "@/drizzle/schema/schema";
 import axios, { AxiosRequestConfig } from "axios";
 import { eq, and } from "drizzle-orm";
 import { aISummariesCommit } from "./gemini";
+import { computeHash } from "@/src/features/rag/services/code-chunker";
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -33,26 +34,6 @@ interface CommitData {
   committerEmail: string;
   committerDate: Date;
   projectId: string;
-}
-
-/**
- * Project statistics from GitHub
- */
-interface ProjectStats {
-  stars: number;
-  forks: number;
-  totalBranches: number;
-  totalContributors: number;
-  totalCommits: number;
-}
-
-/**
- * Options for fetchWithRetry function
- */
-interface FetchOptions {
-  retries?: number;
-  baseDelay?: number;
-  timeout?: number;
 }
 
 /**
@@ -368,6 +349,7 @@ async function fetchWithRetry(
  * @param projectId - Project ID to associate with the commit
  * @returns Formatted commit data for database insertion
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createCommitData(commit: any, projectId: string): CommitData {
   return {
     commitHash: commit.sha,
@@ -398,9 +380,6 @@ function log(
   message: string,
   meta?: Record<string, unknown>,
 ): void {
-  const timestamp = new Date().toISOString();
-  const logData = { timestamp, level, message, ...meta };
-
   switch (level) {
     case "error":
       console.error(`[GitHub:Error] ${message}`, meta || "");
@@ -610,6 +589,8 @@ export async function createNewProject(
         totalBranches: branches.length,
         totalContributors: contributors.length,
         totalCommits: commits.length,
+        embeddingStatus: "pending", // Deferred RAG processing
+        embeddingProgress: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -808,6 +789,9 @@ export async function getRepositoryFiles(
             return null;
           }
 
+          // Compute hash for RAG processing
+          const hash = computeHash(content);
+
           // Store in database
           const [newFile] = await db
             .insert(projectFiles)
@@ -815,6 +799,7 @@ export async function getRepositoryFiles(
               fileName: file.path,
               code: content,
               projectId: projectId,
+              hash: hash,
               createdAt: new Date(),
               updatedAt: new Date(),
             })
@@ -848,6 +833,9 @@ export async function getRepositoryFiles(
         totalFiles: storedFiles.length,
       },
     );
+
+    // Note: RAG processing is now deferred until user selects project for chat
+    // This significantly speeds up project creation
 
     return storedFiles;
   } catch (error) {
@@ -1004,16 +992,21 @@ export async function getAiSummaryOfCommit(
           },
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (data && (data as any).files) {
-          return (data as any).files
-            .map((file: any) => {
-              const fileHeader =
-                file.status === "renamed"
-                  ? `diff --git a/${file.previous_filename || "unknown"} b/${file.filename}\n`
-                  : `diff --git a/${file.filename} b/${file.filename}\n`;
-              return `${fileHeader}${file.patch || ""}`;
-            })
-            .join("\n\n");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (
+            (data as any).files
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((file: any) => {
+                const fileHeader =
+                  file.status === "renamed"
+                    ? `diff --git a/${file.previous_filename || "unknown"} b/${file.filename}\n`
+                    : `diff --git a/${file.filename} b/${file.filename}\n`;
+                return `${fileHeader}${file.patch || ""}`;
+              })
+              .join("\n\n")
+          );
         }
         throw new Error("Could not extract diff data from response");
       }

@@ -33,24 +33,29 @@ const CommitList = ({
   onGenerateSummary,
 }: CommitListProps) => {
   return (
-    <div id="commits-section" className="mt-8 max-w-screen-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold">Recent Commits</h2>
-        <div className="text-sm text-muted-foreground flex items-center gap-2">
+    <div id="commits-section" className="mt-10 max-w-screen-2xl mx-auto">
+      {/* Enhanced Section Header */}
+      <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/30">
+        <h2 className="text-3xl font-bold font-[family-name:var(--font-fira-code)] bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          Recent Commits
+        </h2>
+        <div className="flex items-center gap-2.5 px-4 py-2 bg-gradient-to-br from-primary/10 to-primary/5 rounded-full border border-primary/20 backdrop-blur-sm">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span>AI-powered commit summaries</span>
+          <span className="text-sm font-medium text-primary font-[family-name:var(--font-fira-sans)]">
+            AI-powered summaries
+          </span>
         </div>
       </div>
 
       {isLoading ? (
         <div className="space-y-6">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
         </div>
       ) : commits.length > 0 ? (
-        <div className="bg-background/50 rounded-xl p-6 shadow-sm ring-1 ring-border/10">
-          <ul className="space-y-6">
+        <div className="bg-gradient-to-br from-background/50 to-background/30 rounded-2xl p-8 shadow-lg backdrop-blur-sm border border-border/30">
+          <ul className="space-y-8">
             {commits.map((commit, index) => (
               <CommitItem
                 key={commit.id}
@@ -74,8 +79,16 @@ const CommitList = ({
           )}
 
           {/* Commit count info */}
-          <div className="text-xs text-muted-foreground text-center mt-4">
-            Showing {commits.length} of {totalCommits} commits
+          <div className="text-sm text-muted-foreground text-center mt-6 font-[family-name:var(--font-fira-sans)]">
+            Showing{" "}
+            <span className="font-semibold text-foreground font-[family-name:var(--font-fira-code)]">
+              {commits.length}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-foreground font-[family-name:var(--font-fira-code)]">
+              {totalCommits.toLocaleString()}
+            </span>{" "}
+            commits
           </div>
         </div>
       ) : (

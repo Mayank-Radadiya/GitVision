@@ -26,7 +26,7 @@ export default function UserProjectPage() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatingCommitId, setGeneratingCommitId] = useState<string | null>(
-    null
+    null,
   );
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -84,7 +84,7 @@ export default function UserProjectPage() {
         "Project ID mismatch! URL ID:",
         projectId,
         "API ID:",
-        project.id
+        project.id,
       );
     }
   }, [project, projectId]);
@@ -101,7 +101,7 @@ export default function UserProjectPage() {
         project.githubUrl,
         commit.commitHash,
         projectId, // Use the projectId from URL parameters instead of project.id
-        commitId
+        commitId,
       );
     },
     onMutate: async (commitId) => {
@@ -131,10 +131,10 @@ export default function UserProjectPage() {
               commits: old.commits.map((commit) =>
                 commit.id === commitId
                   ? { ...commit, AiSummary: "Generating AI summary..." }
-                  : commit
+                  : commit,
               ),
             };
-          }
+          },
         );
       }
 
@@ -150,10 +150,10 @@ export default function UserProjectPage() {
           return {
             ...old,
             commits: old.commits.map((commit) =>
-              commit.id === commitId ? { ...commit, AiSummary: data } : commit
+              commit.id === commitId ? { ...commit, AiSummary: data } : commit,
             ),
           };
-        }
+        },
       );
 
       setGeneratingCommitId(null);
@@ -170,7 +170,7 @@ export default function UserProjectPage() {
       if (context?.previousCommits) {
         queryClient.setQueryData(
           ["commits", projectId, currentPage],
-          context.previousCommits
+          context.previousCommits,
         );
       }
     },
@@ -188,13 +188,13 @@ export default function UserProjectPage() {
         commitSection.scrollIntoView({ behavior: "smooth" });
       }
     },
-    [totalPages]
+    [totalPages],
   );
 
   // Clean repository URL (remove .git suffix)
   const cleanRepoUrl = useMemo(
     () => project?.githubUrl?.replace(/\.git$/, "") || "",
-    [project?.githubUrl]
+    [project?.githubUrl],
   );
 
   // Loading state
@@ -232,7 +232,7 @@ export default function UserProjectPage() {
     (commitId: string) => {
       generateAiSummary(commitId);
     },
-    [generateAiSummary]
+    [generateAiSummary],
   );
 
   // Error state rendering
@@ -242,7 +242,7 @@ export default function UserProjectPage() {
 
   // Main render
   return (
-    <div className="space-y-8 p-8 bg-gradient-to-b from-background to-background/70">
+    <div className="min-h-screen space-y-10 p-8 md:p-10 bg-gradient-to-br from-background via-background/95 to-background/90">
       {/* Error Notification */}
       <ErrorNotification
         message={errorMessage}

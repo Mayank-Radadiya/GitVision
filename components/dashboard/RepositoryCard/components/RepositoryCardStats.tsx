@@ -18,10 +18,9 @@ interface StatItemProps {
   value: number;
   label: string;
   bgClass: string;
-  textClass: string;
 }
 
-function StatItem({ icon, value, label, bgClass, textClass }: StatItemProps) {
+function StatItem({ icon, value, label, bgClass }: StatItemProps) {
   return (
     <div className="flex items-center gap-1.5 text-sm">
       <div
@@ -60,28 +59,24 @@ export function RepositoryCardStats({
         value={star}
         label={STAT_CONFIG.stars.label}
         bgClass={STAT_CONFIG.stars.bgClass}
-        textClass={STAT_CONFIG.stars.textClass}
       />
       <StatItem
         icon={<GitFork className="h-3.5 w-3.5 text-blue-500" />}
         value={forks}
         label={STAT_CONFIG.forks.label}
         bgClass={STAT_CONFIG.forks.bgClass}
-        textClass={STAT_CONFIG.forks.textClass}
       />
       <StatItem
         icon={<GitCommit className="h-3.5 w-3.5 text-emerald-500" />}
         value={totalCommits}
         label={STAT_CONFIG.commits.label}
         bgClass={STAT_CONFIG.commits.bgClass}
-        textClass={STAT_CONFIG.commits.textClass}
       />
       <StatItem
         icon={<Users className="h-3.5 w-3.5 text-violet-500" />}
         value={totalContributors}
         label={STAT_CONFIG.contributors.label}
         bgClass={STAT_CONFIG.contributors.bgClass}
-        textClass={STAT_CONFIG.contributors.textClass}
       />
     </div>
   );

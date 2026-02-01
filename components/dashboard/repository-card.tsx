@@ -83,12 +83,6 @@ export const RepositoryCard = memo(function RepositoryCard({
     addSuffix: true,
   });
 
-  // Extract repo path from GitHub URL for display
-  const repoPath = githubUrl.replace(/^https?:\/\/(www\.)?github\.com\//, "");
-
-  // Determine language color (mock - could be passed as prop)
-  const languageColor = "from-blue-500 to-cyan-500";
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -231,7 +225,9 @@ export const RepositoryCard = memo(function RepositoryCard({
           {/* Bottom Row - Created Time Right */}
           <div className="mt-4 pt-4 border-t border-border/30 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="text-muted-foreground/60">{totalBranches} branches</span>
+              <span className="text-muted-foreground/60">
+                {totalBranches} branches
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />

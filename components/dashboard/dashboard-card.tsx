@@ -18,7 +18,7 @@
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { motion, animate } from "framer-motion";
 import { memo, useEffect, useState } from "react";
 
 // =============================================================================

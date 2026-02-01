@@ -8,8 +8,28 @@ import {
   uuid,
   timestamp,
   jsonb,
+  customType,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// Custom vector type for pgvector extension
+const vector = customType<{
+  data: number[];
+  config: { dimensions: number };
+  configRequired: true;
+  input: number[];
+  output: number[];
+}>({
+  dataType(config) {
+    return `vector(${config.dimensions})`;
+  },
+  toDriver(value) {
+    return JSON.stringify(value);
+  },
+  fromDriver(value) {
+    return JSON.parse(value as string);
+  },
+});
 
 export const usersTable = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -39,6 +59,13 @@ export const projectTables = pgTable(
     totalCommits: integer("total_commits").notNull().default(0),
     totalBranches: integer("total_branches").notNull().default(0),
     totalContributors: integer("total_contributors").notNull().default(0),
+    // Embedding status tracking for deferred RAG processing
+    embeddingStatus: varchar("embedding_status", { length: 20 })
+      .notNull()
+      .default("pending"), // Values: 'pending' | 'processing' | 'completed' | 'failed'
+    embeddingError: text("embedding_error"), // Store error message if failed
+    embeddingProgress: integer("embedding_progress").notNull().default(0), // Track progress (0-100)
+    lastEmbeddingAttempt: timestamp("last_embedding_attempt"), // Track when last attempted
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -46,7 +73,7 @@ export const projectTables = pgTable(
     return {
       ownerIdIdx: index("owner_id_idx").on(table.ownerId),
     };
-  }
+  },
 );
 
 export const projectFiles = pgTable(
@@ -57,6 +84,8 @@ export const projectFiles = pgTable(
       .default(sql`gen_random_uuid()`),
     fileName: varchar("file_name", { length: 255 }).notNull(),
     code: text("code").notNull(),
+    language: varchar("language", { length: 50 }), // Language detection
+    hash: varchar("hash", { length: 64 }), // SHA-256 hash for change detection (nullable during migration)
     projectId: uuid("project_id")
       .notNull()
       .references(() => projectTables.id, { onDelete: "cascade" }),
@@ -66,8 +95,42 @@ export const projectFiles = pgTable(
   (table) => {
     return {
       projectIdIdx: index("project_files_project_id_idx").on(table.projectId),
+      hashIdx: index("project_files_hash_idx").on(table.hash),
     };
-  }
+  },
+);
+
+export const codeEmbeddings = pgTable(
+  "code_embeddings",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projectTables.id, { onDelete: "cascade" }),
+    fileId: uuid("file_id")
+      .notNull()
+      .references(() => projectFiles.id, { onDelete: "cascade" }),
+    filePath: varchar("file_path", { length: 255 }).notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    chunkContent: text("chunk_content").notNull(),
+    embedding: vector("embedding", { dimensions: 768 }).notNull(), // Gemini embedding-004 = 768 dims
+    tokenCount: integer("token_count").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      projectIdIdx: index("embeddings_project_id_idx").on(table.projectId),
+      fileIdIdx: index("embeddings_file_id_idx").on(table.fileId),
+      // HNSW index for fast similarity search
+      embeddingIdx: index("embeddings_vector_idx").using(
+        "hnsw",
+        table.embedding.op("vector_cosine_ops"),
+      ),
+    };
+  },
 );
 
 export const commitsTable = pgTable(
@@ -96,14 +159,63 @@ export const commitsTable = pgTable(
       projectIdIdx: index("commits_project_id_idx").on(table.projectId),
       commitHashIdx: index("commits_commit_hash_idx").on(table.commitHash),
     };
-  }
+  },
 );
 
+// New normalized chat tables (replacing chat_history)
+export const projectChats = pgTable(
+  "project_chats",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").references(() => projectTables.id, {
+      onDelete: "cascade",
+    }), // Nullable for general chats
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 20 }).notNull().default("project"), // 'project' | 'general'
+    title: varchar("title", { length: 255 }).notNull().default("New Chat"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      projectIdIdx: index("chats_project_id_idx").on(table.projectId),
+      userIdIdx: index("chats_user_id_idx").on(table.userId),
+      typeIdx: index("chats_type_idx").on(table.type),
+    };
+  },
+);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => projectChats.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull(), // 'user' | 'assistant' | 'system'
+    content: text("content").notNull(),
+    relatedFiles: jsonb("related_files").default([]), // Array of file paths
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      chatIdIdx: index("messages_chat_id_idx").on(table.chatId),
+      createdAtIdx: index("messages_created_at_idx").on(table.createdAt),
+    };
+  },
+);
+
+// Legacy chat history table (kept for backward compatibility - deprecated)
 export const chatHistoryTable = pgTable("chat_history", {
   id: uuid("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-
   userId: varchar("user_id")
     .notNull()
     .references(() => usersTable.id, { onDelete: "cascade" }),
@@ -111,12 +223,7 @@ export const chatHistoryTable = pgTable("chat_history", {
     .notNull()
     .references(() => projectTables.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull().default("New Chat"),
-  messages: jsonb("messages").notNull().default([]), // Store array of messages here
-  // Store the message in this format:
-  //   [
-  //   { "role": "user", "content": "Hello!" },
-  //   { "role": "Ai", "content": "Hi, how can I help you?" }
-  // ]
+  messages: jsonb("messages").notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
