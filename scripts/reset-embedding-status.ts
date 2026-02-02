@@ -7,8 +7,8 @@
  * Usage: bun run scripts/reset-embedding-status.ts
  */
 
-import { db } from "@/drizzle";
-import { projectTables, codeEmbeddings } from "@/drizzle/schema/schema";
+import { db } from "@/db";
+import { projectTables, codeEmbeddings } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 async function resetEmbeddingStatus() {

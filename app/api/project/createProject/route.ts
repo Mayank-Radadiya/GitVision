@@ -1,70 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
-import { repositoryZodSchema } from "@/zodSchema/repository.schema";
-import {
-  createNewProject,
-  getCommitHashes,
-  getRepositoryFiles,
-} from "@/lib/github";
 import { auth } from "@clerk/nextjs/server";
+import { createNewProject, getCommitHashes } from "@/src/lib/github";
 
-// This API route handles the creation of a new project
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    // Get authenticated user
+    // Authenticate user
     const { userId } = await auth();
+
     if (!userId) {
       return NextResponse.json(
-        { error: "Unauthorized. Please sign in." },
-        { status: 401 }
+        { error: "Unauthorized - User not authenticated" },
+        { status: 401 },
       );
     }
 
-    // Parse and validate request body
-    const body = await request.json();
-    // Validate the request body using Zod schema
-    const validationResult = repositoryZodSchema.safeParse(body);
+    // Parse request body
+    const body = await req.json();
+    const { ProjectName, repoUrl } = body;
 
-    // If validation fails, return error response
-    if (!validationResult.success) {
+    // Validate inputs
+    if (
+      !ProjectName ||
+      typeof ProjectName !== "string" ||
+      ProjectName.trim() === ""
+    ) {
       return NextResponse.json(
-        { error: validationResult.error.errors },
-        { status: 400 }
+        { error: "Project name is required" },
+        { status: 400 },
       );
     }
 
-    // Extract validated data
-    const { ProjectName, repoUrl } = validationResult.data;
-
-    // Use the createNewProject function from lib/github.ts
-    const { projectId } = await createNewProject(repoUrl, ProjectName, userId);
-
-    // Extract owner and repo from GitHub URL to get files
-    const cleanUrl = repoUrl.endsWith(".git") ? repoUrl.slice(0, -4) : repoUrl;
-    const [owner, repo] = cleanUrl.split("/").slice(-2);
-
-    if (!owner || !repo) {
+    if (!repoUrl || typeof repoUrl !== "string" || repoUrl.trim() === "") {
       return NextResponse.json(
-        { error: "Invalid GitHub URL format" },
-        { status: 400 }
+        { error: "Repository URL is required" },
+        { status: 400 },
       );
     }
 
-    // store commit hashes and files in the database without await
-    getCommitHashes(repoUrl, projectId);
-    // get files from the repository and store them in the database
-    // This function should be called without await to avoid blocking
-    getRepositoryFiles(owner, repo, projectId);
+    // Create project in database with GitHub data
+    const { projectId } = await createNewProject(
+      repoUrl.trim(),
+      ProjectName.trim(),
+      userId,
+    );
 
-    // Return success response with project details
+    // Fetch and store commits in background (don't await - run async)
+    getCommitHashes(repoUrl.trim(), projectId).catch((error) => {
+      console.error("Error fetching commits in background:", error);
+    });
+
     return NextResponse.json({
       success: true,
+      projectId,
       message: "Project created successfully",
     });
   } catch (error) {
-    console.error("Error in create project API:", error);
+    console.error("Error creating project:", error);
+
+    // Handle specific error types from github.ts
+    if (error instanceof Error) {
+      const gitHubError = error as { statusCode?: number; code?: string };
+
+      if (gitHubError.code === "GITHUB_VALIDATION_ERROR") {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      if (gitHubError.code === "GITHUB_NOT_FOUND") {
+        return NextResponse.json(
+          { error: "GitHub repository not found" },
+          { status: 404 },
+        );
+      }
+
+      if (gitHubError.code === "GITHUB_RATE_LIMIT") {
+        return NextResponse.json(
+          { error: "GitHub API rate limit exceeded. Please try again later." },
+          { status: 429 },
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: "Failed to create project" },
-      { status: 500 }
+      {
+        error:
+          "Failed to create project. Please check the repository URL and try again.",
+      },
+      { status: 500 },
     );
   }
 }

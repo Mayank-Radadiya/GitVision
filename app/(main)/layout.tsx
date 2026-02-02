@@ -1,10 +1,9 @@
 "use client";
 
+import Sidebar from "@/src/features/dashboard/components/sidebar/sidebar";
+import { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from "@/src/features/dashboard/components/sidebar/sidebar.constants"
 import { useState, useEffect, createContext, useContext } from "react";
-import Sidebar, {
-  SIDEBAR_WIDTH_COLLAPSED,
-  SIDEBAR_WIDTH_EXPANDED,
-} from "@/components/dashboard/Sidebar";
+
 
 // Context for sidebar state
 const SidebarContext = createContext<{

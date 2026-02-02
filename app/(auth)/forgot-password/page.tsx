@@ -1,4 +1,4 @@
-import ForgotPassword from "@/components/auth/forgot-password";
+import ForgotPassword from "@/features/auth/components/forgot-password";
 import { NextPage } from "next";
 
 const Page: NextPage = () => {

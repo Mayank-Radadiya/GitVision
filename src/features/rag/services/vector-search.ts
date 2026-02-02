@@ -5,8 +5,8 @@
 
 "use server";
 
-import { db } from "@/drizzle";
-import { codeEmbeddings, projectFiles } from "@/drizzle/schema/schema";
+import { db } from "@/db";
+import { codeEmbeddings, projectFiles } from "@/db/schema";
 import { cosineDistance, desc, gt, sql, eq, and, inArray } from "drizzle-orm";
 
 export interface SearchResult {

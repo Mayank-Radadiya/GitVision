@@ -1,5 +1,5 @@
 "use client";
-import { Loader } from "@/components/custom/Loader";
+import { Loader } from "@/shared/components/feedback/loader";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";

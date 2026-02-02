@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/drizzle";
-import { projectTables } from "@/drizzle/schema/schema";
+import { db } from "@/db";
+import { projectTables } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-/**
- * GET handler for retrieving project details by ID
- */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
 
     if (!projectId) {
       return NextResponse.json(
         { error: "Project ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Fetch project by id
     const project = await db
       .select()
       .from(projectTables)
@@ -29,24 +25,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const formattedProject = {
-      ...project[0],
-      createdAt: project[0].createdAt.toISOString(),
-      updatedAt: project[0].updatedAt.toISOString(),
-    };
-
-    return NextResponse.json(
-      {
-        message: "Project details retrieved successfully",
-        project: formattedProject,
+    return NextResponse.json({
+      project: {
+        id: project[0].id,
+        projectName: project[0].projectName,
+        githubUrl: project[0].githubUrl,
+        star: project[0].star,
+        forks: project[0].forks,
+        totalCommits: project[0].totalCommits,
+        totalBranches: project[0].totalBranches,
+        totalContributors: project[0].totalContributors,
+        createdAt: project[0].createdAt.toISOString(),
+        updatedAt: project[0].updatedAt.toISOString(),
+        ownerId: project[0].ownerId,
       },
-      { status: 200 }
-    );
+    });
   } catch (error) {
     console.error("Error fetching project details:", error);
     return NextResponse.json(
-      { error: "Failed to fetch project details" },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

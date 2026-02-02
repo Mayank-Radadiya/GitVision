@@ -5,8 +5,8 @@
 
 "use server";
 
-import { db } from "@/drizzle";
-import { projectFiles, codeEmbeddings } from "@/drizzle/schema/schema";
+import { db } from "@/db";
+import { projectFiles, codeEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { chunkCode, computeHash, detectLanguage } from "./code-chunker";
 import {
@@ -175,9 +175,9 @@ export async function processProjectForRag(
   errors: string[];
 }> {
   // Import database modules
-  const { db } = await import("@/drizzle");
+  const { db } = await import("@/db");
   const { projectTables, projectFiles } =
-    await import("@/drizzle/schema/schema");
+    await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
 
   try {
@@ -310,8 +310,8 @@ export async function processProjectForRag(
     console.error(`Error processing project ${projectId}:`, error);
 
     // Update status to failed with error message
-    const { db } = await import("@/drizzle");
-    const { projectTables } = await import("@/drizzle/schema/schema");
+    const { db } = await import("@/db");
+    const { projectTables } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
 
     await db

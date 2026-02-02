@@ -17,21 +17,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import toast from "react-hot-toast";
-import StatsCardsSection from "@/components/dashboard/stats-cards-section";
+import StatsCardsSection from "@/features/dashboard/components/stats-cards-section";
 import { useQuery } from "@tanstack/react-query";
-import { getUserDashboardInfo } from "@/action/dashboard/info.action";
-import { getUserProjects } from "@/action/project/userProjects.action";
+import { getUserDashboardInfo } from "@/features/dashboard/actions/get-dashboard-info";
+import { getUserProjects } from "@/features/projects/actions/user-projects-actions";
 import ProjectCardSkeleton from "./_components/ProjectCardSkeleton";
 import NoProjectFoundCred from "./_components/NoProjectFoundCred";
 import dynamic from "next/dynamic";
 import { Plus, FolderGit2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { motion } from "framer-motion";
 
 // Dynamically import RepositoryCard with loading fallback
 const RepositoryCard = dynamic(
   () =>
-    import("@/components/dashboard/RepositoryCard").then(
+    import("@/features/dashboard/components/repository-card").then(
       (mod) => mod.RepositoryCard,
     ),
   { ssr: false },

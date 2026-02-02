@@ -1,85 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/drizzle";
-import { projectTables, projectFiles } from "@/drizzle/schema/schema";
-import { eq, and, or } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { projectFiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
 
     if (!projectId) {
       return NextResponse.json(
         { error: "Project ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Get the authenticated user from the Clerk session
-    const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please sign in to access project files." },
-        { status: 401 }
-      );
-    }
-
-    // Check if user has access to the project (as owner or collaborator)
-    const hasAccess = await db
-      .select({ id: projectTables.id })
-      .from(projectTables)
-      .where(
-        and(
-          eq(projectTables.id, projectId),
-          or(eq(projectTables.ownerId, userId))
-        )
-      )
-      .limit(1);
-
-    if (hasAccess.length === 0) {
-      return NextResponse.json(
-        { error: "You don't have access to this project" },
-        { status: 403 }
-      );
-    }
-
-    // Get project files
+    // Fetch all files for the project
     const files = await db
-      .select({
-        id: projectFiles.id,
-        fileName: projectFiles.fileName,
-        code: projectFiles.code,
-        createdAt: projectFiles.createdAt,
-        updatedAt: projectFiles.updatedAt,
-      })
+      .select()
       .from(projectFiles)
       .where(eq(projectFiles.projectId, projectId));
 
-    // Format the files for Sandpack
-    const sandpackFiles = files.reduce((acc, file) => {
-      acc[file.fileName] = {
-        code: file.code,
-        readOnly: true,
-      };
-      return acc;
-    }, {} as Record<string, { code: string; readOnly: boolean }>);
+    // Transform files to Sandpack format
+    // Sandpack expects: { "/path/to/file.js": { code: "content" } }
+    const sandpackFiles: Record<string, { code: string }> = {};
 
-    // Return the files
-    return NextResponse.json(
-      {
-        message: "Project files retrieved successfully",
-        files: files,
-        sandpackFiles: sandpackFiles,
-      },
-      { status: 200 }
-    );
+    if (files && files.length > 0) {
+      for (const file of files) {
+        // Ensure path starts with /
+        const filePath = file.fileName.startsWith("/")
+          ? file.fileName
+          : `/${file.fileName}`;
+
+        sandpackFiles[filePath] = {
+          code: file.code,
+        };
+      }
+    } else {
+      // Return a helpful placeholder file when no files exist
+      sandpackFiles["/README.md"] = {
+        code: `# Project Files Not Yet Processed\n\nThis project's files are being processed. Please check back in a few moments.\n\nIf this message persists, the project may not have been fully imported from GitHub.`,
+      };
+    }
+
+    return NextResponse.json({
+      sandpackFiles,
+      totalFiles: files?.length || 0,
+      message:
+        files?.length === 0
+          ? "No files found - showing placeholder"
+          : undefined,
+    });
   } catch (error) {
     console.error("Error fetching project files:", error);
     return NextResponse.json(
-      { error: "Failed to fetch project files" },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

@@ -3,8 +3,8 @@
  */
 
 import { Octokit } from "octokit";
-import { db } from "@/drizzle";
-import { projectTables, projectFiles } from "@/drizzle/schema/schema";
+import { db } from "@/db";
+import { projectTables, projectFiles } from "@/db/schema";
 import { eq, like, or, and } from "drizzle-orm";
 import type { ClassifiedQuery } from "./query-classifier";
 

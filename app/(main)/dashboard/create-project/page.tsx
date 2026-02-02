@@ -1,8 +1,8 @@
-import { Loader } from "@/components/custom/Loader";
+import { Loader } from "@/shared/components/feedback/loader";
 import dynamic from "next/dynamic";
 
 const CreateNewProjectForm = dynamic(
-  () => import("@/components/dashboard/create-new-project/add-repo"),
+  () => import("@/features/projects/components/create-project/add-repo"),
   {
     loading: () => <Loader />,
   }

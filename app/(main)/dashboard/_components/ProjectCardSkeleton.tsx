@@ -6,7 +6,7 @@
  * Loading skeleton that matches the new compact repository card layout.
  */
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { memo } from "react";
 
 const ProjectCardSkeleton = () => (

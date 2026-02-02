@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import ModeToggle from "@/components/custom/mode-toggle";
+import ModeToggle from "@/shared/components/theme/mode-toggle";
 
 export default function PrivacyPolicy() {
   return (

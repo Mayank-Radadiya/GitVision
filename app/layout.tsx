@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fira_Code, Fira_Sans } from "next/font/google";
 import "./globals.css";
-import Provider from "@/provider/provider";
+import Provider from "@/shared/providers/app-provider";
 
 // Optimize font loading with preload strategy
 const geistSans = Geist({

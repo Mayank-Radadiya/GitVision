@@ -4,19 +4,19 @@ import { useParams } from "next/navigation";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAiSummaryOfCommit } from "@/lib/github";
+import { getAiSummaryOfCommit } from "@/src/lib/github";
 
-import ErrorState from "../_components/ErrorState";
-import ProjectHeader from "../_components/ProjectHeader";
-import ProjectStats from "../_components/ProjectStats";
-import CommitList from "../_components/CommitList";
-import ErrorNotification from "../_components/ErrorNotification";
+import ErrorState from "@/features/projects/components/project-detail/ErrorState";
+import ProjectHeader from "@/features/projects/components/project-detail/ProjectHeader";
+import ProjectStats from "@/features/projects/components/project-detail/ProjectStats";
+import CommitList from "@/features/projects/components/project-detail/CommitList";
+import ErrorNotification from "@/features/projects/components/project-detail/ErrorNotification";
 
 import {
   fetchProjectCommits,
   fetchProjectDetails,
-} from "../_services/projectService";
-import { ProjectDetails, CommitData } from "../types";
+} from "@/features/projects/services/project-service";
+import { ProjectDetails, CommitData } from "@/features/projects/types/project-types";
 
 export default function UserProjectPage() {
   const params = useParams();

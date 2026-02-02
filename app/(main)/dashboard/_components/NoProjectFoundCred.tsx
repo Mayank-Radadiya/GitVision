@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { FolderGit2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 

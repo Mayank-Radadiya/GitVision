@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { fetchAllUserProject } from "@/action/project/project.action";
+import { fetchAllUserProject } from "@/features/projects/actions/project-actions";
 
 export default async function ChatPage() {
   const { userId } = await auth();

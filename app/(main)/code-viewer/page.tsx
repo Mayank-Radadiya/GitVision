@@ -1,10 +1,10 @@
 "use client";
 
-import { Loader } from "@/components/custom/Loader";
+import { Loader } from "@/shared/components/feedback/loader";
 import dynamic from "next/dynamic";
 
 const RepoList = dynamic(
-  () => import("@/components/code-viewer/repo-selector"),
+  () => import("@/features/code-viewer/components/repo-selector"),
   {
     loading: () => (
       <>
