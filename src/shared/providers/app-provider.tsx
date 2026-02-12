@@ -7,6 +7,9 @@ import { memo, useEffect, useState } from "react";
 import { QueryClient } from "@tanstack/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { httpBatchLink } from "@trpc/client";
+import superjson from "superjson";
+import { trpc } from "@/src/lib/trpc/client";
 
 interface ProviderProps {
   children: React.ReactNode;
@@ -70,7 +73,7 @@ const Provider = ({ children }: ProviderProps) => {
             },
           },
         },
-      })
+      }),
   );
 
   // Using this to avoid hydration mismatch
@@ -86,6 +89,18 @@ const Provider = ({ children }: ProviderProps) => {
     });
   });
 
+  // Create tRPC client
+  const [trpcClient] = useState(() =>
+    trpc.createClient({
+      links: [
+        httpBatchLink({
+          url: "/api/trpc",
+          transformer: superjson,
+        }),
+      ],
+    }),
+  );
+
   useEffect(() => {
     setMounted(true);
 
@@ -94,11 +109,11 @@ const Provider = ({ children }: ProviderProps) => {
       const isDark = document.documentElement.classList.contains("dark");
       document.documentElement.style.setProperty(
         "--toast-bg",
-        isDark ? "transparent" : "transparent"
+        isDark ? "transparent" : "transparent",
       );
       document.documentElement.style.setProperty(
         "--toast-text",
-        isDark ? "#fff" : "#333"
+        isDark ? "#fff" : "#333",
       );
     };
 
@@ -115,24 +130,26 @@ const Provider = ({ children }: ProviderProps) => {
   return (
     <ClerkProvider>
       {mounted && persistor ? (
-        <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{
-            persister: persistor,
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
-          }}
-        >
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            enableColorScheme
-            disableTransitionOnChange={false}
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{
+              persister: persistor,
+              maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            }}
           >
-            <MemoizedToaster />
-            {children}
-          </ThemeProvider>
-        </PersistQueryClientProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              enableColorScheme
+              disableTransitionOnChange={false}
+            >
+              <MemoizedToaster />
+              {children}
+            </ThemeProvider>
+          </PersistQueryClientProvider>
+        </trpc.Provider>
       ) : (
         <ThemeProvider
           attribute="class"

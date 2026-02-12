@@ -262,3 +262,26 @@ body {
     0 2px 4px -2px rgb(0 0 0 / 0.15),
     inset 0 1px 0 0 rgb(255 255 255 / 0.03);
 }
+
+/* Hero headline shimmer */
+@keyframes shimmer-slide {
+  0%,
+  90%,
+  100% {
+    background-position: -200% center;
+  }
+  45% {
+    background-position: 200% center;
+  }
+}
+
+.animate-shimmer-text {
+  background-size: 200% 100%;
+  animation: shimmer-slide 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer-text {
+    animation: none;
+  }
+}
