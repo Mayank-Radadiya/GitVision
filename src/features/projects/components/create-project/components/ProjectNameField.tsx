@@ -1,7 +1,7 @@
 /**
- * =============================================================================
- * PROJECT NAME FIELD COMPONENT
- * =============================================================================
+ * Project Name Field — Validated input with animated feedback.
+ * Shows green checkmark when valid, red error text when invalid.
+ * Uses Framer Motion AnimatePresence for smooth state transitions.
  */
 
 "use client";
@@ -12,11 +12,11 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { cn } from "@/shared/lib/utils";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormData } from "../add-repo.constants";
+import { CreateProjectInput } from "../add-repo.constants";
 
 interface ProjectNameFieldProps {
-  register: UseFormRegister<FormData>;
-  errors: FieldErrors<FormData>;
+  register: UseFormRegister<CreateProjectInput>;
+  errors: FieldErrors<CreateProjectInput>;
   isDirty: boolean;
   isLoading: boolean;
 }
@@ -27,7 +27,7 @@ export function ProjectNameField({
   isDirty,
   isLoading,
 }: ProjectNameFieldProps) {
-  const hasError = !!errors.ProjectName;
+  const hasError = !!errors.projectName;
   const isValid = isDirty && !hasError;
 
   return (
@@ -38,7 +38,7 @@ export function ProjectNameField({
       className="space-y-2"
     >
       <Label
-        htmlFor="repoName"
+        htmlFor="projectName"
         className="flex items-center gap-2 text-sm font-semibold"
       >
         <FolderGit className="h-4 w-4 text-muted-foreground" />
@@ -46,9 +46,9 @@ export function ProjectNameField({
       </Label>
       <div className="relative">
         <Input
-          id="repoName"
+          id="projectName"
           type="text"
-          {...register("ProjectName")}
+          {...register("projectName")}
           placeholder="e.g., my-awesome-project"
           className={cn(
             "h-12 pl-4 pr-10",
@@ -75,7 +75,7 @@ export function ProjectNameField({
         </AnimatePresence>
       </div>
       <AnimatePresence mode="wait">
-        {errors.ProjectName?.message && (
+        {errors.projectName?.message && (
           <motion.p
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -83,7 +83,7 @@ export function ProjectNameField({
             className="flex items-center gap-1.5 text-xs text-destructive"
           >
             <AlertCircle className="h-3.5 w-3.5" />
-            {errors.ProjectName.message}
+            {errors.projectName.message}
           </motion.p>
         )}
       </AnimatePresence>

@@ -1,20 +1,13 @@
 /**
- * =============================================================================
- * ADD REPOSITORY UTILITY FUNCTIONS
- * =============================================================================
+ * Create Project — Utility Functions
  *
- * Helper functions for repository form handling.
- *
- * @module create-new-project/utils
+ * Helpers for repository URL parsing and form state.
  */
 
 import { RepoInfo } from "./add-repo.constants";
 
 /**
- * Extract owner and repository name from GitHub URL
- *
- * @param url - GitHub repository URL
- * @returns Object with owner and repo name, or null if invalid
+ * Extract owner and repository name from a GitHub URL.
  *
  * @example
  * extractRepoInfo("https://github.com/user/repo")
@@ -32,10 +25,7 @@ export function extractRepoInfo(url: string): RepoInfo | null {
 }
 
 /**
- * Get loading message based on current step
- *
- * @param step - Current form step (1-3)
- * @returns Loading message for the step
+ * Get loading message based on current mutation step.
  */
 export function getLoadingMessage(step: number): string {
   switch (step) {
@@ -46,14 +36,4 @@ export function getLoadingMessage(step: number): string {
     default:
       return "Processing...";
   }
-}
-
-/**
- * Simulate validation delay for better UX
- *
- * @param ms - Milliseconds to delay
- * @returns Promise that resolves after delay
- */
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -70,3 +70,11 @@ export const projectCommitsSchema = projectIdSchema.extend({
   limit: paginationSchema.shape.limit,
   cursor: paginationSchema.shape.cursor,
 });
+
+/**
+ * AI summary generation input
+ */
+export const generateAiSummarySchema = z.object({
+  projectId: validators.uuid,
+  commitId: validators.uuid,
+});

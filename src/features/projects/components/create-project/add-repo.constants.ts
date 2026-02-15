@@ -1,21 +1,17 @@
 /**
- * =============================================================================
- * ADD REPOSITORY CONSTANTS
- * =============================================================================
+ * Create Project — Constants & Types
  *
- * Configuration for the add repository form.
- *
- * @module create-new-project/constants
+ * Configuration for the create project form.
+ * Types derived from the shared tRPC validation schema.
  */
 
 import { z } from "zod";
-import { repositoryZodSchema } from "@/features/projects/schemas/repository.schema";
+import { projectCreateSchema } from "@/src/lib/validation/schemas";
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+// ─── Type Definitions ────────────────────────────────────────────────────────
 
-export type FormData = z.infer<typeof repositoryZodSchema>;
+/** Form input shape — inferred from the tRPC validation schema */
+export type CreateProjectInput = z.infer<typeof projectCreateSchema>;
 
 export interface Step {
   id: number;
@@ -28,38 +24,15 @@ export interface RepoInfo {
   repo: string;
 }
 
-export interface InfoCardData {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  color: "primary" | "violet";
-}
-
-// =============================================================================
-// STEPS CONFIGURATION
-// =============================================================================
+// ─── Steps Configuration ─────────────────────────────────────────────────────
 
 export const FORM_STEPS: Step[] = [
-  {
-    id: 1,
-    title: "Enter Details",
-    description: "Name and URL",
-  },
-  {
-    id: 2,
-    title: "Validation",
-    description: "Check repository",
-  },
-  {
-    id: 3,
-    title: "Analysis",
-    description: "Process data",
-  },
+  { id: 1, title: "Enter Details", description: "Name and URL" },
+  { id: 2, title: "Validation", description: "Check repository" },
+  { id: 3, title: "Analysis", description: "Process data" },
 ];
 
-// =============================================================================
-// ANIMATION CONFIGURATION
-// =============================================================================
+// ─── Animation Configuration ─────────────────────────────────────────────────
 
 export const CARD_ANIMATION = {
   initial: { opacity: 0, y: 20 },
@@ -73,9 +46,7 @@ export const HEADER_ICON_ANIMATION = {
   transition: { duration: 0.3, delay: 0.2 },
 } as const;
 
-// =============================================================================
-// STYLE CONFIGURATION
-// =============================================================================
+// ─── Style Configuration ─────────────────────────────────────────────────────
 
 export const STEP_COLORS = {
   completed: "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",

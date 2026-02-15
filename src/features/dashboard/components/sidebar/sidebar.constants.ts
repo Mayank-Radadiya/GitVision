@@ -62,7 +62,7 @@ export const SIDEBAR_WIDTH_EXPANDED = 256;
 export const SIDEBAR_WIDTH_MOBILE = 288; // 72 * 4 = 288 (w-72)
 
 /** Current app version displayed in sidebar footer */
-export const APP_VERSION = "v1.0.0";
+export const APP_VERSION = "v2.1.2";
 
 // =============================================================================
 // ANIMATION CONFIGURATION

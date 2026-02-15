@@ -1,43 +1,30 @@
 "use client";
 
 /**
- * =============================================================================
- * CREATE NEW PROJECT FORM
- * =============================================================================
+ * Create New Project — Form Orchestrator
  *
- * Production-ready form for adding GitHub repositories.
+ * Architecture:
+ * - This file: form state + tRPC mutation wiring
+ * - use-create-project.ts: mutation hook (toasts, cache, redirect)
+ * - components/: presentational form fields (no data fetching)
  *
- * ARCHITECTURE:
- * - add-repo.tsx (this file) - Main orchestrator
- * - add-repo.constants.ts - Types, steps, animations
- * - add-repo.utils.ts - URL parsing, helpers
- * - components/
- *   ├── FormHeader.tsx - Animated header
- *   ├── ProgressSteps.tsx - Step indicator
- *   ├── ProjectNameField.tsx - Name input
- *   ├── RepositoryUrlField.tsx - URL input with preview
- *   ├── SubmitButton.tsx - Submit button
- *   └── InfoCards.tsx - Feature highlights
- *
- * @module components/dashboard/create-new-project
+ * tRPC mutation replaces the old axios.post("/api/project/createProject").
+ * Progress steps now reflect real mutation state instead of fake delays.
  */
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { repositoryZodSchema } from "@/features/projects/schemas/repository.schema";
-import toast from "react-hot-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { projectCreateSchema } from "@/src/lib/validation/schemas";
 import { cn } from "@/shared/lib/utils";
 
-// Local imports
-import { FormData, CARD_ANIMATION } from "./add-repo.constants";
-import { extractRepoInfo, delay } from "./add-repo.utils";
+import { CreateProjectInput, CARD_ANIMATION } from "./add-repo.constants";
+import { extractRepoInfo } from "./add-repo.utils";
+import { useCreateProject } from "@/features/projects/hooks/use-create-project";
 import {
   FormHeader,
   ProgressSteps,
@@ -48,89 +35,51 @@ import {
 } from "./components";
 
 /**
- * Main form component for creating a new project
+ * Main form component for creating a new project.
+ * Uses tRPC project.create mutation via useCreateProject() hook.
  */
 export default function CreateNewProjectForm() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const createProject = useCreateProject();
 
-  // State
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [repoPreview, setRepoPreview] = useState<{
-    owner: string;
-    repo: string;
-  } | null>(null);
-
-  // Form setup
+  // ─── Form setup ─────────────────────────────────────────────────────────
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors, isValid, dirtyFields },
-  } = useForm<FormData>({
-    defaultValues: {
-      ProjectName: "",
-      repoUrl: "",
-    },
-    resolver: zodResolver(repositoryZodSchema),
+  } = useForm<CreateProjectInput>({
+    defaultValues: { projectName: "", repoUrl: "" },
+    resolver: zodResolver(projectCreateSchema),
     mode: "onChange",
   });
 
-  // Watch URL for preview
+  // ─── Repo preview (extracted from URL) ──────────────────────────────────
   const repoUrl = watch("repoUrl");
+  const [repoPreview, setRepoPreview] = useState<{
+    owner: string;
+    repo: string;
+  } | null>(null);
 
   useEffect(() => {
     if (repoUrl && !errors.repoUrl) {
-      const info = extractRepoInfo(repoUrl);
-      setRepoPreview(info);
+      setRepoPreview(extractRepoInfo(repoUrl));
     } else {
       setRepoPreview(null);
     }
   }, [repoUrl, errors.repoUrl]);
 
-  /**
-   * Handle form submission
-   */
-  const handleAddRepository = async (data: FormData) => {
-    try {
-      setIsLoading(true);
-      setCurrentStep(2);
+  // ─── Derive step from mutation state (real progress, not fake delays) ──
+  const currentStep = createProject.isPending
+    ? 2
+    : createProject.isSuccess
+      ? 3
+      : 1;
+  const isLoading = createProject.isPending;
 
-      // Simulate validation
-      await delay(800);
-      setCurrentStep(3);
-
-      const response = await axios.post("/api/project/createProject", {
-        ProjectName: data.ProjectName,
-        repoUrl: data.repoUrl,
-      });
-
-      if (response.status !== 200) {
-        throw new Error("Failed to add repository");
-      }
-
-      toast.success("Repository added successfully!", {
-        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-      });
-
-      // Refetch dashboard data
-      await queryClient.refetchQueries({ queryKey: ["dashboardInfo"] });
-      await queryClient.refetchQueries({ queryKey: ["userProjects"] });
-
-      // Redirect with animation delay
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
-    } catch (error) {
-      console.error("Error adding repository:", error);
-      setCurrentStep(1);
-      toast.error("Failed to add repository. Please try again.", {
-        icon: <AlertCircle className="h-4 w-4 text-rose-500" />,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  // ─── Submit handler ─────────────────────────────────────────────────────
+  const onSubmit = (data: CreateProjectInput) => {
+    createProject.mutate(data);
   };
 
   return (
@@ -145,7 +94,7 @@ export default function CreateNewProjectForm() {
           <Button
             variant="ghost"
             onClick={() => router.push("/dashboard")}
-            className="mb-6 gap-2 hover:bg-accent/50 transition-colors"
+            className="mb-6 gap-2 hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
@@ -156,42 +105,30 @@ export default function CreateNewProjectForm() {
         <motion.div {...CARD_ANIMATION} className="group">
           <div
             className={cn(
-              // Base styles
               "relative overflow-hidden rounded-3xl border",
-              // Glassmorphism
               "bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl",
-              // Border & Shadow
               "border-border/50",
               "shadow-2xl shadow-black/10 dark:shadow-black/40",
               "hover:shadow-primary/5 transition-shadow duration-500",
             )}
           >
             {/* Gradient Accents */}
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 opacity-60 blur-3xl" />
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 opacity-60 blur-3xl" />
             <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 opacity-40 blur-3xl" />
 
             {/* Content */}
             <div className="relative z-10 p-8 lg:p-10">
-              {/* Header */}
               <FormHeader />
-
-              {/* Progress Steps */}
               <ProgressSteps currentStep={currentStep} />
 
-              {/* Form */}
-              <form
-                onSubmit={handleSubmit(handleAddRepository)}
-                className="space-y-6"
-              >
-                {/* Project Name Field */}
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <ProjectNameField
                   register={register}
                   errors={errors}
-                  isDirty={!!dirtyFields.ProjectName}
+                  isDirty={!!dirtyFields.projectName}
                   isLoading={isLoading}
                 />
 
-                {/* Repository URL Field */}
                 <RepositoryUrlField
                   register={register}
                   errors={errors}
@@ -200,7 +137,6 @@ export default function CreateNewProjectForm() {
                   repoPreview={repoPreview}
                 />
 
-                {/* Submit Button */}
                 <SubmitButton
                   isLoading={isLoading}
                   isValid={isValid}
@@ -208,15 +144,14 @@ export default function CreateNewProjectForm() {
                 />
               </form>
 
-              {/* Info Cards */}
               <InfoCards />
             </div>
 
-            {/* Bottom Gradient Line */}
+            {/* Bottom Gradient Line — visible when form is valid */}
             <div
               className={cn(
                 "absolute bottom-0 left-0 right-0 h-1",
-                "bg-gradient-to-r from-primary via-violet-500 to-primary",
+                "bg-gradient-to-r from-primary via-orange-500 to-primary",
                 "opacity-0 transition-opacity duration-500",
                 isValid && !isLoading && "opacity-100",
               )}

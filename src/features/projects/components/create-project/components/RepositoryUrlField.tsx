@@ -1,7 +1,7 @@
 /**
- * =============================================================================
- * REPOSITORY URL FIELD COMPONENT
- * =============================================================================
+ * Repository URL Field — Input with live GitHub URL preview.
+ * Shows repo preview card when a valid GitHub URL is detected.
+ * Uses AnimatePresence for smooth enter/exit of preview and errors.
  */
 
 "use client";
@@ -12,11 +12,11 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { cn } from "@/shared/lib/utils";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormData, RepoInfo } from "../add-repo.constants";
+import { CreateProjectInput, RepoInfo } from "../add-repo.constants";
 
 interface RepositoryUrlFieldProps {
-  register: UseFormRegister<FormData>;
-  errors: FieldErrors<FormData>;
+  register: UseFormRegister<CreateProjectInput>;
+  errors: FieldErrors<CreateProjectInput>;
   isDirty: boolean;
   isLoading: boolean;
   repoPreview: RepoInfo | null;

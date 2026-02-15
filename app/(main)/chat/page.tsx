@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { fetchAllUserProject } from "@/features/projects/actions/project-actions";
+import { caller } from "@/src/lib/trpc/server";
 
 export default async function ChatPage() {
   const { userId } = await auth();
@@ -9,8 +9,8 @@ export default async function ChatPage() {
     redirect("/sign-in");
   }
 
-  // Fetch user's projects
-  const projects = await fetchAllUserProject(userId);
+  // Fetch user's projects via tRPC server caller
+  const projects = await caller.project.getAll();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90 flex items-center justify-center">

@@ -1,14 +1,12 @@
-import { Loader } from "@/shared/components/feedback/loader";
-import dynamic from "next/dynamic";
+/**
+ * Create Project Page — Server Component
+ *
+ * Renders the create project form directly (no dynamic import needed).
+ */
 
-const CreateNewProjectForm = dynamic(
-  () => import("@/features/projects/components/create-project/add-repo"),
-  {
-    loading: () => <Loader />,
-  }
-);
+import CreateNewProjectForm from "@/features/projects/components/create-project/add-repo";
 
-export default function AddRepositoryPage() {
+export default function CreateProjectPage() {
   return (
     <main>
       <CreateNewProjectForm />

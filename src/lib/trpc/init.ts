@@ -1,22 +1,23 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { type FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import superjson from "superjson";
 import { auth } from "@clerk/nextjs/server";
+import { cache } from "react";
 
 /**
  * Creates context for all tRPC procedures
  * Integrates Clerk authentication and request data
+ * opts is optional — present in fetch adapter, absent in server-side callers
  */
-export const createContext = async (opts: FetchCreateContextFnOptions) => {
+export const createTRPCContext = cache(async (opts?: { req?: Request }) => {
   const { userId } = await auth();
 
   return {
-    req: opts.req,
+    req: opts?.req,
     userId,
   };
-};
+});
 
-type Context = Awaited<ReturnType<typeof createContext>>;
+type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 /**
  * Initialize tRPC with context type and transformers
@@ -42,10 +43,17 @@ const t = initTRPC.context<Context>().create({
 /**
  * Export reusable router and procedure builders
  */
-export const router = t.router;
-export const publicProcedure = t.procedure;
+
 export const middleware = t.middleware;
 
+// Used to create routers (e.g., export const userRouter = createTRPCRouter({...}))
+export const createTRPCRouter = t.router;
+
+// Used to generate a server-side caller (e.g., for RSC or actions)
+export const createCallerFactory = t.createCallerFactory;
+
+// Base TRPC procedure (e.g., used to define queries, mutations)
+export const baseProcedure = t.procedure;
 /**
  * Protected procedure - requires Clerk authentication
  * Throws UNAUTHORIZED if user is not authenticated
@@ -66,4 +74,4 @@ const isAuthed = middleware(async ({ ctx, next }) => {
   });
 });
 
-export const protectedProcedure = publicProcedure.use(isAuthed);
+export const protectedProcedure = baseProcedure.use(isAuthed);
