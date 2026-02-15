@@ -6,7 +6,7 @@ import {
   projectFiles,
   usersTable,
 } from "@/db/schema";
-import { eq, desc, or, and, count,  sql } from "drizzle-orm";
+import { eq, desc, or, and, count, sql } from "drizzle-orm";
 import {
   createNewProject as createGitHubProject,
   getCommitHashes,
@@ -44,21 +44,12 @@ export function createProjectService() {
         const owner = parts[parts.length - 2]!;
         const repo = parts[parts.length - 1]!;
 
-        // Fetch and store commits in background (async, don't await)
-        getCommitHashes(data.repoUrl, projectId).catch((error) => {
-          console.error(
-            "[ProjectService] Error fetching commits in background:",
-            error,
-          );
-        });
-
-        // Fetch and store code files in background (async, don't await)
-        getRepositoryFiles(owner, repo, projectId).catch((error) => {
-          console.error(
-            "[ProjectService] Error fetching files in background:",
-            error,
-          );
-        });
+        // Await both tasks — serverless functions (Vercel) terminate after
+        // the response is sent, killing any unawaited promises.
+        await Promise.all([
+          getCommitHashes(data.repoUrl, projectId),
+          getRepositoryFiles(owner, repo, projectId),
+        ]);
 
         return {
           projectId,
