@@ -3,11 +3,9 @@
  * Processes project files, chunks them, generates embeddings, and stores in database
  */
 
-"use server";
-
 import { db } from "@/db";
-import { projectFiles, codeEmbeddings } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { projectFiles, projectTables, codeEmbeddings } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { chunkCode, computeHash, detectLanguage } from "./code-chunker";
 import {
   generateEmbeddingsBatch,
@@ -174,12 +172,6 @@ export async function processProjectForRag(
   totalEmbeddings: number;
   errors: string[];
 }> {
-  // Import database modules
-  const { db } = await import("@/db");
-  const { projectTables, projectFiles } =
-    await import("@/db/schema");
-  const { eq } = await import("drizzle-orm");
-
   try {
     console.log(`[RAG] ========================================`);
     console.log(
@@ -309,11 +301,6 @@ export async function processProjectForRag(
   } catch (error) {
     console.error(`Error processing project ${projectId}:`, error);
 
-    // Update status to failed with error message
-    const { db } = await import("@/db");
-    const { projectTables } = await import("@/db/schema");
-    const { eq } = await import("drizzle-orm");
-
     await db
       .update(projectTables)
       .set({
@@ -378,6 +365,3 @@ export async function getProjectProcessingStatus(projectId: string): Promise<{
     totalEmbeddings,
   };
 }
-
-// Import sql for raw queries
-import { sql } from "drizzle-orm";

@@ -273,6 +273,7 @@ export function createProjectService() {
           totalCommits: projectTables.totalCommits,
           totalBranches: projectTables.totalBranches,
           totalContributors: projectTables.totalContributors,
+          embeddingStatus: projectTables.embeddingStatus,
           createdAt: projectTables.createdAt,
           updatedAt: projectTables.updatedAt,
         })
