@@ -3,8 +3,6 @@
  * Performs cosine similarity search on code chunks
  */
 
-"use server";
-
 import { db } from "@/db";
 import { codeEmbeddings, projectFiles } from "@/db/schema";
 import { cosineDistance, desc, gt, sql, eq, and, inArray } from "drizzle-orm";
@@ -242,4 +240,177 @@ ${result.chunkContent}
   });
   
   return formatted.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Re-ranking
+// ---------------------------------------------------------------------------
+
+/**
+ * Tokenize a query string into lowercase terms, stripping punctuation.
+ */
+function extractQueryTerms(query: string): string[] {
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length > 1),
+    ),
+  ];
+}
+
+/**
+ * Re-rank vector search results using three in-memory signals:
+ *   1. Keyword boost   — +0.05 per exact query term found in chunk content
+ *   2. File-path boost — +0.10 per query term found in the file path
+ *   3. Diversity cap   — max 3 chunks per file to prevent one file dominating
+ *
+ * Returns up to `limit` results sorted by final score.
+ */
+export function reRankResults(
+  results: SearchResult[],
+  query: string,
+  limit: number = 8,
+): SearchResult[] {
+  const terms = extractQueryTerms(query);
+
+  const scored = results.map((r) => {
+    let score = r.similarity;
+
+    if (terms.length > 0) {
+      const lowerContent = r.chunkContent.toLowerCase();
+      const lowerPath = r.filePath.toLowerCase();
+
+      for (const term of terms) {
+        if (lowerContent.includes(term)) score += 0.05;
+        if (lowerPath.includes(term)) score += 0.10;
+      }
+    }
+
+    return { ...r, similarity: score };
+  });
+
+  // Sort descending, then enforce max-3-per-file diversity
+  scored.sort((a, b) => b.similarity - a.similarity);
+
+  const fileCounts: Record<string, number> = {};
+  const diverse: SearchResult[] = [];
+
+  for (const r of scored) {
+    const count = fileCounts[r.filePath] ?? 0;
+    if (count < 3) {
+      fileCounts[r.filePath] = count + 1;
+      diverse.push(r);
+      if (diverse.length >= limit) break;
+    }
+  }
+
+  return diverse;
+}
+
+// ---------------------------------------------------------------------------
+// In-file vector search (for large file-specific queries)
+// ---------------------------------------------------------------------------
+
+/**
+ * Search for the most relevant chunks within a single file.
+ * Used when a file-specific query targets a large file (> 8000 chars).
+ *
+ * @param projectId - Project ID
+ * @param filePath  - Exact file path to search within
+ * @param queryEmbedding - Query vector
+ * @param limit     - Max chunks to return (default 6)
+ */
+export async function searchSimilarCodeInFile(
+  projectId: string,
+  filePath: string,
+  queryEmbedding: number[],
+  limit: number = 6,
+): Promise<SearchResult[]> {
+  try {
+    const similarity = sql<number>`1 - (${cosineDistance(codeEmbeddings.embedding, queryEmbedding)})`;
+
+    const results = await db
+      .select({
+        id: codeEmbeddings.id,
+        filePath: codeEmbeddings.filePath,
+        chunkContent: codeEmbeddings.chunkContent,
+        chunkIndex: codeEmbeddings.chunkIndex,
+        tokenCount: codeEmbeddings.tokenCount,
+        similarity,
+      })
+      .from(codeEmbeddings)
+      .where(
+        and(
+          eq(codeEmbeddings.projectId, projectId),
+          eq(codeEmbeddings.filePath, filePath),
+        ),
+      )
+      .orderBy(desc(similarity))
+      .limit(limit);
+
+    return results;
+  } catch (error) {
+    console.error("Error in searchSimilarCodeInFile:", error);
+    throw new Error(
+      `Failed to search within file: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small-project full-context dump
+// ---------------------------------------------------------------------------
+
+const SMALL_PROJECT_TOKEN_THRESHOLD = 150_000;
+
+/**
+ * Returns true when the project qualifies for the fast "full dump" path.
+ * A null estimatedTokens means the project hasn't been embedded yet — treat
+ * as large (returns false) so it routes through RAG safely.
+ */
+export function isSmallProject(estimatedTokens: number | null): boolean {
+  if (estimatedTokens === null) return false;
+  return estimatedTokens < SMALL_PROJECT_TOKEN_THRESHOLD;
+}
+
+/**
+ * Fetch all project files and format them as a single context string.
+ * Only called on the fast path when isSmallProject() is true.
+ * Files are sorted so smaller files (less noise) come first.
+ */
+export async function getAllProjectFilesForContext(
+  projectId: string,
+): Promise<string> {
+  try {
+    const files = await db
+      .select({
+        fileName: projectFiles.fileName,
+        code: projectFiles.code,
+        language: projectFiles.language,
+      })
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
+
+    if (files.length === 0) {
+      return "No files found for this project.";
+    }
+
+    // Sort by file size ascending so important small config/type files appear first
+    files.sort((a, b) => a.code.length - b.code.length);
+
+    const formatted = files.map((f) => {
+      const lang = f.language ?? f.fileName.split(".").pop() ?? "text";
+      return `\`\`\`${lang}\n// File: ${f.fileName}\n${f.code}\n\`\`\``;
+    });
+
+    return formatted.join("\n\n");
+  } catch (error) {
+    console.error("Error fetching all project files:", error);
+    throw new Error(
+      `Failed to fetch project files: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }

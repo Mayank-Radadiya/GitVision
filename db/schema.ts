@@ -66,6 +66,7 @@ export const projectTables = pgTable(
     embeddingError: text("embedding_error"), // Store error message if failed
     embeddingProgress: integer("embedding_progress").notNull().default(0), // Track progress (0-100)
     lastEmbeddingAttempt: timestamp("last_embedding_attempt"), // Track when last attempted
+    estimatedTokens: integer("estimated_tokens"), // Total token count across all embeddings — used for project size gate (null = unknown, treat as large)
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

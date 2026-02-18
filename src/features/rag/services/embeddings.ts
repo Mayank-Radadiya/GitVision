@@ -1,20 +1,25 @@
 /**
- * Embedding generation service using Google Gemini
+ * Embedding generation service using OpenRouter SDK
  * Generates vector embeddings for code chunks and queries
+ * Model: qwen/qwen3-embedding-8b (768 dimensions for DB compatibility)
  */
 
-import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { OpenRouter } from "@openrouter/sdk";
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY environment variable is required");
+if (!process.env.OPENROUTER_API_KEY) {
+  throw new Error("OPENROUTER_API_KEY environment variable is required");
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const openrouter = new OpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
 
-// Rate limiting configuration
+const EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
+const EMBEDDING_DIMENSIONS = 768;
+
+// Rate limiting configuration (OpenRouter has higher limits than Gemini free tier)
 const RATE_LIMIT = {
-  maxRequestsPerMinute: 60,
-  minDelayMs: 1000, // Minimum 1 second between requests
+  minDelayMs: 200, // 200ms between requests
 };
 
 let lastRequestTime = 0;
@@ -43,27 +48,41 @@ async function applyRateLimit(): Promise<void> {
 
 /**
  * Generate embedding for a single text chunk
- * Uses Gemini embedding-004 model with 768 dimensions
+ * Uses qwen/qwen3-embedding-8b with 768 dimensions
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
     await applyRateLimit();
 
-    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-
-    const result = await model.embedContent({
-      content: { role: "user", parts: [{ text }] },
-      taskType: TaskType.RETRIEVAL_DOCUMENT, // Optimized for code/documentation
+    const result = await openrouter.embeddings.generate({
+      requestBody: {
+        model: EMBEDDING_MODEL,
+        input: text,
+        encodingFormat: "float",
+        dimensions: EMBEDDING_DIMENSIONS,
+      },
     });
 
-    const embedding = result.embedding.values;
-
-    // Validate embedding dimensions
-    if (embedding.length !== 768) {
-      throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
+    // Response can be string or object — handle both
+    if (typeof result === "string") {
+      throw new Error(`Unexpected string response from OpenRouter: ${result}`);
     }
 
-    return embedding;
+    const embeddingData = result.data[0].embedding;
+
+    // embedding can be number[] or base64 string; we requested float
+    if (!Array.isArray(embeddingData)) {
+      throw new Error("Expected float array embedding, got string (base64)");
+    }
+
+    // Validate embedding dimensions
+    if (embeddingData.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error(
+        `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embeddingData.length}`,
+      );
+    }
+
+    return embeddingData;
   } catch (error) {
     console.error("Error generating embedding:", error);
     throw new Error(
@@ -74,26 +93,38 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
 /**
  * Generate embedding for a search query
- * Uses RETRIEVAL_QUERY task type for better search performance
+ * Uses the same model and dimensions as document embeddings
  */
 export async function generateQueryEmbedding(query: string): Promise<number[]> {
   try {
     await applyRateLimit();
 
-    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-
-    const result = await model.embedContent({
-      content: { role: "user", parts: [{ text: query }] },
-      taskType: TaskType.RETRIEVAL_QUERY, // Optimized for search queries
+    const result = await openrouter.embeddings.generate({
+      requestBody: {
+        model: EMBEDDING_MODEL,
+        input: query,
+        encodingFormat: "float",
+        dimensions: EMBEDDING_DIMENSIONS,
+      },
     });
 
-    const embedding = result.embedding.values;
-
-    if (embedding.length !== 768) {
-      throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
+    if (typeof result === "string") {
+      throw new Error(`Unexpected string response from OpenRouter: ${result}`);
     }
 
-    return embedding;
+    const embeddingData = result.data[0].embedding;
+
+    if (!Array.isArray(embeddingData)) {
+      throw new Error("Expected float array embedding, got string (base64)");
+    }
+
+    if (embeddingData.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error(
+        `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embeddingData.length}`,
+      );
+    }
+
+    return embeddingData;
   } catch (error) {
     console.error("Error generating query embedding:", error);
     throw new Error(
@@ -143,7 +174,7 @@ export async function generateEmbeddingsBatch(
 
     // Add delay between batches
     if (i + batchSize < chunks.length) {
-      await sleep(2000); // 2 second delay between batches
+      await sleep(100); // 500ms delay between batches (reduced from 2s)
     }
   }
 

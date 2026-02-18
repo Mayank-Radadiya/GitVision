@@ -36,7 +36,7 @@ export function useEmbeddingManager(
   const checkStatus = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/project/${projectId}/embedding-status`,
+        `/api/embeddings?projectId=${projectId}`,
       );
 
       if (!response.ok) {
@@ -61,12 +61,11 @@ export function useEmbeddingManager(
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/project/${projectId}/start-embedding`,
-        {
-          method: "POST",
-        },
-      );
+      const response = await fetch(`/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to start embedding generation");

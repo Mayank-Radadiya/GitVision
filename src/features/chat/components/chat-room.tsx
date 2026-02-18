@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { ArrowLeft, FolderGit2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/shared/components/ui/button";
@@ -24,6 +24,68 @@ interface ChatRoomProps {
   }>;
 }
 
+// ---------------------------------------------------------------------------
+// Types matching the data events sent by the server
+// ---------------------------------------------------------------------------
+
+interface StatusEvent {
+  type: "status";
+  value: "searching";
+}
+
+interface SourcesEvent {
+  type: "sources";
+  files: string[];
+}
+
+type DataEvent = StatusEvent | SourcesEvent;
+
+// ---------------------------------------------------------------------------
+// Shimmer skeleton shown while retrieval is running (before first token)
+// ---------------------------------------------------------------------------
+
+function RetrievalSkeleton() {
+  return (
+    <div className="group flex gap-3 px-4 py-5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+        <Sparkles className="h-4 w-4 animate-pulse" />
+      </div>
+      <div className="flex max-w-[85%] flex-col gap-2 items-start">
+        <div className="rounded-2xl rounded-tl-md bg-muted/40 border border-border/30 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                style={{ animationDelay: "0ms", animationDuration: "1.2s" }}
+              />
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                style={{ animationDelay: "150ms", animationDuration: "1.2s" }}
+              />
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                style={{ animationDelay: "300ms", animationDuration: "1.2s" }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground/60 animate-pulse">
+              Searching codebase...
+            </span>
+          </div>
+          {/* Shimmer lines */}
+          <div className="mt-3 space-y-2">
+            <div className="h-2.5 w-48 rounded-full bg-muted-foreground/10 animate-pulse" />
+            <div className="h-2.5 w-36 rounded-full bg-muted-foreground/8 animate-pulse" style={{ animationDelay: "100ms" }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function ChatRoom({
   chatId,
   projectId,
@@ -35,6 +97,14 @@ export function ChatRoom({
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Track whether we've received the first streaming token for the current
+  // assistant reply — distinguishes "retrieval phase" from "streaming phase"
+  const hasFirstTokenRef = useRef(false);
+  const [hasFirstToken, setHasFirstToken] = useState(false);
+
+  // Live sources delivered via the data stream for the current response
+  const [liveSources, setLiveSources] = useState<string[]>([]);
+
   const {
     messages,
     input,
@@ -44,6 +114,7 @@ export function ChatRoom({
     error,
     stop,
     reload,
+    data,
   } = useChat({
     api: "/api/chat",
     body: {
@@ -56,7 +127,42 @@ export function ChatRoom({
       role: m.role,
       content: m.content,
     })),
+    onResponse() {
+      // Server has started responding — reset first-token tracker
+      hasFirstTokenRef.current = false;
+      setHasFirstToken(false);
+      setLiveSources([]);
+    },
+    onFinish() {
+      hasFirstTokenRef.current = false;
+      setHasFirstToken(false);
+    },
   });
+
+  // Read data stream events
+  useEffect(() => {
+    if (!data || data.length === 0) return;
+
+    for (const event of data as DataEvent[]) {
+      if (event.type === "sources" && Array.isArray(event.files)) {
+        setLiveSources(event.files);
+      }
+    }
+  }, [data]);
+
+  // Detect when the first streaming token arrives for the current reply
+  const lastMsg = messages[messages.length - 1];
+  useEffect(() => {
+    if (
+      isLoading &&
+      lastMsg?.role === "assistant" &&
+      lastMsg.content.length > 0 &&
+      !hasFirstTokenRef.current
+    ) {
+      hasFirstTokenRef.current = true;
+      setHasFirstToken(true);
+    }
+  }, [isLoading, lastMsg]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -70,16 +176,33 @@ export function ChatRoom({
 
   const onSubmit = () => {
     if (!input.trim() || isLoading) return;
+    setLiveSources([]);
+    setHasFirstToken(false);
     handleSubmit();
   };
 
-  const getRelatedFiles = (messageId: string): string[] => {
+  // For persisted messages (loaded from DB), read relatedFiles from
+  // initialMessages. For the live streaming message, use liveSources.
+  const getRelatedFiles = (messageId: string, isLiveMessage: boolean): string[] => {
+    if (isLiveMessage && liveSources.length > 0) return liveSources;
     const original = initialMessages.find((m) => m.id === messageId);
     if (original?.relatedFiles && Array.isArray(original.relatedFiles)) {
       return original.relatedFiles as string[];
     }
     return [];
   };
+
+  // The current response is in "retrieval phase" when loading, the last
+  // message is from the user (waiting for assistant), and no token has arrived
+  const isRetrieving =
+    isLoading &&
+    messages[messages.length - 1]?.role === "user";
+
+  // The current response is actively streaming tokens
+  const isStreaming =
+    isLoading &&
+    messages[messages.length - 1]?.role === "assistant" &&
+    hasFirstToken;
 
   return (
     <div className="flex h-[calc(100vh-2rem)] flex-col">
@@ -110,7 +233,7 @@ export function ChatRoom({
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !isRetrieving ? (
           <div className="flex h-full items-center justify-center p-6">
             <div className="max-w-md text-center">
               <h2 className="text-lg font-semibold">
@@ -150,28 +273,46 @@ export function ChatRoom({
         ) : (
           <div className="mx-auto max-w-3xl pb-4">
             <AnimatePresence initial={false}>
-              {messages.map((m, i) => (
+              {messages.map((m, i) => {
+                const isLastMsg = i === messages.length - 1;
+                const isLiveAssistantMsg =
+                  isLastMsg && m.role === "assistant" && isLoading;
+
+                return (
+                  <motion.div
+                    key={m.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChatMessage
+                      role={m.role as "user" | "assistant"}
+                      content={m.content}
+                      relatedFiles={getRelatedFiles(m.id, isLiveAssistantMsg)}
+                      isStreaming={isLastMsg && isStreaming && m.role === "assistant"}
+                    />
+                  </motion.div>
+                );
+              })}
+
+              {/* Retrieval phase: shimmer skeleton before first token */}
+              {isRetrieving && (
                 <motion.div
-                  key={m.id}
+                  key="retrieval-skeleton"
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.15 }}
                 >
-                  <ChatMessage
-                    role={m.role as "user" | "assistant"}
-                    content={m.content}
-                    relatedFiles={getRelatedFiles(m.id)}
-                    isStreaming={
-                      isLoading &&
-                      i === messages.length - 1 &&
-                      m.role === "assistant"
-                    }
-                  />
+                  <RetrievalSkeleton />
                 </motion.div>
-              ))}
+              )}
+
+              {/* Streaming phase transition: loading indicator while first
+                  token hasn't arrived but assistant message exists */}
               {isLoading &&
-                messages.length > 0 &&
-                messages[messages.length - 1].role === "user" && (
+                !isRetrieving &&
+                !hasFirstToken &&
+                lastMsg?.role === "assistant" && (
                   <motion.div
                     key="thinking"
                     initial={{ opacity: 0, y: 8 }}

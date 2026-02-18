@@ -5,7 +5,7 @@
 
 import { db } from "@/db";
 import { projectFiles, projectTables, codeEmbeddings } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, sum } from "drizzle-orm";
 import { chunkCode, computeHash, detectLanguage } from "./code-chunker";
 import {
   generateEmbeddingsBatch,
@@ -276,6 +276,14 @@ export async function processProjectForRag(
     console.log(`[RAG] Errors: ${errors.length}`);
     console.log(`[RAG] ========================================`);
 
+    // Calculate total token count across all embeddings for the project size gate
+    const tokenSumResult = await db
+      .select({ total: sum(codeEmbeddings.tokenCount) })
+      .from(codeEmbeddings)
+      .where(eq(codeEmbeddings.projectId, projectId));
+
+    const estimatedTokens = Number(tokenSumResult[0]?.total ?? 0);
+
     // Update status to completed
     await db
       .update(projectTables)
@@ -283,6 +291,7 @@ export async function processProjectForRag(
         embeddingStatus: "completed",
         embeddingProgress: 100,
         embeddingError: null,
+        estimatedTokens,
         updatedAt: new Date(),
       })
       .where(eq(projectTables.id, projectId));
