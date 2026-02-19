@@ -16,7 +16,11 @@ import ProjectListSkeleton from "./project-list-skeleton";
 import EmptyState from "../empty-state";
 
 function ProjectList() {
-  const { data: projects = [], isLoading } = useUserProjects();
+  const { data, isLoading } = useUserProjects();
+
+  const projects = useMemo(() => {
+    return Array.isArray(data) ? data : [];
+  }, [data]);
 
   // ─── Local search/sort state ─────────────────────────────────────────────
   const [query, setQuery] = useState("");

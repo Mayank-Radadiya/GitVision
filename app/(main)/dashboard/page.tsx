@@ -8,7 +8,7 @@ import { HydrateClient } from "@/src/lib/trpc/server";
 import DashboardContent from "@/features/dashboard/components/dashboard-page";
 
 export default async function DashboardPage() {
-  prefetchDashboard();
+  await prefetchDashboard();
 
   return (
     <HydrateClient>

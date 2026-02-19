@@ -8,7 +8,7 @@ import { prefetch, trpc, HydrateClient } from "@/src/lib/trpc/server";
 import CodeViewerProjectGrid from "@/features/projects/components/code-viewer-project-grid";
 
 export default async function CodeViewerPage() {
-  prefetch(trpc.project.getAll.queryOptions());
+  await prefetch(trpc.project.getAll.queryOptions());
 
   return (
     <HydrateClient>

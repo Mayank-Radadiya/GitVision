@@ -83,13 +83,11 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
 
   // Detect infinite queries by inspecting the query key metadata
   if (queryOptions.queryKey[1]?.type === "infinite") {
-    // Prefetch infinite query pages
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    void queryClient.prefetchInfiniteQuery(queryOptions as any);
-  } else {
-    // Prefetch standard queries
-    void queryClient.prefetchQuery(queryOptions);
+    return queryClient.prefetchInfiniteQuery(queryOptions as any);
   }
+
+  return queryClient.prefetchQuery(queryOptions);
 }
 
 /**

@@ -4,12 +4,12 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { memo, useEffect, useState } from "react";
-import { QueryClient } from "@tanstack/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/src/lib/trpc/client";
+import { makeQueryClient } from "@/src/lib/trpc/query-client";
 
 interface ProviderProps {
   children: React.ReactNode;
@@ -48,33 +48,8 @@ const MemoizedToaster = memo(() => (
 MemoizedToaster.displayName = "MemoizedToaster";
 
 const Provider = ({ children }: ProviderProps) => {
-  // Create a client
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime in v4)
-            refetchOnWindowFocus: false,
-            retry: (failureCount, error) => {
-              // Retry network errors but not others
-              if (error instanceof Error && "isAxiosError" in error) {
-                // Retry network errors up to 3 times
-                return failureCount < 3;
-              }
-              return false; // Don't retry other errors
-            },
-          },
-          mutations: {
-            // Make sure mutations handle errors properly
-            onError: (err) => {
-              console.error("Mutation error:", err);
-            },
-          },
-        },
-      }),
-  );
+  // Create a client using the factory to ensure consistent configuration (transformers, etc.)
+  const [queryClient] = useState(() => makeQueryClient());
 
   // Using this to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
@@ -165,5 +140,4 @@ const Provider = ({ children }: ProviderProps) => {
     </ClerkProvider>
   );
 };
-
 export default Provider;

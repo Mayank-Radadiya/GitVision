@@ -1,12 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { db } from "@/db";
-import {
-  projectTables,
-  commitsTable,
-  projectFiles,
-  usersTable,
-} from "@/db/schema";
-import { eq, desc, or, and, count, sql } from "drizzle-orm";
+import { projectTables, commitsTable, projectFiles } from "@/db/schema";
+import { eq, desc, and, count, sql } from "drizzle-orm";
 import {
   createNewProject as createGitHubProject,
   getCommitHashes,
@@ -278,7 +273,7 @@ export function createProjectService() {
           updatedAt: projectTables.updatedAt,
         })
         .from(projectTables)
-        .where(or(eq(projectTables.ownerId, userId)))
+        .where(eq(projectTables.ownerId, userId))
         .orderBy(desc(projectTables.createdAt));
 
       return projects;
@@ -289,37 +284,28 @@ export function createProjectService() {
      * @returns Total projects, commits, files, and user credits
      */
     async getDashboardInfo(userId: string) {
-      const [projectsResult, commitsResult, filesResult, creditsResult] =
-        await Promise.all([
-          db
-            .select({ count: count(projectTables.id) })
-            .from(projectTables)
-            .where(or(eq(projectTables.ownerId, userId))),
-          db
-            .select({ count: count(commitsTable.id) })
-            .from(commitsTable)
-            .innerJoin(
-              projectTables,
-              eq(commitsTable.projectId, projectTables.id),
-            ),
-          db
-            .select({ count: count(projectFiles.id) })
-            .from(projectFiles)
-            .innerJoin(
-              projectTables,
-              eq(projectFiles.projectId, projectTables.id),
-            ),
-          db
-            .select({ credits: usersTable.credits })
-            .from(usersTable)
-            .where(eq(usersTable.id, userId)),
-        ]);
+      const result = await db.execute(
+        sql`SELECT
+          (SELECT count(*)::int FROM projects WHERE owner_id = ${userId}) AS total_projects,
+          (SELECT count(*)::int FROM commits c INNER JOIN projects p ON c.project_id = p.id WHERE p.owner_id = ${userId}) AS total_commits,
+          (SELECT count(*)::int FROM project_files f INNER JOIN projects p ON f.project_id = p.id WHERE p.owner_id = ${userId}) AS total_files,
+          (SELECT COALESCE(credits, 0) FROM users WHERE id = ${userId}) AS credits`,
+      );
+
+      const row = result.rows[0] as
+        | {
+            total_projects: number;
+            total_commits: number;
+            total_files: number;
+            credits: number;
+          }
+        | undefined;
 
       return {
-        totalProjects: Number(projectsResult[0]?.count ?? 0),
-        totalCommits: Number(commitsResult[0]?.count ?? 0),
-        totalFiles: Number(filesResult[0]?.count ?? 0),
-        userCredits: Number(creditsResult[0]?.credits ?? 0),
+        totalProjects: Number(row?.total_projects ?? 0),
+        totalCommits: Number(row?.total_commits ?? 0),
+        totalFiles: Number(row?.total_files ?? 0),
+        userCredits: Number(row?.credits ?? 0),
       };
     },
 

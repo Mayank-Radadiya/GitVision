@@ -159,6 +159,7 @@ export const commitsTable = pgTable(
     return {
       projectIdIdx: index("commits_project_id_idx").on(table.projectId),
       commitHashIdx: index("commits_commit_hash_idx").on(table.commitHash),
+      authorDateIdx: index("commits_author_date_idx").on(table.authorDate),
     };
   },
 );

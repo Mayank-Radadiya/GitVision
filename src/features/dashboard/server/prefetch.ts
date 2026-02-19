@@ -3,11 +3,13 @@
  * Queries are dehydrated and rehydrated on the client via HydrateClient.
  */
 
-import { trpc } from "@/src/lib/trpc/server";
+import { prefetch, trpc } from "@/src/lib/trpc/server";
 
 export function prefetchDashboard() {
-  void trpc.project.getDashboardInfo.queryOptions();
-  void trpc.project.getAll.queryOptions();
-  void trpc.project.getRecentActivity.queryOptions();
-  void trpc.project.getCommitChart.queryOptions();
+  return Promise.all([
+    prefetch(trpc.project.getDashboardInfo.queryOptions()),
+    prefetch(trpc.project.getAll.queryOptions()),
+    prefetch(trpc.project.getRecentActivity.queryOptions()),
+    prefetch(trpc.project.getCommitChart.queryOptions()),
+  ]);
 }
