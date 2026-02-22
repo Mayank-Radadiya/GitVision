@@ -1,4 +1,4 @@
-import { streamText, createDataStreamResponse } from "ai";
+import { streamText, generateText, createDataStreamResponse } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
@@ -35,12 +35,20 @@ const SYSTEM_PROMPT_GENERAL = `You are GitVision AI, a helpful and knowledgeable
 Answer questions clearly and concisely. Use markdown formatting for readability.
 When providing code examples, use fenced code blocks with language identifiers.`;
 
+function appendConversationHistory(prompt: string, conversationHistory: string): string {
+  if (!conversationHistory || conversationHistory === "No previous conversation.") {
+    return prompt;
+  }
+  return `${prompt}\n\nPREVIOUS CONVERSATION:\n${conversationHistory}`;
+}
+
 function buildSmallProjectSystemPrompt(
   projectName: string,
   fullContext: string,
   conversationHistory: string,
 ): string {
-  return `You are GitVision AI, a code-aware assistant with full access to the "${projectName}" codebase.
+  return appendConversationHistory(
+    `You are GitVision AI, a code-aware assistant with full access to the "${projectName}" codebase.
 
 FULL CODEBASE:
 ${fullContext}
@@ -49,11 +57,9 @@ INSTRUCTIONS:
 - You have the complete codebase above. Answer questions directly from it.
 - Reference specific file paths and function names when relevant.
 - Use markdown with fenced code blocks.
-- When suggesting changes, show before/after snippets.${
-    conversationHistory && conversationHistory !== "No previous conversation."
-      ? `\n\nPREVIOUS CONVERSATION:\n${conversationHistory}`
-      : ""
-  }`;
+- When suggesting changes, show before/after snippets.`,
+    conversationHistory,
+  );
 }
 
 function buildRagSystemPrompt(
@@ -62,7 +68,8 @@ function buildRagSystemPrompt(
   projectStats: { languages: string[]; totalFiles: number; totalEmbeddings: number },
   conversationHistory: string,
 ): string {
-  return `You are GitVision AI, a code-aware assistant analyzing the "${projectName}" project.
+  return appendConversationHistory(
+    `You are GitVision AI, a code-aware assistant analyzing the "${projectName}" project.
 
 PROJECT INFO:
 - Languages: ${projectStats.languages.join(", ") || "Unknown"}
@@ -78,11 +85,9 @@ INSTRUCTIONS:
 - If the context doesn't contain enough information, say so honestly.
 - Use markdown formatting with fenced code blocks.
 - When suggesting changes, show diff-style before/after snippets.
-- Keep responses focused and actionable.${
-    conversationHistory && conversationHistory !== "No previous conversation."
-      ? `\n\nPREVIOUS CONVERSATION:\n${conversationHistory}`
-      : ""
-  }`;
+- Keep responses focused and actionable.`,
+    conversationHistory,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +114,7 @@ async function rewriteQueryForRetrieval(
   }
 
   try {
-    const result = await streamText({
+    const { text } = await generateText({
       model: google("gemini-2.5-flash"),
       system: `You are a search query optimizer for a code repository.
 Given a conversation and the user's latest message, output ONLY a concise
@@ -124,14 +129,8 @@ at the end.`,
       ],
     });
 
-    let rewritten = "";
-    for await (const chunk of result.textStream) {
-      rewritten += chunk;
-    }
-
-    return rewritten.trim() || userMessage;
+    return text.trim() || userMessage;
   } catch {
-    // Non-fatal — fall back to original message
     return userMessage;
   }
 }
@@ -232,7 +231,7 @@ async function retrieveContext(
         );
 
         if (inFileResults.length > 0) {
-          const inFileContext = await formatRetrievedContext(inFileResults);
+          const inFileContext = formatRetrievedContext(inFileResults);
           return {
             context: inFileContext,
             relatedFiles: [targetFile],
@@ -257,7 +256,7 @@ async function retrieveContext(
   const queryEmbedding = await generateQueryEmbedding(standaloneQuery);
   const rawResults = await searchSimilarCode(projectId, queryEmbedding, 12, 0.45);
   const ranked = reRankResults(rawResults, standaloneQuery, 8);
-  const context = await formatRetrievedContext(ranked);
+  const context = formatRetrievedContext(ranked);
   const relatedFiles = [...new Set(ranked.map((r) => r.filePath))];
 
   return { context, relatedFiles };
@@ -421,7 +420,7 @@ export async function POST(req: Request) {
                 chatId,
                 role: "assistant",
                 content: text,
-                relatedFiles: relatedFiles.length > 0 ? relatedFiles : [],
+                relatedFiles,
                 createdAt: new Date(),
               }),
               db

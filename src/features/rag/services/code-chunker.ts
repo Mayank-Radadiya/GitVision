@@ -86,8 +86,8 @@ function extractImportBlock(code: string, language: string | null): string {
       // Collect import/require lines plus blank lines between them
       if (
         trimmed.startsWith("import ") ||
-        trimmed.startsWith("const ") && trimmed.includes("require(") ||
-        trimmed === "" && importLines.length > 0
+        (trimmed.startsWith("const ") && trimmed.includes("require(")) ||
+        (trimmed === "" && importLines.length > 0)
       ) {
         importLines.push(line);
       } else if (importLines.length > 0 && !trimmed.startsWith("import")) {
@@ -619,17 +619,17 @@ export function chunkCode(
   const language = detectLanguage(filePath);
   const lines = code.split("\n");
 
-  let boundaries: Boundary[] = [];
+  const boundaryDetectors: Record<string, (code: string) => Boundary[]> = {
+    typescript: findTypeScriptBoundaries,
+    javascript: findTypeScriptBoundaries,
+    python: findPythonBoundaries,
+    go: findGoBoundaries,
+    rust: findRustBoundaries,
+  };
 
-  if (language === "typescript" || language === "javascript") {
-    boundaries = findTypeScriptBoundaries(code);
-  } else if (language === "python") {
-    boundaries = findPythonBoundaries(code);
-  } else if (language === "go") {
-    boundaries = findGoBoundaries(code);
-  } else if (language === "rust") {
-    boundaries = findRustBoundaries(code);
-  }
+  const boundaries = language && boundaryDetectors[language]
+    ? boundaryDetectors[language](code)
+    : [];
 
   let rawChunks: CodeChunk[];
 

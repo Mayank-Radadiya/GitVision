@@ -174,46 +174,30 @@ export async function getProjectContext(projectId: string): Promise<{
   totalFiles: number;
   totalEmbeddings: number;
 }> {
-  try {
-    // Get unique languages
-    const languagesResult = await db
-      .selectDistinct({
-        language: projectFiles.language,
-      })
+  const [languagesResult, filesResult, embeddingsResult] = await Promise.all([
+    db
+      .selectDistinct({ language: projectFiles.language })
       .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId));
-    
-    const languages = languagesResult
-      .map((r) => r.language)
-      .filter((l): l is string => l !== null && l !== "unknown");
-    
-    // Get file count
-    const filesResult = await db
-      .select({
-        count: sql<number>`count(*)`,
-      })
+      .where(eq(projectFiles.projectId, projectId)),
+    db
+      .select({ count: sql<number>`count(*)` })
       .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId));
-    
-    // Get embeddings count
-    const embeddingsResult = await db
-      .select({
-        count: sql<number>`count(*)`,
-      })
+      .where(eq(projectFiles.projectId, projectId)),
+    db
+      .select({ count: sql<number>`count(*)` })
       .from(codeEmbeddings)
-      .where(eq(codeEmbeddings.projectId, projectId));
-    
-    return {
-      languages,
-      totalFiles: filesResult[0]?.count || 0,
-      totalEmbeddings: embeddingsResult[0]?.count || 0,
-    };
-  } catch (error) {
-    console.error("Error getting project context:", error);
-    throw new Error(
-      `Failed to get project context: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
+      .where(eq(codeEmbeddings.projectId, projectId)),
+  ]);
+
+  const languages = languagesResult
+    .map((r) => r.language)
+    .filter((l): l is string => l !== null && l !== "unknown");
+
+  return {
+    languages,
+    totalFiles: filesResult[0]?.count || 0,
+    totalEmbeddings: embeddingsResult[0]?.count || 0,
+  };
 }
 
 /**
@@ -223,23 +207,23 @@ export async function getProjectContext(projectId: string): Promise<{
  * @param results - Search results from vector search
  * @returns Formatted context string
  */
-export async function formatRetrievedContext(results: SearchResult[]): Promise<string> {
+export function formatRetrievedContext(results: SearchResult[]): string {
   if (results.length === 0) {
     return "No relevant code found for this query.";
   }
   
-  const formatted = results.map((result, index) => {
-    return `
+  return results
+    .map(
+      (result, index) => `
 --- CODE CHUNK ${index + 1} ---
 File: ${result.filePath}
 Similarity: ${(result.similarity * 100).toFixed(1)}%
 Token Count: ${result.tokenCount}
 
 ${result.chunkContent}
-`;
-  });
-  
-  return formatted.join("\n");
+`,
+    )
+    .join("\n");
 }
 
 // ---------------------------------------------------------------------------

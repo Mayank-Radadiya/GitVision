@@ -79,13 +79,9 @@ const Provider = ({ children }: ProviderProps) => {
   useEffect(() => {
     setMounted(true);
 
-    // Set CSS variables based on theme for toast styling
     const updateToastThemeVars = () => {
       const isDark = document.documentElement.classList.contains("dark");
-      document.documentElement.style.setProperty(
-        "--toast-bg",
-        isDark ? "transparent" : "transparent",
-      );
+      document.documentElement.style.setProperty("--toast-bg", "transparent");
       document.documentElement.style.setProperty(
         "--toast-text",
         isDark ? "#fff" : "#333",
@@ -102,6 +98,18 @@ const Provider = ({ children }: ProviderProps) => {
     return () => observer.disconnect();
   }, []);
 
+  const themed = (content: React.ReactNode) => (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem
+      enableColorScheme
+      disableTransitionOnChange={false}
+    >
+      {content}
+    </ThemeProvider>
+  );
+
   return (
     <ClerkProvider>
       {mounted && persistor ? (
@@ -110,32 +118,19 @@ const Provider = ({ children }: ProviderProps) => {
             client={queryClient}
             persistOptions={{
               persister: persistor,
-              maxAge: 24 * 60 * 60 * 1000, // 24 hours
+              maxAge: 24 * 60 * 60 * 1000,
             }}
           >
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="dark"
-              enableSystem
-              enableColorScheme
-              disableTransitionOnChange={false}
-            >
-              <MemoizedToaster />
-              {children}
-            </ThemeProvider>
+            {themed(
+              <>
+                <MemoizedToaster />
+                {children}
+              </>,
+            )}
           </PersistQueryClientProvider>
         </trpc.Provider>
       ) : (
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          enableColorScheme
-          disableTransitionOnChange={false}
-        >
-          {/* Empty placeholder while client initializes */}
-          <div style={{ visibility: "hidden" }}></div>
-        </ThemeProvider>
+        themed(<div style={{ visibility: "hidden" }} />)
       )}
     </ClerkProvider>
   );

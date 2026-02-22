@@ -46,92 +46,38 @@ async function applyRateLimit(): Promise<void> {
   lastRequestTime = Date.now();
 }
 
-/**
- * Generate embedding for a single text chunk
- * Uses qwen/qwen3-embedding-8b with 768 dimensions
- */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  try {
-    await applyRateLimit();
+  await applyRateLimit();
 
-    const result = await openrouter.embeddings.generate({
-      requestBody: {
-        model: EMBEDDING_MODEL,
-        input: text,
-        encodingFormat: "float",
-        dimensions: EMBEDDING_DIMENSIONS,
-      },
-    });
+  const result = await openrouter.embeddings.generate({
+    requestBody: {
+      model: EMBEDDING_MODEL,
+      input: text,
+      encodingFormat: "float",
+      dimensions: EMBEDDING_DIMENSIONS,
+    },
+  });
 
-    // Response can be string or object — handle both
-    if (typeof result === "string") {
-      throw new Error(`Unexpected string response from OpenRouter: ${result}`);
-    }
+  if (typeof result === "string") {
+    throw new Error(`Unexpected string response from OpenRouter: ${result}`);
+  }
 
-    const embeddingData = result.data[0].embedding;
+  const embeddingData = result.data[0].embedding;
 
-    // embedding can be number[] or base64 string; we requested float
-    if (!Array.isArray(embeddingData)) {
-      throw new Error("Expected float array embedding, got string (base64)");
-    }
+  if (!Array.isArray(embeddingData)) {
+    throw new Error("Expected float array embedding, got string (base64)");
+  }
 
-    // Validate embedding dimensions
-    if (embeddingData.length !== EMBEDDING_DIMENSIONS) {
-      throw new Error(
-        `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embeddingData.length}`,
-      );
-    }
-
-    return embeddingData;
-  } catch (error) {
-    console.error("Error generating embedding:", error);
+  if (embeddingData.length !== EMBEDDING_DIMENSIONS) {
     throw new Error(
-      `Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`,
+      `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embeddingData.length}`,
     );
   }
+
+  return embeddingData;
 }
 
-/**
- * Generate embedding for a search query
- * Uses the same model and dimensions as document embeddings
- */
-export async function generateQueryEmbedding(query: string): Promise<number[]> {
-  try {
-    await applyRateLimit();
-
-    const result = await openrouter.embeddings.generate({
-      requestBody: {
-        model: EMBEDDING_MODEL,
-        input: query,
-        encodingFormat: "float",
-        dimensions: EMBEDDING_DIMENSIONS,
-      },
-    });
-
-    if (typeof result === "string") {
-      throw new Error(`Unexpected string response from OpenRouter: ${result}`);
-    }
-
-    const embeddingData = result.data[0].embedding;
-
-    if (!Array.isArray(embeddingData)) {
-      throw new Error("Expected float array embedding, got string (base64)");
-    }
-
-    if (embeddingData.length !== EMBEDDING_DIMENSIONS) {
-      throw new Error(
-        `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embeddingData.length}`,
-      );
-    }
-
-    return embeddingData;
-  } catch (error) {
-    console.error("Error generating query embedding:", error);
-    throw new Error(
-      `Failed to generate query embedding: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
+export const generateQueryEmbedding = generateEmbedding;
 
 /**
  * Generate embeddings for multiple chunks in batches
@@ -174,7 +120,7 @@ export async function generateEmbeddingsBatch(
 
     // Add delay between batches
     if (i + batchSize < chunks.length) {
-      await sleep(100); // 500ms delay between batches (reduced from 2s)
+      await sleep(100);
     }
   }
 

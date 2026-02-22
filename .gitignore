@@ -42,6 +42,5 @@ next-env.d.ts
 
 # vs code workspace
 .vscode
-# .agent
 .codex
 .agent
