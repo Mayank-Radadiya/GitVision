@@ -36,6 +36,7 @@ export const usersTable = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull().default("unknown"),
   email: varchar("email", { length: 255 })
     .notNull()
+    .unique()
     .default("example@gmail.com"),
   credits: integer("credits").notNull().default(100),
   isProUser: boolean("is_pro_user").notNull().default(false),

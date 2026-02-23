@@ -1,10 +1,11 @@
 "use client";
 import { Loader } from "@/shared/components/feedback/loader";
+import AuthLayout from "@/src/features/auth/components/authLayout";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function AuthLayout({
+export default function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -20,5 +21,9 @@ export default function AuthLayout({
 
   if (!isLoaded) return <Loader />; // optional: show a loader
 
-  return <>{children}</>;
+  return (
+    <>
+      <AuthLayout>{children}</AuthLayout>
+    </>
+  );
 }
