@@ -19,7 +19,7 @@ import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import ModeToggle from "@/shared/components/theme/mode-toggle";
 import { APP_VERSION } from "../sidebar.constants";
-import { SidebarUserProfile } from "./SidebarUserProfile";
+import { SidebarUserProfile, SidebarCredits } from "./";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -50,6 +50,7 @@ interface SidebarFooterProps {
  * Sidebar footer with user profile, version, and controls
  *
  * Features:
+ * - AI Credits Display
  * - User profile section (when signed in)
  * - App version display (when expanded)
  * - Theme toggle button
@@ -61,7 +62,10 @@ export function SidebarFooter({
   onExpand,
 }: SidebarFooterProps) {
   return (
-    <div className="border-t border-border/50 p-3">
+    <div className="border-t border-border/50 p-3 flex flex-col gap-2">
+      {/* AI Credits */}
+      <SidebarCredits isCollapsed={isCollapsed} />
+
       {/* User Profile */}
       {user && <SidebarUserProfile user={user} isCollapsed={isCollapsed} />}
 

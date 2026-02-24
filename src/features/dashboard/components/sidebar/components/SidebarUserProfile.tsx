@@ -15,6 +15,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { FADE_TRANSITION } from "../sidebar.constants";
+import { SidebarSignOut } from "./SidebarSignOut";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -99,6 +100,9 @@ export function SidebarUserProfile({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Signout Button */}
+      <SidebarSignOut isCollapsed={isCollapsed} />
     </div>
   );
 }

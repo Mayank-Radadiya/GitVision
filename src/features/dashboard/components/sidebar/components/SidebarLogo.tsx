@@ -18,6 +18,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { FADE_TRANSITION } from "../sidebar.constants";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/src/shared/components/ui/tooltip";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -88,15 +93,22 @@ export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
 
       {/* Collapse Toggle Button - Desktop Only */}
       {!isCollapsed && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-          aria-label="Collapse sidebar"
-          className="hidden h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground md:flex"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+              className="hidden h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground md:flex"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">
+            Collapse (Ctrl + B)
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

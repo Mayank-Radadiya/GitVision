@@ -56,30 +56,6 @@ export function useMobileSidebar() {
 }
 
 // =============================================================================
-// ACTIVE ROUTE HOOK
-// =============================================================================
-
-/**
- * Determines if a given route is currently active
- *
- * Uses Next.js pathname to check if the current route matches
- * the provided href. Useful for highlighting active nav items.
- *
- * @param href - The route path to check
- * @returns Whether the route is currently active
- *
- * @example
- * ```tsx
- * const isActive = useIsActiveRoute("/dashboard");
- * // Returns true if current URL is /dashboard
- * ```
- */
-export function useIsActiveRoute(href: string): boolean {
-  const pathname = usePathname();
-  return pathname === href;
-}
-
-// =============================================================================
 // CURRENT PATH HOOK
 // =============================================================================
 

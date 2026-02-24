@@ -17,4 +17,5 @@ export { SidebarNavSection } from "./SidebarNavSection";
 export { SidebarUserProfile } from "./SidebarUserProfile";
 export { SidebarFooter } from "./SidebarFooter";
 export { SidebarSignOut } from "./SidebarSignOut";
+export { SidebarCredits } from "./SidebarCredits";
 export { MobileMenuButton, MobileOverlay, MobileDrawer } from "./SidebarMobile";

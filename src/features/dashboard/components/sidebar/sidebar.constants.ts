@@ -17,8 +17,6 @@ import {
   PlusCircle,
   MessageSquare,
   Code2Icon,
-  UserCircle,
-  Settings,
   LucideIcon,
 } from "lucide-react";
 
@@ -131,14 +129,14 @@ export const PRIMARY_NAVIGATION: NavItem[] = [
  * Typically contains user-specific settings and account options
  */
 export const SECONDARY_NAVIGATION: NavItem[] = [
-  {
-    name: "Account",
-    href: "/account",
-    icon: UserCircle,
-  },
-  {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
+  // {
+  //   name: "Account",
+  //   href: "/account",
+  //   icon: UserCircle,
+  // },
+  // {
+  //   name: "Settings",
+  //   href: "/settings",
+  //   icon: Settings,
+  // },
 ];

@@ -111,7 +111,7 @@ export function SidebarNavItem({
   // Wrap in tooltip when collapsed
   if (isCollapsed) {
     return (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={200}>
         <TooltipTrigger asChild>{content}</TooltipTrigger>
         <TooltipContent side="right" className="font-medium">
           {item.name}
