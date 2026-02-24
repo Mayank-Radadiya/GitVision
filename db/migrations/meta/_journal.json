@@ -8,6 +8,13 @@
       "when": 1771852554752,
       "tag": "0000_loud_ted_forrester",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771908830266,
+      "tag": "0001_spotty_frank_castle",
+      "breakpoints": true
     }
   ]
 }

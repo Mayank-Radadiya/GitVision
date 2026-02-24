@@ -9,7 +9,7 @@ import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Settings } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { sendTestInngestEvent } from "@/src/inngest/actions";
+import { sendTestInngestEvent } from "@/src/lib/inngest/actions";
 import toast from "react-hot-toast";
 
 function QuickActions() {

@@ -4,9 +4,9 @@ import { projectTables, commitsTable, projectFiles } from "@/db/schema";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import {
   createNewProject as createGitHubProject,
-  getCommitHashes,
   getAiSummaryOfCommit,
   getRepositoryFiles,
+  syncIssuesAndComments,
 } from "@/src/lib/github";
 
 /**
@@ -24,14 +24,14 @@ export function createProjectService() {
       userId: string,
     ) {
       try {
-        // Create project in database with GitHub data
+        // Create project in DB + fetch metadata + initial 100 commits via GraphQL
         const { projectId } = await createGitHubProject(
           data.repoUrl,
           data.projectName,
           userId,
         );
 
-        // Extract owner/repo from URL for background tasks
+        // Extract owner/repo for tarball download
         const cleanUrl = data.repoUrl.endsWith(".git")
           ? data.repoUrl.slice(0, -4)
           : data.repoUrl;
@@ -39,11 +39,11 @@ export function createProjectService() {
         const owner = parts[parts.length - 2]!;
         const repo = parts[parts.length - 1]!;
 
-        // Await both tasks — serverless functions (Vercel) terminate after
-        // the response is sent, killing any unawaited promises.
+        // Fetch files (tarball) + issues/PRs (GraphQL) in parallel.
+        // Commits are already stored by createNewProject via GraphQL.
         await Promise.all([
-          getCommitHashes(data.repoUrl, projectId),
           getRepositoryFiles(owner, repo, projectId),
+          syncIssuesAndComments(data.repoUrl, projectId),
         ]);
 
         return {

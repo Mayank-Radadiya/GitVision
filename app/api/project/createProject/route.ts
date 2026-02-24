@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { createNewProject, getCommitHashes } from "@/src/lib/github";
+import { createNewProject, syncIssuesAndComments } from "@/src/lib/github";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,16 +37,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create project in database with GitHub data
+    // Create project + fetch metadata + initial 100 commits via GraphQL
     const { projectId } = await createNewProject(
       repoUrl.trim(),
       ProjectName.trim(),
       userId,
     );
 
-    // Fetch and store commits in background (don't await - run async)
-    getCommitHashes(repoUrl.trim(), projectId).catch((error) => {
-      console.error("Error fetching commits in background:", error);
+    // Fetch issues/PRs + comments via GraphQL in background
+    syncIssuesAndComments(repoUrl.trim(), projectId).catch((error) => {
+      console.error("Error fetching issues in background:", error);
     });
 
     return NextResponse.json({

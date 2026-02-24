@@ -230,3 +230,57 @@ export const chatHistoryTable = pgTable("chat_history", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const issuesTable = pgTable(
+  "issues",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    issueNumber: integer("issue_number").notNull(),
+    title: text("title").notNull(),
+    body: text("body"), // Can be empty or null
+    state: varchar("state", { length: 20 }).notNull(), // 'open' | 'closed'
+    isPullRequest: boolean("is_pull_request").notNull().default(false),
+    authorLogin: varchar("author_login", { length: 255 }).notNull(),
+    authorAvatar: varchar("author_avatar", { length: 255 }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projectTables.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    githubCreatedAt: timestamp("github_created_at").notNull(),
+    githubUpdatedAt: timestamp("github_updated_at").notNull(),
+    githubClosedAt: timestamp("github_closed_at"),
+  },
+  (table) => {
+    return {
+      projectIdIdx: index("issues_project_id_idx").on(table.projectId),
+      issueNumberIdx: index("issues_issue_number_idx").on(table.issueNumber),
+    };
+  },
+);
+
+export const issueCommentsTable = pgTable(
+  "issue_comments",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issuesTable.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    authorLogin: varchar("author_login", { length: 255 }).notNull(),
+    authorAvatar: varchar("author_avatar", { length: 255 }),
+    githubCreatedAt: timestamp("github_created_at").notNull(),
+    githubUpdatedAt: timestamp("github_updated_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      issueIdIdx: index("issue_comments_issue_id_idx").on(table.issueId),
+    };
+  },
+);
