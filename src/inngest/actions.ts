@@ -1,6 +1,6 @@
 "use server";
 
-import { inngest } from "@/src/lib/inngest/client";
+import { inngest } from "@/src/inngest/client";
 
 export async function sendTestInngestEvent(email: string) {
   try {
