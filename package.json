@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "clean": "rm -rf dist && rm -rf .next && rm -rf ~/.bun/cache"
+    "clean": "rm -rf dist && rm -rf .next && rm -rf ~/.bun/cache",
+    "inngest": "npx inngest-cli@latest dev"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.18",
@@ -51,6 +52,7 @@
     "drizzle-orm": "^0.43.1",
     "framer-motion": "^12.9.7",
     "highlight.js": "^11.11.1",
+    "inngest": "^3.52.3",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.507.0",
     "neon-serverless": "^0.5.3",
