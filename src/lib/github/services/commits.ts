@@ -9,7 +9,7 @@ import { commitsTable } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { aISummariesCommit } from "@/src/lib/gemini";
 import type { GitHubFile } from "../types";
-import { GITHUB_CONFIG, DEFAULTS } from "../constants";
+import { GITHUB_CONFIG } from "../constants";
 import {
   GitHubError,
   GitHubValidationError,
