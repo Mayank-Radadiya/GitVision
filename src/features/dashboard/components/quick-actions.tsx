@@ -9,22 +9,17 @@ import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Settings } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { inngest } from "@/src/lib/inngest/client";
+import { sendTestInngestEvent } from "@/src/lib/inngest/actions";
 import toast from "react-hot-toast";
 
 function QuickActions() {
   const router = useRouter();
 
   const handleSetupInngestTest = async () => {
-    const res = await inngest.send({
-      name: "test/hello.world",
-      data: {
-        email: "[EMAIL_ADDRESS]",
-      },
-    });
+    const res = await sendTestInngestEvent("[EMAIL_ADDRESS]");
 
     // Verify that the event was sent. Give toast success if sent.
-    if (res.ids.length > 0) {
+    if (res.success && res.ids && res.ids.length > 0) {
       toast.success("Event sent successfully");
     } else {
       toast.error("Failed to send event");
