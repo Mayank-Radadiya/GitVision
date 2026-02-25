@@ -83,8 +83,8 @@ export async function createNewProject(
     const [newProject] = await db
       .insert(projectTables)
       .values({
-        projectName: projectName.trim() || repo,
-        githubUrl: url,
+        projectName: (projectName.trim() || repo).substring(0, 255),
+        githubUrl: url.substring(0, 255),
         ownerId: userId,
         star: repoData.stargazerCount || 0,
         forks: repoData.forkCount || 0,
@@ -112,12 +112,21 @@ export async function createNewProject(
         const commitRows = batch.map((node) => ({
           commitHash: node.oid,
           commitMessage: node.message || node.messageHeadline || "",
-          authorName: node.author?.name || DEFAULTS.NAME,
-          authorAvatar: node.author?.avatarUrl || DEFAULTS.AVATAR,
-          authorEmail: node.author?.email || DEFAULTS.EMAIL,
+          authorName: (node.author?.name || DEFAULTS.NAME).substring(0, 255),
+          authorAvatar: (node.author?.avatarUrl || DEFAULTS.AVATAR).substring(
+            0,
+            255,
+          ),
+          authorEmail: (node.author?.email || DEFAULTS.EMAIL).substring(0, 255),
           authorDate: new Date(node.authoredDate),
-          committerName: node.committer?.name || DEFAULTS.NAME,
-          committerEmail: node.committer?.email || DEFAULTS.EMAIL,
+          committerName: (node.committer?.name || DEFAULTS.NAME).substring(
+            0,
+            255,
+          ),
+          committerEmail: (node.committer?.email || DEFAULTS.EMAIL).substring(
+            0,
+            255,
+          ),
           committerDate: new Date(node.committedDate),
           projectId: newProject.id,
         }));

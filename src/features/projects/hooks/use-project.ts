@@ -52,6 +52,17 @@ export function useProjectFiles(projectId: string) {
 }
 
 /**
+ * Fetches single file code content.
+ * Keeps file tree lightweight while allowing code to be loaded on demand.
+ */
+export function useFileContent(projectId: string, fileId: string | undefined) {
+  return trpc.project.getFileContent.useQuery(
+    { projectId, fileId: fileId! },
+    { enabled: !!projectId && !!fileId, staleTime: Infinity },
+  );
+}
+
+/**
  * AI summary generation mutation.
  * Moves the `getAiSummaryOfCommit` call server-side for security.
  * Includes optimistic update to show "Generating..." state immediately.

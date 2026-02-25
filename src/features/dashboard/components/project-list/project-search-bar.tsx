@@ -30,7 +30,7 @@ function ProjectSearchBar({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Search Input */}
       <div className="relative max-w-sm flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2  z-20 text-muted-foreground" />
         <input
           type="text"
           placeholder="Search projects..."

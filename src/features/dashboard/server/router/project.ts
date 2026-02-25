@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -10,60 +11,40 @@ import {
 } from "@/src/lib/validation/schemas";
 import { createProjectService } from "./services/projectService";
 
-/**
- * Project router - all project-related tRPC procedures
- * All procedures are protected and require Clerk authentication
- */
+// Instantiate the service once, saving memory and CPU cycles
+const projectService = createProjectService();
+
 export const projectRouter = createTRPCRouter({
-  /**
-   * Get all projects owned by the authenticated user
-   * Protected: Requires authentication
-   */
   getAll: protectedProcedure.query(async ({ ctx }) => {
-    const service = createProjectService();
-    return service.getAllProjects(ctx.userId);
+    return projectService.getAllProjects(ctx.userId);
   }),
 
-  /**
-   * Get aggregated dashboard statistics
-   * Protected: Requires authentication
-   */
   getDashboardInfo: protectedProcedure.query(async ({ ctx }) => {
-    const service = createProjectService();
-    return service.getDashboardInfo(ctx.userId);
+    return projectService.getDashboardInfo(ctx.userId);
   }),
 
-  /**
-   * Create a new project from GitHub repository
-   * Protected: Requires authentication
-   */
   create: protectedProcedure
     .input(projectCreateSchema)
     .mutation(async ({ input, ctx }) => {
-      const service = createProjectService();
-      return service.createProject(input, ctx.userId);
+      return projectService.createProject(input, ctx.userId);
     }),
 
-  /**
-   * Get project details by ID
-   * Protected: Requires authentication + ownership verification
-   */
   getDetails: protectedProcedure
     .input(projectIdSchema)
     .query(async ({ input, ctx }) => {
-      const service = createProjectService();
-      return service.getProjectById(input.projectId, ctx.userId);
+      return projectService.getProjectById(input.projectId, ctx.userId);
     }),
 
-  /**
-   * Get project commits with cursor-based pagination
-   * Protected: Requires authentication + ownership verification
-   */
+  getFiles: protectedProcedure
+    .input(projectIdSchema)
+    .query(async ({ input, ctx }) => {
+      return projectService.getProjectFiles(input.projectId, ctx.userId);
+    }),
+
   getCommits: protectedProcedure
     .input(projectCommitsSchema)
     .query(async ({ input, ctx }) => {
-      const service = createProjectService();
-      return service.getProjectCommits(
+      return projectService.getProjectCommits(
         input.projectId,
         ctx.userId,
         input.limit,
@@ -71,48 +52,57 @@ export const projectRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Get all project files in Sandpack format
-   * Protected: Requires authentication + ownership verification
-   */
-  getFiles: protectedProcedure
-    .input(projectIdSchema)
+  getFileContent: protectedProcedure
+    .input(z.object({ projectId: z.string(), fileId: z.string() }))
     .query(async ({ input, ctx }) => {
-      const service = createProjectService();
-      return service.getProjectFiles(input.projectId, ctx.userId);
+      return projectService.getFileContent(
+        input.projectId,
+        input.fileId,
+        ctx.userId,
+      );
     }),
 
-  /**
-   * Get recent commit activity across all user projects
-   * Protected: Requires authentication
-   */
-  getRecentActivity: protectedProcedure.query(async ({ ctx }) => {
-    const service = createProjectService();
-    return service.getRecentActivity(ctx.userId);
-  }),
+  // IMPROVEMENT: Added optional limit parameter for future "View All" pages
+  getRecentActivity: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().min(1).max(50).optional().default(8) })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      return projectService.getRecentActivity(ctx.userId, input?.limit);
+    }),
 
-  /**
-   * Get daily commit counts for the commit chart
-   * Protected: Requires authentication
-   */
-  getCommitChart: protectedProcedure.query(async ({ ctx }) => {
-    const service = createProjectService();
-    return service.getCommitChart(ctx.userId);
-  }),
+  // IMPROVEMENT: Added optional days parameter for chart filtering (7, 30, 90 days)
+  getCommitChart: protectedProcedure
+    .input(
+      z
+        .object({ days: z.number().min(7).max(365).optional().default(7) })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      return projectService.getCommitChart(ctx.userId, input?.days);
+    }),
 
-  /**
-   * Generate an AI summary for a specific commit.
-   * Moves server-side logic out of the client for security.
-   * Protected: Requires authentication + ownership verification
-   */
   generateAiSummary: protectedProcedure
     .input(generateAiSummarySchema)
     .mutation(async ({ input, ctx }) => {
-      const service = createProjectService();
-      return service.generateAiSummary(
+      return projectService.generateAiSummary(
         input.projectId,
         input.commitId,
         ctx.userId,
       );
     }),
+
+  getPickUpWhereYouLeftOff: protectedProcedure.query(async ({ ctx }) => {
+    return projectService.getPickUpWhereYouLeftOff(ctx.userId);
+  }),
+
+  getLanguageBreakdown: protectedProcedure.query(async ({ ctx }) => {
+    return projectService.getLanguageBreakdown(ctx.userId);
+  }),
+
+  getNeedsAttention: protectedProcedure.query(async ({ ctx }) => {
+    return projectService.getNeedsAttention(ctx.userId);
+  }),
 });

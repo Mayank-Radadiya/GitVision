@@ -25,7 +25,7 @@ interface CodePanelProps {
   language: string;
 }
 
-function CodePanel({ filePath, content, language }: CodePanelProps) {
+function CodePanel({ filePath, content = "", language }: CodePanelProps) {
   const { theme: systemTheme } = useTheme();
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [isHighlighting, setIsHighlighting] = useState(false);

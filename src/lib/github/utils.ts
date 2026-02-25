@@ -55,14 +55,25 @@ export function createCommitData(commit: any, projectId: string): CommitData {
   return {
     commitHash: commit.sha,
     commitMessage: commit.commit.message || "",
-    authorName: commit.commit.author?.name || DEFAULTS.NAME,
-    authorAvatar: commit.author?.avatar_url || DEFAULTS.AVATAR,
-    authorEmail: commit.commit.author?.email || DEFAULTS.EMAIL,
+    authorName: (commit.commit.author?.name || DEFAULTS.NAME).substring(0, 255),
+    authorAvatar: (commit.author?.avatar_url || DEFAULTS.AVATAR).substring(
+      0,
+      255,
+    ),
+    authorEmail: (commit.commit.author?.email || DEFAULTS.EMAIL).substring(
+      0,
+      255,
+    ),
     authorDate: commit.commit.author?.date
       ? new Date(commit.commit.author.date)
       : new Date(),
-    committerName: commit.commit.committer?.name || DEFAULTS.NAME,
-    committerEmail: commit.commit.committer?.email || DEFAULTS.EMAIL,
+    committerName: (commit.commit.committer?.name || DEFAULTS.NAME).substring(
+      0,
+      255,
+    ),
+    committerEmail: (
+      commit.commit.committer?.email || DEFAULTS.EMAIL
+    ).substring(0, 255),
     committerDate: commit.commit.committer?.date
       ? new Date(commit.commit.committer.date)
       : new Date(),

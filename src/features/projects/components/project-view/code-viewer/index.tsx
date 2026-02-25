@@ -20,7 +20,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/components/ui/skeleton";
-import { useProjectFiles } from "@/features/projects/hooks/use-project";
+import {
+  useProjectFiles,
+  useFileContent,
+} from "@/features/projects/hooks/use-project";
 import { buildFileTree, type FileEntry } from "./utils";
 import FileTree from "./file-tree";
 import CodePanel from "./code-panel";
@@ -52,6 +55,8 @@ function CodeViewer({ projectId }: CodeViewerProps) {
     () => files.find((f) => f.path === activePath),
     [files, activePath],
   );
+
+  const { data: fileContent } = useFileContent(projectId, selectedFile?.id);
 
   const handleSelect = useCallback((path: string) => {
     setSelectedPath(path);
@@ -171,7 +176,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
             {selectedFile ? (
               <CodePanel
                 filePath={selectedFile.path}
-                content={selectedFile.content}
+                content={fileContent || ""}
                 language={selectedFile.language}
               />
             ) : (

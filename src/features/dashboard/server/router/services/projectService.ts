@@ -1,37 +1,37 @@
 import { TRPCError } from "@trpc/server";
 import { db } from "@/db";
-import { projectTables, commitsTable, projectFiles } from "@/db/schema";
+import {
+  projectTables,
+  commitsTable,
+  projectFiles,
+  issuesTable,
+  projectChats,
+} from "@/db/schema";
 import { eq, desc, and, count, sql } from "drizzle-orm";
+import { inngest } from "@/src/lib/inngest/client";
 import {
   createNewProject as createGitHubProject,
   getAiSummaryOfCommit,
-  getRepositoryFiles,
-  syncIssuesAndComments,
 } from "@/src/lib/github";
 
-/**
- * Service layer for project-related business logic
- * All functions are reusable and testable
- */
 export function createProjectService() {
   return {
     /**
-     * Creates a new project with GitHub integration
-     * @throws {TRPCError} If GitHub API fails or user validation fails
+     * Creates a new project with GitHub integration.
+     * Delegates heavy fetching to a background process to prevent Serverless timeouts.
      */
     async createProject(
       data: { projectName: string; repoUrl: string },
       userId: string,
     ) {
       try {
-        // Create project in DB + fetch metadata + initial 100 commits via GraphQL
+        // 1. Instantly create the project row & fetch initial GraphQL metadata
         const { projectId } = await createGitHubProject(
           data.repoUrl,
           data.projectName,
           userId,
         );
 
-        // Extract owner/repo for tarball download
         const cleanUrl = data.repoUrl.endsWith(".git")
           ? data.repoUrl.slice(0, -4)
           : data.repoUrl;
@@ -39,20 +39,26 @@ export function createProjectService() {
         const owner = parts[parts.length - 2]!;
         const repo = parts[parts.length - 1]!;
 
-        // Fetch files (tarball) + issues/PRs (GraphQL) in parallel.
-        // Commits are already stored by createNewProject via GraphQL.
-        await Promise.all([
-          getRepositoryFiles(owner, repo, projectId),
-          syncIssuesAndComments(data.repoUrl, projectId),
-        ]);
+        // 2. Schedule background execution via Inngest (Prevents 504 Gateway Timeouts)
+        await inngest.send({
+          name: "project/created",
+          data: {
+            projectId,
+            repoUrl: data.repoUrl,
+            projectName: data.projectName,
+            owner,
+            repo,
+          },
+        });
 
+        // 3. Return immediately to the user so the UI loads instantly
         return {
           projectId,
           success: true,
-          message: "Project created successfully",
+          message:
+            "Project created! Files and issues are syncing in the background.",
         };
       } catch (error) {
-        // Map GitHub errors to tRPC errors
         if (error instanceof Error) {
           const githubError = error as { code?: string; statusCode?: number };
 
@@ -62,19 +68,16 @@ export function createProjectService() {
               message: error.message,
             });
           }
-
           if (githubError.code === "GITHUB_NOT_FOUND") {
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "GitHub repository not found",
             });
           }
-
           if (githubError.code === "GITHUB_RATE_LIMIT") {
             throw new TRPCError({
               code: "TOO_MANY_REQUESTS",
-              message:
-                "GitHub API rate limit exceeded. Please try again later.",
+              message: "GitHub API rate limit exceeded.",
             });
           }
         }
@@ -87,11 +90,6 @@ export function createProjectService() {
       }
     },
 
-    /**
-     * Verifies that the user owns the project
-     * @throws {TRPCError} FORBIDDEN if user doesn't own project
-     * @throws {TRPCError} NOT_FOUND if project doesn't exist
-     */
     async verifyOwnership(projectId: string, userId: string): Promise<void> {
       const project = await db
         .select({ ownerId: projectTables.ownerId })
@@ -109,15 +107,11 @@ export function createProjectService() {
       if (project[0].ownerId !== userId) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You do not have permission to access this project",
+          message: "You do not have permission",
         });
       }
     },
 
-    /**
-     * Fetches project details by ID with ownership verification
-     * @throws {TRPCError} NOT_FOUND if project doesn't exist
-     */
     async getProjectById(projectId: string, userId: string) {
       await this.verifyOwnership(projectId, userId);
 
@@ -138,8 +132,7 @@ export function createProjectService() {
     },
 
     /**
-     * Fetches project commits with cursor-based pagination
-     * @returns Commits and nextCursor for pagination
+     * Fetches project commits with pagination and defensive limits
      */
     async getProjectCommits(
       projectId: string,
@@ -149,7 +142,9 @@ export function createProjectService() {
     ) {
       await this.verifyOwnership(projectId, userId);
 
-      // If cursor is provided, fetch the cursor commit's date for proper keyset pagination
+      // DEFENSIVE SCALING: Never allow the frontend to request millions of rows
+      const safeLimit = Math.min(limit, 100);
+
       let cursorDate: Date | undefined;
       if (cursor) {
         const cursorCommit = await db
@@ -157,7 +152,6 @@ export function createProjectService() {
           .from(commitsTable)
           .where(eq(commitsTable.id, cursor))
           .limit(1);
-
         cursorDate = cursorCommit[0]?.authorDate;
       }
 
@@ -173,53 +167,43 @@ export function createProjectService() {
         .from(commitsTable)
         .where(baseConditions)
         .orderBy(desc(commitsTable.authorDate))
-        .limit(limit + 1);
+        .limit(safeLimit + 1);
 
       let nextCursor: string | undefined;
-      if (commits.length > limit) {
+      if (commits.length > safeLimit) {
         const nextItem = commits.pop();
         nextCursor = nextItem!.id;
       }
 
-      return {
-        commits,
-        nextCursor,
-      };
+      return { commits, nextCursor };
     },
 
     /**
-     * Fetches all project files with auto-detected language.
-     * Returns a generic file list (not Sandpack-specific).
+     * OPTIMIZED: Fetches ONLY the file tree (no raw code!).
+     * Prevents 10MB+ payload bombs and browser freezes.
      */
     async getProjectFiles(projectId: string, userId: string) {
       await this.verifyOwnership(projectId, userId);
 
+      // Select ONLY the metadata, specifically excluding `code`
       const files = await db
-        .select()
+        .select({
+          id: projectFiles.id,
+          fileName: projectFiles.fileName,
+        })
         .from(projectFiles)
         .where(eq(projectFiles.projectId, projectId));
 
       if (!files || files.length === 0) {
-        return {
-          files: [
-            {
-              path: "/README.md",
-              content:
-                "# Project Files Not Yet Processed\n\nThis project's files are being processed. Please check back in a few moments.\n\nIf this message persists, the project may not have been fully imported from GitHub.",
-              language: "markdown",
-            },
-          ],
-          totalFiles: 0,
-        };
+        return { files: [], totalFiles: 0 };
       }
 
       const fileList = files.map((file) => {
         const filePath = file.fileName.startsWith("/")
           ? file.fileName
           : `/${file.fileName}`;
-
-        // Detect language from extension
         const ext = filePath.split(".").pop()?.toLowerCase() || "";
+
         const langMap: Record<string, string> = {
           ts: "typescript",
           tsx: "tsx",
@@ -244,8 +228,8 @@ export function createProjectService() {
         };
 
         return {
+          id: file.id,
           path: filePath,
-          content: file.code,
           language: langMap[ext] || "text",
         };
       });
@@ -254,11 +238,35 @@ export function createProjectService() {
     },
 
     /**
-     * Fetches all projects owned by the user
-     * @returns Array of projects ordered by creation date (newest first)
+     * NEW: Fetches the actual code content for a single file dynamically
+     * Add this to your `project.ts` router!
      */
+    async getFileContent(projectId: string, fileId: string, userId: string) {
+      await this.verifyOwnership(projectId, userId);
+
+      const file = await db
+        .select({ code: projectFiles.code })
+        .from(projectFiles)
+        .where(
+          and(
+            eq(projectFiles.id, fileId),
+            eq(projectFiles.projectId, projectId),
+          ),
+        )
+        .limit(1);
+
+      if (!file || file.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "File content not found",
+        });
+      }
+
+      return file[0].code;
+    },
+
     async getAllProjects(userId: string) {
-      const projects = await db
+      return await db
         .select({
           id: projectTables.id,
           projectName: projectTables.projectName,
@@ -275,47 +283,50 @@ export function createProjectService() {
         .from(projectTables)
         .where(eq(projectTables.ownerId, userId))
         .orderBy(desc(projectTables.createdAt));
-
-      return projects;
     },
 
     /**
-     * Aggregates dashboard statistics for the user
-     * @returns Total projects, commits, files, and user credits
+     * OPTIMIZED: Dashboard Info
+     * Relies on cached columns rather than heavy `count(*)` queries.
      */
     async getDashboardInfo(userId: string) {
-      const result = await db.execute(
-        sql`SELECT
-          (SELECT count(*)::int FROM projects WHERE owner_id = ${userId}) AS total_projects,
-          (SELECT count(*)::int FROM commits c INNER JOIN projects p ON c.project_id = p.id WHERE p.owner_id = ${userId}) AS total_commits,
-          (SELECT count(*)::int FROM project_files f INNER JOIN projects p ON f.project_id = p.id WHERE p.owner_id = ${userId}) AS total_files,
-          (SELECT COALESCE(credits, 0) FROM users WHERE id = ${userId}) AS credits`,
+      const projects = await db
+        .select({
+          totalCommits: projectTables.totalCommits,
+          // totalFiles: projectTables.totalFiles // Uncomment when added to schema
+        })
+        .from(projectTables)
+        .where(eq(projectTables.ownerId, userId));
+
+      const totalProjects = projects.length;
+      const totalCommits = projects.reduce(
+        (acc, p) => acc + (p.totalCommits || 0),
+        0,
       );
 
-      const row = result.rows[0] as
-        | {
-            total_projects: number;
-            total_commits: number;
-            total_files: number;
-            credits: number;
-          }
+      // Fallback SQL for files and credits until `totalFiles` column is fully migrated
+      const fallbackSql = await db.execute(sql`
+        SELECT 
+          (SELECT count(*)::int FROM project_files f INNER JOIN projects p ON f.project_id = p.id WHERE p.owner_id = ${userId}) AS total_files,
+          (SELECT COALESCE(credits, 0) FROM users WHERE id = ${userId}) AS credits
+      `);
+
+      const statsRow = fallbackSql.rows[0] as
+        | { total_files: number; credits: number }
         | undefined;
 
       return {
-        totalProjects: Number(row?.total_projects ?? 0),
-        totalCommits: Number(row?.total_commits ?? 0),
-        totalFiles: Number(row?.total_files ?? 0),
-        userCredits: Number(row?.credits ?? 0),
+        totalProjects,
+        totalCommits,
+        totalFiles: Number(statsRow?.total_files ?? 0),
+        userCredits: Number(statsRow?.credits ?? 0),
       };
     },
 
-    /**
-     * Fetches recent commit activity across all user projects.
-     * Joins commits with projects to include project name.
-     * @returns Latest N commits with project context
-     */
     async getRecentActivity(userId: string, limit = 8) {
-      const activities = await db
+      const safeLimit = Math.min(limit, 50); // Defensive bound
+
+      return await db
         .select({
           id: commitsTable.id,
           commitMessage: commitsTable.commitMessage,
@@ -329,19 +340,13 @@ export function createProjectService() {
         .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
         .where(eq(projectTables.ownerId, userId))
         .orderBy(desc(commitsTable.authorDate))
-        .limit(limit);
-
-      return activities;
+        .limit(safeLimit);
     },
 
-    /**
-     * Aggregates daily commit counts for the last N days.
-     * Used for the commit frequency chart on the dashboard.
-     * @returns Array of { date, commits } sorted chronologically
-     */
     async getCommitChart(userId: string, days = 7) {
+      const safeDays = Math.min(days, 365);
       const since = new Date();
-      since.setDate(since.getDate() - days);
+      since.setDate(since.getDate() - safeDays);
 
       const result = await db
         .select({
@@ -362,11 +367,6 @@ export function createProjectService() {
       }));
     },
 
-    /**
-     * Generates an AI summary for a specific commit.
-     * Wraps getAiSummaryOfCommit in the service layer for tRPC mutation.
-     * @throws {TRPCError} NOT_FOUND if commit doesn't exist
-     */
     async generateAiSummary(
       projectId: string,
       commitId: string,
@@ -374,10 +374,8 @@ export function createProjectService() {
     ) {
       await this.verifyOwnership(projectId, userId);
 
-      // Get project details for GitHub URL
       const project = await this.getProjectById(projectId, userId);
 
-      // Get commit record
       const commitRecord = await db
         .select()
         .from(commitsTable)
@@ -385,23 +383,200 @@ export function createProjectService() {
         .limit(1);
 
       if (!commitRecord || commitRecord.length === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Commit not found",
-        });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commit not found" });
       }
 
-      const commit = commitRecord[0];
-
-      // Call the AI summary generator
-      const summary = await getAiSummaryOfCommit(
+      return await getAiSummaryOfCommit(
         project.githubUrl,
-        commit.commitHash,
+        commitRecord[0].commitHash,
         projectId,
         commitId,
       );
+    },
 
-      return summary;
+    async getPickUpWhereYouLeftOff(userId: string) {
+      const [lastChat, recentCommit] = await Promise.all([
+        db
+          .select({
+            id: projectChats.id,
+            title: projectChats.title,
+            projectId: projectChats.projectId,
+            projectName: projectTables.projectName,
+            updatedAt: projectChats.updatedAt,
+          })
+          .from(projectChats)
+          .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
+          .where(eq(projectChats.userId, userId))
+          .orderBy(desc(projectChats.updatedAt))
+          .limit(1),
+
+        db
+          .select({
+            id: commitsTable.id,
+            commitMessage: commitsTable.commitMessage,
+            projectId: commitsTable.projectId,
+            projectName: projectTables.projectName,
+            authorDate: commitsTable.authorDate,
+            hasSummary: sql<boolean>`${commitsTable.AiSummary} IS NOT NULL`,
+          })
+          .from(commitsTable)
+          .innerJoin(
+            projectTables,
+            eq(commitsTable.projectId, projectTables.id),
+          )
+          .where(eq(projectTables.ownerId, userId))
+          .orderBy(desc(commitsTable.authorDate))
+          .limit(1),
+      ]);
+
+      const cards: {
+        type: "chat" | "file" | "commit";
+        title: string;
+        description: string;
+        href: string;
+        projectName: string;
+      }[] = [];
+
+      if (lastChat[0]) {
+        const c = lastChat[0];
+        cards.push({
+          type: "chat",
+          title: "Continue Conversation",
+          description: c.title || "Your last chat session",
+          href: c.projectId
+            ? `/projects/${c.projectId}/chat/${c.id}`
+            : `/chat/${c.id}`,
+          projectName: c.projectName || "General",
+        });
+      }
+
+      if (recentCommit[0]) {
+        const cm = recentCommit[0];
+        const msg =
+          cm.commitMessage.length > 60
+            ? cm.commitMessage.slice(0, 57) + "..."
+            : cm.commitMessage;
+        cards.push({
+          type: "commit",
+          title: "Recent Commit",
+          description: msg,
+          href: `/projects/${cm.projectId}`,
+          projectName: cm.projectName,
+        });
+      }
+
+      return { cards };
+    },
+
+    async getLanguageBreakdown(userId: string) {
+      const rows = await db.execute(sql`
+        SELECT
+          LOWER(SUBSTRING(f.file_name FROM '\.([^.]+)$')) AS ext,
+          COUNT(*)::int AS file_count
+        FROM project_files f
+        INNER JOIN projects p ON f.project_id = p.id
+        WHERE p.owner_id = ${userId}
+          AND f.file_name LIKE '%.%'
+        GROUP BY ext
+        ORDER BY file_count DESC
+        LIMIT 12
+      `);
+
+      const langMap: Record<string, string> = {
+        ts: "TypeScript",
+        tsx: "TSX",
+        js: "JavaScript",
+        jsx: "JSX",
+        json: "JSON",
+        md: "Markdown",
+        css: "CSS",
+        scss: "SCSS",
+        html: "HTML",
+        py: "Python",
+        go: "Go",
+        rs: "Rust",
+        java: "Java",
+        rb: "Ruby",
+        sh: "Shell",
+        sql: "SQL",
+        yaml: "YAML",
+        yml: "YAML",
+        toml: "TOML",
+        xml: "XML",
+        svg: "SVG",
+        c: "C",
+        cpp: "C++",
+        h: "C Header",
+        cs: "C#",
+        php: "PHP",
+        swift: "Swift",
+        kt: "Kotlin",
+        dart: "Dart",
+        vue: "Vue",
+        svelte: "Svelte",
+      };
+
+      const typedRows = rows.rows as { ext: string; file_count: number }[];
+      const totalFiles = typedRows.reduce((sum, r) => sum + r.file_count, 0);
+
+      return typedRows
+        .filter((r) => r.ext)
+        .map((r) => ({
+          language: langMap[r.ext] || r.ext.toUpperCase(),
+          ext: r.ext,
+          count: r.file_count,
+          percentage:
+            totalFiles > 0
+              ? Math.round((r.file_count / totalFiles) * 1000) / 10
+              : 0,
+        }))
+        .slice(0, 8);
+    },
+
+    async getNeedsAttention(userId: string) {
+      const [counts, items] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            SUM(CASE WHEN i.is_pull_request = false THEN 1 ELSE 0 END)::int AS open_issues,
+            SUM(CASE WHEN i.is_pull_request = true THEN 1 ELSE 0 END)::int AS open_prs
+          FROM issues i
+          INNER JOIN projects p ON i.project_id = p.id
+          WHERE p.owner_id = ${userId} AND i.state = 'open'
+        `),
+
+        db
+          .select({
+            id: issuesTable.id,
+            title: issuesTable.title,
+            issueNumber: issuesTable.issueNumber,
+            isPullRequest: issuesTable.isPullRequest,
+            authorLogin: issuesTable.authorLogin,
+            authorAvatar: issuesTable.authorAvatar,
+            projectId: issuesTable.projectId,
+            projectName: projectTables.projectName,
+            githubUpdatedAt: issuesTable.githubUpdatedAt,
+          })
+          .from(issuesTable)
+          .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
+          .where(
+            and(
+              eq(projectTables.ownerId, userId),
+              eq(issuesTable.state, "open"),
+            ),
+          )
+          .orderBy(desc(issuesTable.githubUpdatedAt))
+          .limit(8),
+      ]);
+
+      const row = counts.rows[0] as
+        | { open_issues: number; open_prs: number }
+        | undefined;
+
+      return {
+        openIssuesCount: Number(row?.open_issues ?? 0),
+        openPRsCount: Number(row?.open_prs ?? 0),
+        items,
+      };
     },
   };
 }

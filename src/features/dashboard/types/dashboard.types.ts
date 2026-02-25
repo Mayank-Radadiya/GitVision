@@ -46,6 +46,48 @@ export interface CommitChartPoint {
   commits: number;
 }
 
+/** Single action card in the "Pick Up Where You Left Off" section */
+export interface PickUpCard {
+  type: "chat" | "file" | "commit";
+  title: string;
+  description: string;
+  href: string;
+  projectName: string;
+}
+
+/** Data returned by `project.getPickUpWhereYouLeftOff` */
+export interface PickUpData {
+  cards: PickUpCard[];
+}
+
+/** Single language entry for the breakdown chart */
+export interface LanguageEntry {
+  language: string;
+  ext: string;
+  count: number;
+  percentage: number;
+}
+
+/** Single open issue/PR item */
+export interface AttentionItem {
+  id: string;
+  title: string;
+  issueNumber: number;
+  isPullRequest: boolean;
+  authorLogin: string;
+  authorAvatar: string | null;
+  projectId: string;
+  projectName: string;
+  githubUpdatedAt: Date;
+}
+
+/** Data returned by `project.getNeedsAttention` */
+export interface NeedsAttentionData {
+  openIssuesCount: number;
+  openPRsCount: number;
+  items: AttentionItem[];
+}
+
 // ─── Component Props Types ───────────────────────────────────────────────────
 
 /** Stat card configuration */

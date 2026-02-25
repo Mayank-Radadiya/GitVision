@@ -15,6 +15,13 @@
       "when": 1771908830266,
       "tag": "0001_spotty_frank_castle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771928035286,
+      "tag": "0002_clumsy_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

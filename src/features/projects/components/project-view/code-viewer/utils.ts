@@ -8,12 +8,13 @@
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface FileEntry {
+  id: string;
   path: string;
-  content: string;
   language: string;
 }
 
 export interface TreeNode {
+  id?: string;
   name: string;
   path: string;
   type: "file" | "directory";
@@ -125,6 +126,7 @@ export function buildFileTree(files: FileEntry[]): TreeNode[] {
 
       if (!existing) {
         const node: TreeNode = {
+          id: isFile ? file.id : undefined,
           name: part,
           path: fullPath,
           type: isFile ? "file" : "directory",

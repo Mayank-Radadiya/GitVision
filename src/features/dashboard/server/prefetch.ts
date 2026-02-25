@@ -11,5 +11,8 @@ export function prefetchDashboard() {
     prefetch(trpc.project.getAll.queryOptions()),
     prefetch(trpc.project.getRecentActivity.queryOptions()),
     prefetch(trpc.project.getCommitChart.queryOptions()),
+    prefetch(trpc.project.getPickUpWhereYouLeftOff.queryOptions()),
+    prefetch(trpc.project.getLanguageBreakdown.queryOptions()),
+    prefetch(trpc.project.getNeedsAttention.queryOptions()),
   ]);
 }

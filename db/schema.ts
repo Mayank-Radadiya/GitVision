@@ -60,6 +60,7 @@ export const projectTables = pgTable(
     totalCommits: integer("total_commits").notNull().default(0),
     totalBranches: integer("total_branches").notNull().default(0),
     totalContributors: integer("total_contributors").notNull().default(0),
+    totalFiles: integer("total_files").notNull().default(0),
     // Embedding status tracking for deferred RAG processing
     embeddingStatus: varchar("embedding_status", { length: 20 })
       .notNull()
