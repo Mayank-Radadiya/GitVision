@@ -1,22 +1,16 @@
 "use client";
 
-/**
- * Simplified project card — single file replaces the 6-file repository-card/ folder.
- * Displays project name, GitHub link, key stats, and creation date.
- */
-
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { motion } from "framer-motion";
 import {
-  Star,
-  GitFork,
   GitCommit,
+  GitFork,
+  Star,
   Users,
-  ExternalLink,
   ChevronRight,
-  Clock,
+  ExternalLink,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
@@ -32,29 +26,40 @@ interface ProjectCardProps {
   index: number;
 }
 
-/** Format large numbers: 1200 → "1.2k", 1200000 → "1.2M" */
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toString();
-}
-
-/** Single inline stat with icon */
-function Stat({
+/** Compact inline stat */
+function InlineStat({
   icon: Icon,
   value,
-  color,
+  colorClass = "text-muted-foreground",
 }: {
-  icon: typeof Star;
+  icon: LucideIcon;
   value: number;
-  color: string;
+  colorClass?: string;
 }) {
   return (
-    <div className="flex items-center gap-1 text-sm">
-      <Icon className={cn("h-3.5 w-3.5", color)} />
-      <span className="font-medium text-foreground">{fmt(value)}</span>
-    </div>
+    <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover:text-foreground">
+      <Icon className={cn("h-3.5 w-3.5", colorClass)} />
+      <span className="text-[13px] tabular-nums font-medium">
+        {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}
+      </span>
+    </span>
   );
+}
+
+// Generate consistent background color based on name
+function getProjectColor(name: string) {
+  const colors = [
+    "bg-blue-500/10 text-blue-500",
+    "bg-emerald-500/10 text-emerald-500",
+    "bg-amber-500/10 text-amber-500",
+    "bg-cyan-500/10 text-cyan-500",
+    "bg-rose-500/10 text-rose-500",
+    "bg-purple-500/10 text-purple-500",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
 }
 
 function ProjectCard({
@@ -65,106 +70,85 @@ function ProjectCard({
   forks,
   totalCommits,
   totalContributors,
-  createdAt,
-  index,
 }: ProjectCardProps) {
   const router = useRouter();
 
-  const repoPath = githubUrl.replace(/^https?:\/\/(www\.)?github\.com\//, "");
-  const timeAgo = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
+  const repoPath = useMemo(() => {
+    try {
+      const url = new URL(githubUrl);
+      return url.pathname.slice(1);
+    } catch {
+      return githubUrl;
+    }
+  }, [githubUrl]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+    <div
+      onClick={() => router.push(`/dashboard/user-project/${id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) =>
+        e.key === "Enter" && router.push(`/dashboard/user-project/${id}`)
+      }
+      className={cn(
+        "group relative cursor-pointer rounded-2xl border border-border/50 p-4",
+        "bg-card/40 backdrop-blur-xl",
+        "shadow-sm transition-all duration-300",
+        "hover:-translate-y-0.5 hover:bg-card/80 hover:border-primary/40 hover:shadow-md hover:shadow-primary/5",
+      )}
+      aria-label={`Open project ${projectName}`}
     >
-      <div
-        onClick={() => router.push(`/dashboard/user-project/${id}`)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) =>
-          e.key === "Enter" && router.push(`/dashboard/user-project/${id}`)
-        }
-        className={cn(
-          "group relative cursor-pointer overflow-hidden rounded-2xl border p-5",
-          "bg-card/80 backdrop-blur-xl",
-          "border-border/60 hover:border-primary/30",
-          "shadow-sm hover:shadow-md transition-all duration-200",
-        )}
-        aria-label={`Open project ${projectName}`}
-      >
-        {/* Ambient glow on hover */}
+      <div className="flex items-center gap-4">
+        {/* Project icon */}
         <div
           className={cn(
-            "absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-0 blur-2xl",
-            "transition-opacity duration-300 group-hover:opacity-20",
-            "bg-gradient-to-br from-primary to-blue-400",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold shadow-sm transition-transform duration-300 group-hover:scale-105",
+            getProjectColor(projectName),
           )}
-        />
+        >
+          {projectName.charAt(0).toUpperCase()}
+        </div>
 
-        <div className="relative z-10">
-          {/* Row 1: Avatar + Name + Arrow */}
-          <div className="flex items-center gap-4">
-            {/* Avatar */}
-            <div
-              className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-                "bg-gradient-to-br from-primary/15 to-blue-400/15",
-                "text-primary font-bold text-base",
-                "transition-transform duration-200 group-hover:scale-105",
-              )}
-            >
-              {projectName.charAt(0).toUpperCase()}
-            </div>
+        {/* Name + URL */}
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
+            {projectName}
+          </h3>
+          <a
+            href={githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground/60 transition-colors hover:text-primary"
+            aria-label={`View ${repoPath} on GitHub`}
+          >
+            <ExternalLink className="h-3 w-3" />
+            <span className="truncate">{repoPath}</span>
+          </a>
+        </div>
 
-            {/* Name + URL */}
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
-                {projectName}
-              </h3>
-              <a
-                href={githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                aria-label={`View ${repoPath} on GitHub`}
-              >
-                <ExternalLink className="h-3 w-3" />
-                <span className="truncate">{repoPath}</span>
-              </a>
-            </div>
+        {/* Stats */}
+        <div className="hidden items-center gap-5 sm:flex">
+          <InlineStat icon={Star} value={star} colorClass="text-amber-400" />
+          <InlineStat icon={GitFork} value={forks} colorClass="text-blue-400" />
+          <InlineStat
+            icon={GitCommit}
+            value={totalCommits}
+            colorClass="text-emerald-400"
+          />
+          <InlineStat
+            icon={Users}
+            value={totalContributors}
+            colorClass="text-purple-400"
+          />
+        </div>
 
-            {/* Arrow */}
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
-          </div>
-
-          {/* Row 2: Stats + Time */}
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <Stat icon={Star} value={star} color="text-amber-500" />
-              <Stat icon={GitFork} value={forks} color="text-blue-500" />
-              <Stat
-                icon={GitCommit}
-                value={totalCommits}
-                color="text-emerald-500"
-              />
-              <Stat
-                icon={Users}
-                value={totalContributors}
-                color="text-cyan-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
-              <Clock className="h-3 w-3" />
-              <span>{timeAgo}</span>
-            </div>
-          </div>
+        {/* Arrow */}
+        <div className="h-7 w-7 rounded-full bg-border/50 flex items-center justify-center opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300">
+          <ChevronRight className="h-4 w-4 text-foreground/80" />
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 

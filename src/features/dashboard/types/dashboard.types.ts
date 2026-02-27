@@ -88,6 +88,17 @@ export interface NeedsAttentionData {
   items: AttentionItem[];
 }
 
+/** Consolidated dashboard payload from `project.getDashboardData` */
+export interface DashboardData {
+  stats: DashboardStats;
+  projects: Project[];
+  recentActivity: ActivityEvent[];
+  commitChart: CommitChartPoint[];
+  pickUp: PickUpData;
+  languages: LanguageEntry[];
+  attention: NeedsAttentionData;
+}
+
 // ─── Component Props Types ───────────────────────────────────────────────────
 
 /** Stat card configuration */

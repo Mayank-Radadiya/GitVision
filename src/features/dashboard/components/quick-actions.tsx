@@ -1,53 +1,25 @@
 "use client";
 
 /**
- * Quick action shortcuts — "New Project" and other frequent actions.
- * Pure presentational, receives no data hooks.
+ * Quick action — premium "New Project" CTA button.
  */
 
 import { memo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Settings } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { sendTestInngestEvent } from "@/src/lib/inngest/actions";
-import toast from "react-hot-toast";
+import { Plus } from "lucide-react";
 
 function QuickActions() {
   const router = useRouter();
 
-  const handleSetupInngestTest = async () => {
-    const res = await sendTestInngestEvent("[EMAIL_ADDRESS]");
-
-    // Verify that the event was sent. Give toast success if sent.
-    if (res.success && res.ids && res.ids.length > 0) {
-      toast.success("Event sent successfully");
-    } else {
-      toast.error("Failed to send event");
-    }
-  };
-
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleSetupInngestTest}
-        className="gap-1.5 rounded-lg text-xs"
-        aria-label="Dashboard settings"
-      >
-        <Settings className="h-3.5 w-3.5" />
-        Setup Inngest test
-      </Button>
-      <Button
-        size="sm"
-        onClick={() => router.push("/dashboard/create-project")}
-        className="gap-1.5 rounded-lg text-xs shadow-md shadow-primary/20"
-        aria-label="Create new project"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        New Project
-      </Button>
-    </div>
+    <button
+      onClick={() => router.push("/create-project")}
+      className="group relative inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+      aria-label="Create new project"
+    >
+      <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
+      New Project
+    </button>
   );
 }
 

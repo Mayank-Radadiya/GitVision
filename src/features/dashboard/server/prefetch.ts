@@ -1,18 +1,10 @@
 /**
  * Server-side prefetch for dashboard data.
- * Queries are dehydrated and rehydrated on the client via HydrateClient.
+ * Single consolidated call — replaces the previous 7 separate prefetches.
  */
 
 import { prefetch, trpc } from "@/src/lib/trpc/server";
 
 export function prefetchDashboard() {
-  return Promise.all([
-    prefetch(trpc.project.getDashboardInfo.queryOptions()),
-    prefetch(trpc.project.getAll.queryOptions()),
-    prefetch(trpc.project.getRecentActivity.queryOptions()),
-    prefetch(trpc.project.getCommitChart.queryOptions()),
-    prefetch(trpc.project.getPickUpWhereYouLeftOff.queryOptions()),
-    prefetch(trpc.project.getLanguageBreakdown.queryOptions()),
-    prefetch(trpc.project.getNeedsAttention.queryOptions()),
-  ]);
+  return prefetch(trpc.project.getDashboardData.queryOptions());
 }

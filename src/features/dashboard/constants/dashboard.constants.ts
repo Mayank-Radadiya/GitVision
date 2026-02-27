@@ -3,7 +3,12 @@
  * Keep all magic values here to maintain a single source of truth.
  */
 
-import { GitBranch, FileIcon, Star, CircleDollarSign } from "lucide-react";
+import {
+  FolderGit2,
+  FileCode2,
+  GitCommitHorizontal,
+  Coins,
+} from "lucide-react";
 import type {
   StatCardConfig,
   ProjectSortOption,
@@ -16,30 +21,30 @@ import type {
 export const STAT_CARDS: StatCardConfig[] = [
   {
     label: "Projects",
-    icon: GitBranch,
+    icon: FolderGit2,
     color: "blue",
-    description: "Total Repositories",
+    description: "Tracked repos",
     getValue: (s) => s.totalProjects,
   },
   {
     label: "Files",
-    icon: FileIcon,
+    icon: FileCode2,
     color: "cyan",
-    description: "Files Tracked",
+    description: "Indexed files",
     getValue: (s) => s.totalFiles,
   },
   {
     label: "Commits",
-    icon: Star,
+    icon: GitCommitHorizontal,
     color: "amber",
-    description: "Commits Analyzed",
+    description: "Analyzed",
     getValue: (s) => s.totalCommits,
   },
   {
     label: "Credits",
-    icon: CircleDollarSign,
+    icon: Coins,
     color: "emerald",
-    description: "Available Credits",
+    description: "Available",
     getValue: (s) => s.userCredits,
   },
 ];
@@ -59,40 +64,40 @@ export const SORT_OPTIONS: ProjectSortOption[] = [
 export const COLOR_TOKENS: Record<
   StatColor,
   {
-    gradient: string;
-    glow: string;
     bg: string;
     text: string;
     border: string;
+    gradient: string;
+    glow: string;
   }
 > = {
   blue: {
+    bg: "bg-blue-500/10",
+    text: "text-blue-400",
+    border: "border-border/50",
     gradient: "from-blue-500 to-blue-600",
     glow: "shadow-blue-500/20",
-    bg: "bg-blue-500/10",
-    text: "text-blue-500",
-    border: "border-blue-500/20",
   },
   emerald: {
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-400",
+    border: "border-border/50",
     gradient: "from-emerald-500 to-emerald-600",
     glow: "shadow-emerald-500/20",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-500",
-    border: "border-emerald-500/20",
   },
   amber: {
-    gradient: "from-amber-500 to-orange-500",
-    glow: "shadow-amber-500/20",
     bg: "bg-amber-500/10",
-    text: "text-amber-500",
-    border: "border-amber-500/20",
+    text: "text-amber-400",
+    border: "border-border/50",
+    gradient: "from-amber-500 to-amber-600",
+    glow: "shadow-amber-500/20",
   },
   cyan: {
-    gradient: "from-cyan-500 to-teal-500",
-    glow: "shadow-cyan-500/20",
     bg: "bg-cyan-500/10",
-    text: "text-cyan-500",
-    border: "border-cyan-500/20",
+    text: "text-cyan-400",
+    border: "border-border/50",
+    gradient: "from-cyan-500 to-cyan-600",
+    glow: "shadow-cyan-500/20",
   },
 };
 

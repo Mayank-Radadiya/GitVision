@@ -3,33 +3,58 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 const DASHBOARD_STALE_TIME = 60_000; // 60s — hydrated data stays fresh
+const DASHBOARD_GC_TIME = 5 * 60_000; // 5min — keep in cache for quick revisits
+
+// ─── Core consolidated query ──────────────────────────────────────────────────
+
+/**
+ * Single query that loads ALL dashboard data.
+ * All derived hooks project from this one query — no extra HTTP calls.
+ */
+const useDashboardData = () =>
+  trpc.project.getDashboardData.useQuery(undefined, {
+    staleTime: DASHBOARD_STALE_TIME,
+    gcTime: DASHBOARD_GC_TIME,
+  });
+
+// ─── Derived hooks (each projects a slice of the consolidated data) ───────────
 
 export const useDashboardInfo = () => {
-  return trpc.project.getDashboardInfo.useQuery(undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
-  });
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.stats, ...rest };
 };
 
 export const useUserProjects = () => {
-  return trpc.project.getAll.useQuery(undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
-  });
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.projects, ...rest };
 };
 
-// Now accepts an optional limit parameter!
-export const useRecentActivity = (limit?: number) => {
-  return trpc.project.getRecentActivity.useQuery(
-    limit ? { limit } : undefined,
-    { staleTime: DASHBOARD_STALE_TIME },
-  );
+export const useRecentActivity = (_limit?: number) => {
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.recentActivity, ...rest };
 };
 
-// Now accepts an optional days parameter!
-export const useCommitChart = (days?: number) => {
-  return trpc.project.getCommitChart.useQuery(days ? { days } : undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
-  });
+export const useCommitChart = (_days?: number) => {
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.commitChart, ...rest };
 };
+
+export const usePickUpWhereYouLeftOff = () => {
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.pickUp, ...rest };
+};
+
+export const useLanguageBreakdown = () => {
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.languages, ...rest };
+};
+
+export const useNeedsAttention = () => {
+  const { data, ...rest } = useDashboardData();
+  return { data: data?.attention, ...rest };
+};
+
+// ─── Mutations (unchanged) ──────────────────────────────────────────────────
 
 export const useCreateProject = () => {
   const router = useRouter();
@@ -39,34 +64,13 @@ export const useCreateProject = () => {
     onSuccess: () => {
       toast.success("Project created successfully");
 
-      // Type-safe cache invalidation. This guarantees you wipe the exact queries.
-      // We invalidate the dashboard stats and the project list.
-      utils.project.getDashboardInfo.invalidate();
-      utils.project.getAll.invalidate();
-      utils.project.getRecentActivity.invalidate();
+      // Invalidate the consolidated query — refreshes everything
+      utils.project.getDashboardData.invalidate();
 
       router.push("/dashboard");
     },
     onError: (error) => {
       toast.error(`Error creating project: ${error.message}`);
     },
-  });
-};
-
-export const usePickUpWhereYouLeftOff = () => {
-  return trpc.project.getPickUpWhereYouLeftOff.useQuery(undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
-  });
-};
-
-export const useLanguageBreakdown = () => {
-  return trpc.project.getLanguageBreakdown.useQuery(undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
-  });
-};
-
-export const useNeedsAttention = () => {
-  return trpc.project.getNeedsAttention.useQuery(undefined, {
-    staleTime: DASHBOARD_STALE_TIME,
   });
 };

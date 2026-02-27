@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Dashboard header — greeting, quick actions, and stats grid.
+ * Dashboard header — greeting with date, quick actions.
  * Subscribes to useUser() — user info changes don't rerender the project list.
  */
 
@@ -20,15 +20,21 @@ function DashboardHeader({ stats }: DashboardHeaderProps) {
   const { user } = useUser();
   const firstName = user?.firstName || "there";
 
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Greeting + Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <motion.h1
-            initial={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+            className="text-xl font-semibold tracking-tight text-foreground"
           >
             Welcome back, {firstName}
           </motion.h1>
@@ -36,9 +42,9 @@ function DashboardHeader({ stats }: DashboardHeaderProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="mt-1 text-sm text-muted-foreground"
+            className="mt-0.5 text-sm text-muted-foreground"
           >
-            Here&apos;s an overview of your repositories
+            {today}
           </motion.p>
         </div>
         <QuickActions />

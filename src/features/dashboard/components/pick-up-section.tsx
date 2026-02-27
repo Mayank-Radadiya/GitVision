@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * "Pick Up Where You Left Off" — horizontal quick-action cards.
- * Shows the user's most recent chat session and latest commit
- * so they can jump back into context instantly.
+ * "Pick Up Where You Left Off" — compact inline prompt bar.
+ * Shows recent chat and latest commit as inline links in a single row.
  */
 
 import { memo } from "react";
@@ -21,68 +20,28 @@ const ICON_MAP = {
 } as const;
 
 const COLOR_MAP = {
-  chat: {
-    bg: "bg-blue-500/10",
-    text: "text-blue-500",
-    border: "border-blue-500/20",
-  },
-  file: {
-    bg: "bg-cyan-500/10",
-    text: "text-cyan-500",
-    border: "border-cyan-500/20",
-  },
-  commit: {
-    bg: "bg-amber-500/10",
-    text: "text-amber-500",
-    border: "border-amber-500/20",
-  },
+  chat: { text: "text-blue-400" },
+  file: { text: "text-cyan-400" },
+  commit: { text: "text-amber-400" },
 } as const;
 
-function PickUpCard({ card }: { card: PickUpCard }) {
+function PickUpItem({ card }: { card: PickUpCard }) {
   const Icon = ICON_MAP[card.type];
   const colors = COLOR_MAP[card.type];
 
   return (
-    <Link href={card.href} className="group block flex-1">
-      <div
-        className={cn(
-          "relative h-full rounded-xl border bg-card/60 p-4 backdrop-blur-sm",
-          "transition-all duration-200",
-          "hover:bg-card/90 hover:shadow-md",
-          "cursor-pointer",
-          colors.border,
-        )}
-      >
-        {/* Icon */}
-        <div
-          className={cn(
-            "mb-3 flex h-8 w-8 items-center justify-center rounded-lg",
-            colors.bg,
-          )}
-        >
-          <Icon className={cn("h-4 w-4", colors.text)} />
-        </div>
-
-        {/* Content */}
-        <p className="text-sm font-medium text-foreground">{card.title}</p>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-          {card.description}
-        </p>
-
-        {/* Project badge */}
-        <div className="mt-3 flex items-center justify-between">
-          <span
-            className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-[10px] font-medium",
-              colors.bg,
-              colors.text,
-            )}
-          >
-            {card.projectName}
-          </span>
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-      </div>
+    <Link
+      href={card.href}
+      className="group flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:bg-muted/30"
+    >
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
+      <span className="truncate text-xs font-medium text-foreground">
+        {card.title}
+      </span>
+      <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+        — {card.description}
+      </span>
+      <ArrowRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
@@ -93,21 +52,20 @@ function PickUpSection() {
   if (!isLoading && (!data || data.cards.length === 0)) return null;
 
   return (
-    <div>
-      <h3 className="mb-3 text-sm font-semibold text-foreground">
-        Pick up where you left off
-      </h3>
+    <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card/40 px-2 py-1.5 backdrop-blur-sm">
+      <span className="shrink-0 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+        Resume
+      </span>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {Array.from({ length: 2 }, (_, i) => (
-            <Skeleton key={i} className="h-[120px] rounded-xl" />
-          ))}
+        <div className="flex gap-3">
+          <Skeleton className="h-6 w-48 rounded-lg" />
+          <Skeleton className="h-6 w-48 rounded-lg" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {data!.cards.map((card) => (
-            <PickUpCard key={card.type} card={card} />
+            <PickUpItem key={card.type} card={card} />
           ))}
         </div>
       )}

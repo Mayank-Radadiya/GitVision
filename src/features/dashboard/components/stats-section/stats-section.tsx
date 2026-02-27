@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Stats bento grid — renders 4 stat cards (or skeletons) in a responsive grid.
+ * Stats grid — renders 4 compact stat cards in a uniform grid.
  * Receives stats data as props from the parent orchestrator.
  */
 
@@ -18,16 +18,16 @@ interface StatsSectionProps {
 function StatsSection({ stats }: StatsSectionProps) {
   if (!stats) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {STAT_CARDS.map((c) => (
-          <Skeleton key={c.label} className="h-[120px] rounded-2xl" />
+          <Skeleton key={c.label} className="h-[68px] rounded-xl" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {STAT_CARDS.map((card) => (
         <StatCard
           key={card.label}

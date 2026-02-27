@@ -6,6 +6,7 @@ import {
   projectFiles,
   issuesTable,
   projectChats,
+  usersTable,
 } from "@/db/schema";
 import { eq, desc, and, count, sql } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
@@ -290,36 +291,65 @@ export function createProjectService() {
      * Relies on cached columns rather than heavy `count(*)` queries.
      */
     async getDashboardInfo(userId: string) {
-      const projects = await db
-        .select({
-          totalCommits: projectTables.totalCommits,
-          // totalFiles: projectTables.totalFiles // Uncomment when added to schema
-        })
-        .from(projectTables)
-        .where(eq(projectTables.ownerId, userId));
+      // Run both queries in parallel — eliminates the sequential waterfall
+      const [projects, creditsRow] = await Promise.all([
+        db
+          .select({
+            totalCommits: projectTables.totalCommits,
+            totalFiles: projectTables.totalFiles,
+          })
+          .from(projectTables)
+          .where(eq(projectTables.ownerId, userId)),
 
-      const totalProjects = projects.length;
-      const totalCommits = projects.reduce(
-        (acc, p) => acc + (p.totalCommits || 0),
-        0,
-      );
-
-      // Fallback SQL for files and credits until `totalFiles` column is fully migrated
-      const fallbackSql = await db.execute(sql`
-        SELECT 
-          (SELECT count(*)::int FROM project_files f INNER JOIN projects p ON f.project_id = p.id WHERE p.owner_id = ${userId}) AS total_files,
-          (SELECT COALESCE(credits, 0) FROM users WHERE id = ${userId}) AS credits
-      `);
-
-      const statsRow = fallbackSql.rows[0] as
-        | { total_files: number; credits: number }
-        | undefined;
+        db
+          .select({ credits: usersTable.credits })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1),
+      ]);
 
       return {
-        totalProjects,
-        totalCommits,
-        totalFiles: Number(statsRow?.total_files ?? 0),
-        userCredits: Number(statsRow?.credits ?? 0),
+        totalProjects: projects.length,
+        totalCommits: projects.reduce(
+          (acc, p) => acc + (p.totalCommits || 0),
+          0,
+        ),
+        totalFiles: projects.reduce((acc, p) => acc + (p.totalFiles || 0), 0),
+        userCredits: creditsRow[0]?.credits ?? 0,
+      };
+    },
+
+    /**
+     * CONSOLIDATED: Fetches ALL dashboard data in a single call.
+     * Runs 7 queries in parallel instead of 7 sequential HTTP round-trips.
+     */
+    async getDashboardData(userId: string) {
+      const [
+        stats,
+        projects,
+        recentActivity,
+        commitChart,
+        pickUp,
+        languages,
+        attention,
+      ] = await Promise.all([
+        this.getDashboardInfo(userId),
+        this.getAllProjects(userId),
+        this.getRecentActivity(userId, 8),
+        this.getCommitChart(userId, 7),
+        this.getPickUpWhereYouLeftOff(userId),
+        this.getLanguageBreakdown(userId),
+        this.getNeedsAttention(userId),
+      ]);
+
+      return {
+        stats,
+        projects,
+        recentActivity,
+        commitChart,
+        pickUp,
+        languages,
+        attention,
       };
     },
 

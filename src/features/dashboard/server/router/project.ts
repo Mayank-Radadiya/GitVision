@@ -23,6 +23,10 @@ export const projectRouter = createTRPCRouter({
     return projectService.getDashboardInfo(ctx.userId);
   }),
 
+  getDashboardData: protectedProcedure.query(async ({ ctx }) => {
+    return projectService.getDashboardData(ctx.userId);
+  }),
+
   create: protectedProcedure
     .input(projectCreateSchema)
     .mutation(async ({ input, ctx }) => {

@@ -3,31 +3,39 @@
 /**
  * Dashboard page orchestrator — the root client component.
  *
- * Architecture:
- * - Subscribes to useDashboardInfo() only (for stats)
- * - Composes isolated sections that manage their own data:
- *   • DashboardHeader → useUser()
- *   • PickUpSection → usePickUpWhereYouLeftOff()
- *   • ProjectList → useUserProjects()
- *   • ActivityFeed → useRecentActivity()
- *   • CommitChart → useCommitChart()
- *   • LanguageBreakdown → useLanguageBreakdown()
- *   • NeedsAttention → useNeedsAttention()
- *
- * This separation prevents cross-concern rerenders:
- * project list changes → only ProjectList rerenders, not the header or stats.
+ * Layout: Header → Stats → 2-column grid (Projects 60% | Insights 40%)
+ * Centered with max-w for ultrawide screens.
  */
 
 import { useEffect } from "react";
 import toast from "react-hot-toast";
+import { motion } from "framer-motion";
 import { useDashboardInfo } from "@/features/dashboard/hooks/use-dashboard";
 import DashboardHeader from "./dashboard-header";
-import PickUpSection from "./pick-up-section";
 import ProjectList from "./project-list/project-list";
-import ActivityFeed from "./activity-feed/activity-feed";
 import CommitChart from "./commit-chart";
 import LanguageBreakdown from "./language-breakdown";
 import NeedsAttention from "./needs-attention";
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+};
 
 export default function DashboardPage() {
   const { data: stats, isError } = useDashboardInfo();
@@ -39,30 +47,34 @@ export default function DashboardPage() {
   }, [isError]);
 
   return (
-    <div className="min-h-screen p-6 lg:p-8">
+    <motion.div
+      className="mx-auto min-h-screen max-w-[1400px] p-5 lg:p-8"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Header + Stats */}
-      <DashboardHeader stats={stats} />
-
-      {/* Pick Up Where You Left Off */}
-      <div className="mt-6">
-        <PickUpSection />
-      </div>
+      <motion.div variants={staggerItem}>
+        <DashboardHeader stats={stats} />
+      </motion.div>
 
       {/* Main Content: 2-column on desktop */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left: Project List (takes 2/3 width) */}
-        <div className="lg:col-span-2">
+      <motion.div
+        variants={staggerItem}
+        className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-5"
+      >
+        {/* Left: Project List (3/5 width) */}
+        <div className="lg:col-span-3">
           <ProjectList />
         </div>
 
-        {/* Right: Charts + Insights (takes 1/3 width) */}
-        <div className="space-y-6">
+        {/* Right: Insights Column (2/5 width) */}
+        <div className="space-y-5 lg:col-span-2">
           <CommitChart />
           <LanguageBreakdown />
           <NeedsAttention />
-          <ActivityFeed />
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
