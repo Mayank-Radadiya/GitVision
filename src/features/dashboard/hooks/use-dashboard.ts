@@ -29,12 +29,12 @@ export const useUserProjects = () => {
   return { data: data?.projects, ...rest };
 };
 
-export const useRecentActivity = (_limit?: number) => {
+export const useRecentActivity = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.recentActivity, ...rest };
 };
 
-export const useCommitChart = (_days?: number) => {
+export const useCommitChart = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.commitChart, ...rest };
 };

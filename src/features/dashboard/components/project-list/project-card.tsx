@@ -2,7 +2,6 @@
 
 import { memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
 import {
   GitCommit,
   GitFork,

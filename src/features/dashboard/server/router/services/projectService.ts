@@ -291,8 +291,8 @@ export function createProjectService() {
      * Relies on cached columns rather than heavy `count(*)` queries.
      */
     async getDashboardInfo(userId: string) {
-      // Run both queries in parallel — eliminates the sequential waterfall
-      const [projects, creditsRow] = await Promise.all([
+      // Run queries in parallel — eliminates the sequential waterfall
+      const [projects, creditsRow, filesQuery] = await Promise.all([
         db
           .select({
             totalCommits: projectTables.totalCommits,
@@ -306,6 +306,16 @@ export function createProjectService() {
           .from(usersTable)
           .where(eq(usersTable.id, userId))
           .limit(1),
+
+        // Live file count for accuracy
+        db
+          .select({ count: count(projectFiles.id) })
+          .from(projectFiles)
+          .innerJoin(
+            projectTables,
+            eq(projectFiles.projectId, projectTables.id),
+          )
+          .where(eq(projectTables.ownerId, userId)),
       ]);
 
       return {
@@ -314,7 +324,7 @@ export function createProjectService() {
           (acc, p) => acc + (p.totalCommits || 0),
           0,
         ),
-        totalFiles: projects.reduce((acc, p) => acc + (p.totalFiles || 0), 0),
+        totalFiles: Number(filesQuery[0]?.count || 0),
         userCredits: creditsRow[0]?.credits ?? 0,
       };
     },
