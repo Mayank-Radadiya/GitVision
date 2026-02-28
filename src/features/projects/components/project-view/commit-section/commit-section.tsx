@@ -1,15 +1,17 @@
 "use client";
 
 /**
- * Commit Section — Displays the commit timeline with "Load More" pagination.
- * Subscribes to useProjectCommits() (useInfiniteQuery) and useGenerateAiSummary().
- * Isolated: rerenders here don't affect header or stats.
+ * Commit Section — Bento widget variant.
+ * Fixed-height ScrollArea with infinite-load footer.
+ * Renders as a self-contained card used inside the bento grid.
  */
 
 import { memo, useState, useCallback } from "react";
 import { GitCommit, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { ScrollArea } from "@/shared/components/ui/scroll-area";
+import { Badge } from "@/shared/components/ui/badge";
 import {
   useProjectCommits,
   useGenerateAiSummary,
@@ -30,107 +32,126 @@ function CommitSection({ projectId, repoUrl }: CommitSectionProps) {
     null,
   );
 
-  /** Flatten pages into a single commit list */
   const commits = data?.pages.flatMap((page) => page.commits) ?? [];
+  const cleanRepoUrl = repoUrl.replace(/\.git$/, "");
 
-  /** Handle AI summary generation with loading state */
   const handleGenerateSummary = useCallback(
     (commitId: string) => {
       setGeneratingCommitId(commitId);
       generateAiSummary.mutate(
         { projectId, commitId },
-        {
-          onSettled: () => setGeneratingCommitId(null),
-        },
+        { onSettled: () => setGeneratingCommitId(null) },
       );
     },
     [generateAiSummary, projectId],
   );
 
-  /** Clean repo URL (remove .git suffix) */
-  const cleanRepoUrl = repoUrl.replace(/\.git$/, "");
-
-  return (
-    <div>
-      {/* Section Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <GitCommit className="h-4 w-4" />
-          </div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Recent Commits
-          </h2>
-          {commits.length > 0 && (
-            <span className="text-sm text-muted-foreground">
-              ({commits.length} loaded)
-            </span>
-          )}
+  // ─── Loading Skeleton ──────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="mb-4 flex items-center gap-2">
+          <Skeleton className="h-7 w-7 rounded-lg" />
+          <Skeleton className="h-5 w-36" />
         </div>
-      </div>
-
-      {/* Loading Skeleton */}
-      {isLoading && (
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex gap-4">
-              <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
-              <Skeleton className="h-32 flex-1 rounded-xl" />
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+              <Skeleton className="h-20 flex-1 rounded-xl" />
             </div>
           ))}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+            <GitCommit className="h-3.5 w-3.5" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground">
+            Recent Commits
+          </h3>
+        </div>
+        {commits.length > 0 && (
+          <Badge
+            variant="secondary"
+            className="text-[10px] h-5 px-1.5 font-medium tabular-nums"
+          >
+            {commits.length} loaded
+          </Badge>
+        )}
+      </div>
 
       {/* Empty State */}
-      {!isLoading && commits.length === 0 && (
-        <div className="py-16 text-center">
-          <GitCommit className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
-          <p className="text-muted-foreground">
-            No commits found for this project.
+      {commits.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/40 border border-border/30">
+            <GitCommit className="h-6 w-6 text-muted-foreground/40" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">
+            No commits found
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/60 max-w-[200px]">
+            This repository has no commits visible yet.
           </p>
         </div>
       )}
 
-      {/* Commit List */}
+      {/* Commits — Scrollable */}
       {commits.length > 0 && (
-        <div className="space-y-4">
-          {commits.map((commit,index) => (
-            <CommitCard
-              key={index}
-              id={commit.id}
-              commitHash={commit.commitHash}
-              commitMessage={commit.commitMessage}
-              aiSummary={commit.AiSummary}
-              authorName={commit.authorName}
-              authorAvatar={commit.authorAvatar}
-              authorDate={commit.authorDate}
-              repoUrl={cleanRepoUrl}
-              isGenerating={generatingCommitId === commit.id}
-              isAnyGenerating={generatingCommitId !== null}
-              onGenerateSummary={handleGenerateSummary}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Load More */}
-      {hasNextPage && (
-        <div className="mt-6 flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-            className="gap-2 cursor-pointer"
-          >
-            {isFetchingNextPage ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
+        <ScrollArea className="flex-1 pr-1" style={{ maxHeight: "520px" }}>
+          {/* Timeline wrapper */}
+          <div className="relative">
+            {/* Vertical connector line behind the avatar column */}
+            {commits.length > 1 && (
+              <div className="absolute left-[15px] top-8 bottom-8 w-px bg-border/30 pointer-events-none" />
             )}
-            {isFetchingNextPage ? "Loading..." : "Load More Commits"}
-          </Button>
-        </div>
+            <div className="space-y-0.5">
+              {commits.map((commit) => (
+                <CommitCard
+                  key={commit.id}
+                  id={commit.id}
+                  commitHash={commit.commitHash}
+                  commitMessage={commit.commitMessage}
+                  aiSummary={commit.AiSummary}
+                  authorName={commit.authorName}
+                  authorAvatar={commit.authorAvatar}
+                  authorDate={commit.authorDate}
+                  repoUrl={cleanRepoUrl}
+                  isGenerating={generatingCommitId === commit.id}
+                  isAnyGenerating={generatingCommitId !== null}
+                  onGenerateSummary={handleGenerateSummary}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Load More */}
+          {hasNextPage && (
+            <div className="pt-3 pb-1 flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="gap-2 h-8 text-xs cursor-pointer border-border/40 hover:border-primary/30 hover:bg-primary/5"
+              >
+                {isFetchingNextPage ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                {isFetchingNextPage ? "Loading…" : "Load More"}
+              </Button>
+            </div>
+          )}
+        </ScrollArea>
       )}
     </div>
   );

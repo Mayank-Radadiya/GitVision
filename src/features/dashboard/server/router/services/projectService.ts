@@ -132,6 +132,16 @@ export function createProjectService() {
       return project[0];
     },
 
+    async deleteProject(projectId: string, userId: string) {
+      await this.verifyOwnership(projectId, userId);
+
+      // Cascade constraints in DB schema will handle deleting related
+      // commits, files, embeddings, issues, etc.
+      await db.delete(projectTables).where(eq(projectTables.id, projectId));
+
+      return { success: true, message: "Project deleted successfully" };
+    },
+
     /**
      * Fetches project commits with pagination and defensive limits
      */
@@ -617,6 +627,39 @@ export function createProjectService() {
         openPRsCount: Number(row?.open_prs ?? 0),
         items,
       };
+    },
+
+    /**
+     * Fetches issues or pull requests specifically for a single project
+     */
+    async getProjectIssues(
+      projectId: string,
+      userId: string,
+      isPullRequest: boolean,
+    ) {
+      await this.verifyOwnership(projectId, userId);
+
+      return await db
+        .select({
+          id: issuesTable.id,
+          title: issuesTable.title,
+          issueNumber: issuesTable.issueNumber,
+          isPullRequest: issuesTable.isPullRequest,
+          state: issuesTable.state,
+          authorLogin: issuesTable.authorLogin,
+          authorAvatar: issuesTable.authorAvatar,
+          githubUpdatedAt: issuesTable.githubUpdatedAt,
+          githubCreatedAt: issuesTable.githubCreatedAt,
+        })
+        .from(issuesTable)
+        .where(
+          and(
+            eq(issuesTable.projectId, projectId),
+            eq(issuesTable.isPullRequest, isPullRequest),
+          ),
+        )
+        .orderBy(desc(issuesTable.githubUpdatedAt))
+        .limit(50);
     },
   };
 }

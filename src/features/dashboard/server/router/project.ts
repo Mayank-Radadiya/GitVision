@@ -39,6 +39,12 @@ export const projectRouter = createTRPCRouter({
       return projectService.getProjectById(input.projectId, ctx.userId);
     }),
 
+  delete: protectedProcedure
+    .input(projectIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      return projectService.deleteProject(input.projectId, ctx.userId);
+    }),
+
   getFiles: protectedProcedure
     .input(projectIdSchema)
     .query(async ({ input, ctx }) => {
@@ -109,4 +115,14 @@ export const projectRouter = createTRPCRouter({
   getNeedsAttention: protectedProcedure.query(async ({ ctx }) => {
     return projectService.getNeedsAttention(ctx.userId);
   }),
+
+  getIssues: protectedProcedure
+    .input(z.object({ projectId: z.string(), isPullRequest: z.boolean() }))
+    .query(async ({ input, ctx }) => {
+      return projectService.getProjectIssues(
+        input.projectId,
+        ctx.userId,
+        input.isPullRequest,
+      );
+    }),
 });

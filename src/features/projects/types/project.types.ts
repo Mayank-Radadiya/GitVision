@@ -57,4 +57,4 @@ export interface ProjectStatConfig {
 
 // ─── Tab Navigation ──────────────────────────────────────────────────────────
 
-export type ProjectTab = "commits" | "code" | "chat";
+export type ProjectTab = "overview" | "commits" | "pull-requests" | "issues";

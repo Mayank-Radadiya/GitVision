@@ -84,3 +84,14 @@ export function useGenerateAiSummary(projectId: string) {
     },
   });
 }
+
+/**
+ * Fetches project issues or pull requests.
+ * Stale time: 1 minute.
+ */
+export function useProjectIssues(projectId: string, isPullRequest: boolean) {
+  return trpc.project.getIssues.useQuery(
+    { projectId, isPullRequest },
+    { enabled: !!projectId, staleTime: 60 * 1000 },
+  );
+}
