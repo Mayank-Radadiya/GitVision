@@ -5,6 +5,7 @@ import {
   commitsTable,
   projectFiles,
   issuesTable,
+  issueCommentsTable,
   projectChats,
   usersTable,
 } from "@/db/schema";
@@ -13,6 +14,7 @@ import { inngest } from "@/src/lib/inngest/client";
 import {
   createNewProject as createGitHubProject,
   getAiSummaryOfCommit,
+  syncIssuesAndComments,
 } from "@/src/lib/github";
 
 export function createProjectService() {
@@ -41,16 +43,28 @@ export function createProjectService() {
         const repo = parts[parts.length - 1]!;
 
         // 2. Schedule background execution via Inngest (Prevents 504 Gateway Timeouts)
-        await inngest.send({
-          name: "project/created",
-          data: {
-            projectId,
-            repoUrl: data.repoUrl,
-            projectName: data.projectName,
-            owner,
-            repo,
-          },
-        });
+        // If this fails (e.g. Inngest dev server not running), rollback the DB row.
+        try {
+          await inngest.send({
+            name: "project/created",
+            data: {
+              projectId,
+              repoUrl: data.repoUrl,
+              projectName: data.projectName,
+              owner,
+              repo,
+            },
+          });
+        } catch (inngestError) {
+          // Rollback: delete the project row so we don't leave a dangling, never-synced project
+          await db.delete(projectTables).where(eq(projectTables.id, projectId));
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              "Failed to queue background sync. The project has been removed. Please ensure the background worker is running and try again.",
+            cause: inngestError,
+          });
+        }
 
         // 3. Return immediately to the user so the UI loads instantly
         return {
@@ -140,6 +154,41 @@ export function createProjectService() {
       await db.delete(projectTables).where(eq(projectTables.id, projectId));
 
       return { success: true, message: "Project deleted successfully" };
+    },
+
+    /**
+     * Re-syncs issues and pull requests from GitHub for an existing project.
+     * Useful when the initial Inngest background job failed or never ran.
+     */
+    async syncIssues(projectId: string, userId: string) {
+      await this.verifyOwnership(projectId, userId);
+
+      const project = await db
+        .select({ githubUrl: projectTables.githubUrl })
+        .from(projectTables)
+        .where(eq(projectTables.id, projectId))
+        .limit(1);
+
+      if (!project || project.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      // Delete existing issues/comments so we don't get duplicates on re-sync
+      await db.delete(issuesTable).where(eq(issuesTable.projectId, projectId));
+
+      const result = await syncIssuesAndComments(
+        project[0].githubUrl,
+        projectId,
+      );
+
+      return {
+        success: true,
+        issuesFetched: result.issuesFetched,
+        commentsFetched: result.commentsFetched,
+      };
     },
 
     /**
@@ -659,6 +708,41 @@ export function createProjectService() {
           ),
         )
         .orderBy(desc(issuesTable.githubUpdatedAt))
+        .limit(50);
+    },
+
+    /**
+     * Fetches comments for a specific issue.
+     * Ownership is verified via the issue's parent project.
+     */
+    async getIssueComments(issueId: string, userId: string) {
+      // Verify ownership through the issue's project
+      const issue = await db
+        .select({ projectId: issuesTable.projectId })
+        .from(issuesTable)
+        .where(eq(issuesTable.id, issueId))
+        .limit(1);
+
+      if (!issue || issue.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
+      }
+
+      await this.verifyOwnership(issue[0].projectId, userId);
+
+      return await db
+        .select({
+          id: issueCommentsTable.id,
+          body: issueCommentsTable.body,
+          authorLogin: issueCommentsTable.authorLogin,
+          authorAvatar: issueCommentsTable.authorAvatar,
+          githubCreatedAt: issueCommentsTable.githubCreatedAt,
+        })
+        .from(issueCommentsTable)
+        .where(eq(issueCommentsTable.issueId, issueId))
+        .orderBy(issueCommentsTable.githubCreatedAt)
         .limit(50);
     },
   };

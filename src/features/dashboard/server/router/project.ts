@@ -125,4 +125,16 @@ export const projectRouter = createTRPCRouter({
         input.isPullRequest,
       );
     }),
+
+  getIssueComments: protectedProcedure
+    .input(z.object({ issueId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return projectService.getIssueComments(input.issueId, ctx.userId);
+    }),
+
+  syncIssues: protectedProcedure
+    .input(projectIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      return projectService.syncIssues(input.projectId, ctx.userId);
+    }),
 });

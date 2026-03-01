@@ -176,7 +176,10 @@ export default function ProjectPage() {
                 exit="exit"
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                <PullRequestsTab projectId={projectId} />
+                <PullRequestsTab
+                  projectId={projectId}
+                  repoUrl={project?.githubUrl}
+                />
               </motion.div>
             )}
 
@@ -190,7 +193,7 @@ export default function ProjectPage() {
                 exit="exit"
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                <IssuesTab projectId={projectId} />
+                <IssuesTab projectId={projectId} repoUrl={project?.githubUrl} />
               </motion.div>
             )}
           </AnimatePresence>

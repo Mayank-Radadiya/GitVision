@@ -21,4 +21,18 @@ export function prefetchProject(projectId: string) {
 
   // Prefetch first page of commits (standard query — initial load)
   prefetch(trpc.project.getCommits.queryOptions({ projectId, limit: 10 }));
+
+  // Prefetch issues + pull requests so tabs render instantly (no loading flash)
+  prefetch(
+    trpc.project.getIssues.queryOptions({
+      projectId,
+      isPullRequest: false,
+    }),
+  );
+  prefetch(
+    trpc.project.getIssues.queryOptions({
+      projectId,
+      isPullRequest: true,
+    }),
+  );
 }

@@ -95,3 +95,29 @@ export function useProjectIssues(projectId: string, isPullRequest: boolean) {
     { enabled: !!projectId, staleTime: 60 * 1000 },
   );
 }
+
+/**
+ * Fetches comments for a specific issue.
+ * Only fetches when issueId is truthy (expand on demand).
+ * Stale time: 2 minutes.
+ */
+export function useIssueComments(issueId: string | null) {
+  return trpc.project.getIssueComments.useQuery(
+    { issueId: issueId! },
+    { enabled: !!issueId, staleTime: 2 * 60 * 1000 },
+  );
+}
+
+/**
+ * Re-syncs issues and pull requests from GitHub.
+ * Invalidates issue/PR queries on success so the UI auto-refreshes.
+ */
+export function useSyncIssues(projectId: string) {
+  const utils = trpc.useUtils();
+  return trpc.project.syncIssues.useMutation({
+    onSuccess: () => {
+      utils.project.getIssues.invalidate({ projectId, isPullRequest: false });
+      utils.project.getIssues.invalidate({ projectId, isPullRequest: true });
+    },
+  });
+}
