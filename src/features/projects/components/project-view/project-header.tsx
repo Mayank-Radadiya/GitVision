@@ -32,8 +32,9 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { trpc } from "@/src/lib/trpc/client";
-import { toast } from "sonner";
+
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 // ─── Dropdown Actions ────────────────────────────────────────────────────────
 
