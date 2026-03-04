@@ -45,6 +45,18 @@ export interface GitHubFile {
   patch?: string;
 }
 
+/** A single language node returned by GitHub's GraphQL `languages` query */
+export interface LanguageNode {
+  name: string;
+  color: string | null;
+}
+
+/** A language edge — combines the language node with the byte-size count */
+export interface LanguageEdge {
+  size: number;
+  node: LanguageNode;
+}
+
 /**
  * Shape of the single GraphQL response used in `createNewProject`.
  * Consolidates stars, forks, branch count, contributor count, and
@@ -56,6 +68,10 @@ export interface GraphQLRepoData {
     forkCount: number;
     refs: { totalCount: number };
     mentionableUsers: { totalCount: number };
+    /** Top 10 languages ordered by byte size. May be empty for repos with no detectable code. */
+    languages: {
+      edges: LanguageEdge[];
+    };
     defaultBranchRef: {
       target: {
         history: {

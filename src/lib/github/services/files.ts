@@ -7,7 +7,8 @@
 // files directly into the database (O(1) memory — no OOM risk).
 
 import { db } from "@/db";
-import { projectFiles } from "@/db/schema";
+import { projectFiles, projectTables } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import axios from "axios";
 import * as tar from "tar-stream";
 import { createGunzip } from "zlib";
@@ -65,6 +66,13 @@ export async function getRepositoryFiles(
 
     // ── Stream directly into DB (O(1) memory) ──
     const totalStored = await streamAndStoreTarball(response.data, projectId);
+
+    // ── Persist the final file count to the project row ──
+    // This avoids a SELECT COUNT(*) on every dashboard load (N+1 fix).
+    await db
+      .update(projectTables)
+      .set({ totalFiles: totalStored })
+      .where(eq(projectTables.id, projectId));
 
     log("info", `Stored ${totalStored} files from tarball`, {
       owner,

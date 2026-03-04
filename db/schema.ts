@@ -61,6 +61,12 @@ export const projectTables = pgTable(
     totalBranches: integer("total_branches").notNull().default(0),
     totalContributors: integer("total_contributors").notNull().default(0),
     totalFiles: integer("total_files").notNull().default(0),
+    /**
+     * Tech stack breakdown populated from GitHub's GraphQL `languages` edge.
+     * Stored as JSONB array of { name: string; color: string | null; size: number; percentage: number }.
+     * Null until fetched. Empty array means the repo has no detectable languages.
+     */
+    languages: jsonb("languages").$type<LanguageEntry[]>().default([]),
     // Embedding status tracking for deferred RAG processing
     embeddingStatus: varchar("embedding_status", { length: 20 })
       .notNull()
@@ -232,6 +238,17 @@ export const chatHistoryTable = pgTable("chat_history", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+/**
+ * One entry in the `languages` JSONB column of `projectTables`.
+ * `percentage` is computed client-side from (size / totalSize) * 100.
+ */
+export interface LanguageEntry {
+  name: string;
+  color: string | null;
+  size: number; // bytes as reported by GitHub
+  percentage: number; // 0–100, rounded to 1 dp
+}
+
 export const issuesTable = pgTable(
   "issues",
   {
@@ -253,6 +270,13 @@ export const issuesTable = pgTable(
     githubCreatedAt: timestamp("github_created_at").notNull(),
     githubUpdatedAt: timestamp("github_updated_at").notNull(),
     githubClosedAt: timestamp("github_closed_at"),
+    // ── AI Triage columns (populated by a deferred Gemini background job) ──
+    /** One-line AI-generated description of the issue/PR intent. */
+    aiSummary: text("ai_summary"),
+    /** Estimated complexity: 'high' | 'medium' | 'low'. Null until processed. */
+    aiComplexity: varchar("ai_complexity", { length: 10 }),
+    /** Semantic tags e.g. ["Bug Fix", "Auth", "Performance"]. Null until processed. */
+    aiTags: jsonb("ai_tags").$type<string[]>(),
   },
   (table) => {
     return {

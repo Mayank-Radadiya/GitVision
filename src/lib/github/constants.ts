@@ -122,6 +122,15 @@ export const REPO_METADATA_QUERY = `
       mentionableUsers {
         totalCount
       }
+      languages(first: 10, orderBy: { field: SIZE, direction: DESC }) {
+        edges {
+          size
+          node {
+            name
+            color
+          }
+        }
+      }
       defaultBranchRef {
         target {
           ... on Commit {

@@ -117,17 +117,24 @@ export const projectRouter = createTRPCRouter({
   }),
 
   getIssues: protectedProcedure
-    .input(z.object({ projectId: z.string(), isPullRequest: z.boolean() }))
+    .input(
+      z.object({
+        projectId: z.string().uuid(),
+        isPullRequest: z.boolean(),
+        limit: z.number().min(1).max(100).optional().default(50),
+      }),
+    )
     .query(async ({ input, ctx }) => {
       return projectService.getProjectIssues(
         input.projectId,
         ctx.userId,
         input.isPullRequest,
+        input.limit,
       );
     }),
 
   getIssueComments: protectedProcedure
-    .input(z.object({ issueId: z.string() }))
+    .input(z.object({ issueId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
       return projectService.getIssueComments(input.issueId, ctx.userId);
     }),
@@ -136,5 +143,20 @@ export const projectRouter = createTRPCRouter({
     .input(projectIdSchema)
     .mutation(async ({ input, ctx }) => {
       return projectService.syncIssues(input.projectId, ctx.userId);
+    }),
+
+  /**
+   * NEW — powers the "Needs Attention" triage widget.
+   * Returns the top N open issues/PRs with aiComplexity of 'high' or 'medium'
+   * across all of the user's projects. Defaults to 5 items.
+   */
+  getRecentTriageIssues: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().min(1).max(20).optional().default(5) })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      return projectService.getRecentTriageIssues(ctx.userId, input?.limit);
     }),
 });

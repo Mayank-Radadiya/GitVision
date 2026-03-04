@@ -51,20 +51,21 @@ const FALLBACK_COLOR = "#6B7280";
 function StackedBar({
   data,
 }: {
-  data: { language: string; percentage: number }[];
+  data: { name: string; color: string | null; percentage: number }[];
 }) {
   return (
     <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-primary/20">
       {data.map((entry) => (
         <div
-          key={entry.language}
+          key={entry.name}
           className="transition-all duration-500 hover:opacity-80"
           style={{
             width: `${entry.percentage}%`,
-            backgroundColor: LANG_COLORS[entry.language] || FALLBACK_COLOR,
+            backgroundColor:
+              entry.color || LANG_COLORS[entry.name] || FALLBACK_COLOR,
             minWidth: entry.percentage > 0 ? "3px" : "0",
           }}
-          title={`${entry.language}: ${entry.percentage}%`}
+          title={`${entry.name}: ${entry.percentage}%`}
         />
       ))}
     </div>
@@ -72,11 +73,11 @@ function StackedBar({
 }
 
 function LegendItem({
-  language,
+  name,
   percentage,
   color,
 }: {
-  language: string;
+  name: string;
   percentage: number;
   color: string;
 }) {
@@ -87,7 +88,7 @@ function LegendItem({
         style={{ backgroundColor: color }}
       />
       <span className="text-xs text-muted-foreground">
-        {language}{" "}
+        {name}{" "}
         <span className="tabular-nums text-foreground/70">{percentage}%</span>
       </span>
     </div>
@@ -130,10 +131,10 @@ function LanguageBreakdown() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
             {topLangs.map((entry) => (
               <LegendItem
-                key={entry.ext}
-                language={entry.language}
+                key={entry.name}
+                name={entry.name}
                 percentage={entry.percentage}
-                color={LANG_COLORS[entry.language] || FALLBACK_COLOR}
+                color={entry.color || LANG_COLORS[entry.name] || FALLBACK_COLOR}
               />
             ))}
           </div>

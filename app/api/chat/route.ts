@@ -14,9 +14,7 @@ import {
   isSmallProject,
   getAllProjectFilesForContext,
 } from "@/src/features/rag/services/vector-search";
-import {
-  classifyQuery,
-} from "@/src/features/rag/services/rag/query-classifier";
+import { classifyQuery } from "@/src/features/rag/services/rag/query-classifier";
 import {
   fetchContext,
   type CodeContext,
@@ -35,8 +33,14 @@ const SYSTEM_PROMPT_GENERAL = `You are GitVision AI, a helpful and knowledgeable
 Answer questions clearly and concisely. Use markdown formatting for readability.
 When providing code examples, use fenced code blocks with language identifiers.`;
 
-function appendConversationHistory(prompt: string, conversationHistory: string): string {
-  if (!conversationHistory || conversationHistory === "No previous conversation.") {
+function appendConversationHistory(
+  prompt: string,
+  conversationHistory: string,
+): string {
+  if (
+    !conversationHistory ||
+    conversationHistory === "No previous conversation."
+  ) {
     return prompt;
   }
   return `${prompt}\n\nPREVIOUS CONVERSATION:\n${conversationHistory}`;
@@ -65,7 +69,11 @@ INSTRUCTIONS:
 function buildRagSystemPrompt(
   projectName: string,
   context: string,
-  projectStats: { languages: string[]; totalFiles: number; totalEmbeddings: number },
+  projectStats: {
+    languages: string[];
+    totalFiles: number;
+    totalEmbeddings: number;
+  },
   conversationHistory: string,
 ): string {
   return appendConversationHistory(
@@ -248,13 +256,21 @@ async function retrieveContext(
         }
       }
     } catch (err) {
-      console.warn("[RAG] fetchContext failed, falling back to vector search:", err);
+      console.warn(
+        "[RAG] fetchContext failed, falling back to vector search:",
+        err,
+      );
     }
   }
 
   // 3. Fallback: vector search + re-ranking
   const queryEmbedding = await generateQueryEmbedding(standaloneQuery);
-  const rawResults = await searchSimilarCode(projectId, queryEmbedding, 12, 0.45);
+  const rawResults = await searchSimilarCode(
+    projectId,
+    queryEmbedding,
+    12,
+    0.45,
+  );
   const ranked = reRankResults(rawResults, standaloneQuery, 8);
   const context = formatRetrievedContext(ranked);
   const relatedFiles = [...new Set(ranked.map((r) => r.filePath))];
@@ -284,7 +300,9 @@ export async function POST(req: Request) {
       });
     }
 
-    const userMessage = messages[messages.length - 1]?.content as string | undefined;
+    const userMessage = messages[messages.length - 1]?.content as
+      | string
+      | undefined;
     if (!userMessage) {
       return new Response(JSON.stringify({ error: "Empty message" }), {
         status: 400,
@@ -341,9 +359,20 @@ export async function POST(req: Request) {
           }). Please let the user know that embeddings need to be generated before codebase-aware chat can work. You can still answer general programming questions.`;
         } else {
           // Conversation history for both prompts and query rewrite
-          const conversationHistory = chatId
-            ? await getRecentChatHistoryForContext(chatId, 4)
-            : "No previous conversation.";
+          let conversationHistory = "No previous conversation.";
+          if (chatId) {
+            try {
+              conversationHistory = await getRecentChatHistoryForContext(
+                chatId,
+                4,
+              );
+            } catch (historyError) {
+              console.warn(
+                "[RAG] Failed to load conversation history, proceeding without it:",
+                historyError,
+              );
+            }
+          }
 
           // ------------------------------------------------------------------
           // FAST PATH: small project — dump entire codebase into context
@@ -387,7 +416,10 @@ export async function POST(req: Request) {
           }
         }
       } catch (ragError) {
-        console.error("[RAG] Retrieval error, falling back to general mode:", ragError);
+        console.error(
+          "[RAG] Retrieval error, falling back to general mode:",
+          ragError,
+        );
         // systemPrompt stays as SYSTEM_PROMPT_GENERAL — graceful degradation
       }
     }

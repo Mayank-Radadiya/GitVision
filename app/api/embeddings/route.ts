@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { projectTables } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { projectTables, codeEmbeddings } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { processProjectForRag } from "@/src/features/rag/services/rag-ingestion";
 
 // Store active generation promises to prevent GC
@@ -44,6 +44,30 @@ export async function POST(req: Request) {
         { error: "Embeddings are already being generated" },
         { status: 409 },
       );
+    }
+
+    // Safety check: if status is "completed" but no embeddings actually exist,
+    // reset status to allow re-generation (fixes the green-dot-but-empty-DB bug)
+    if (project.embeddingStatus === "completed") {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(codeEmbeddings)
+        .where(eq(codeEmbeddings.projectId, projectId));
+
+      if ((countResult?.count ?? 0) === 0) {
+        console.warn(
+          `[Embeddings] Project ${projectId} marked as completed but has 0 embeddings — resetting to pending`,
+        );
+        await db
+          .update(projectTables)
+          .set({
+            embeddingStatus: "pending",
+            embeddingProgress: 0,
+            embeddingError: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectTables.id, projectId));
+      }
     }
 
     const generationPromise = processProjectForRag(projectId)
@@ -101,6 +125,32 @@ export async function GET(req: Request) {
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Auto-correct: if marked as "completed" but no embeddings exist, reset to "pending"
+    if (project.embeddingStatus === "completed") {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(codeEmbeddings)
+        .where(eq(codeEmbeddings.projectId, projectId));
+
+      if ((countResult?.count ?? 0) === 0) {
+        await db
+          .update(projectTables)
+          .set({
+            embeddingStatus: "pending",
+            embeddingProgress: 0,
+            embeddingError: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectTables.id, projectId));
+
+        return NextResponse.json({
+          status: "pending",
+          progress: 0,
+          error: null,
+        });
+      }
     }
 
     return NextResponse.json({

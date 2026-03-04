@@ -10,6 +10,16 @@ type Events = {
       repo: string;
     };
   };
+  "embeddings/generate": {
+    data: {
+      projectId: string;
+    };
+  };
+  "embeddings/cancel": {
+    data: {
+      projectId: string;
+    };
+  };
 };
 
 // Create a client to send and receive events

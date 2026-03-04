@@ -75,6 +75,10 @@ export const syncIssuesAndComments = async (
           githubCreatedAt: new Date(node.createdAt),
           githubUpdatedAt: new Date(node.updatedAt),
           githubClosedAt: node.closedAt ? new Date(node.closedAt) : null,
+          // ── AI Triage (deferred — a Gemini background job fills these in) ──
+          aiSummary: null as string | null,
+          aiComplexity: null as string | null,
+          aiTags: null as string[] | null,
         }));
 
         const inserted = await db

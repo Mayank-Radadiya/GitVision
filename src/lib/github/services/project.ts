@@ -8,6 +8,7 @@
 
 import { db } from "@/db";
 import { commitsTable, projectTables } from "@/db/schema";
+import type { LanguageEntry } from "@/db/schema";
 import type { CreateProjectResult, GraphQLRepoData } from "../types";
 import { GITHUB_CONFIG, DEFAULTS, REPO_METADATA_QUERY } from "../constants";
 import {
@@ -76,6 +77,19 @@ export async function createNewProject(
     const repoData = gqlResponse.repository;
     const history = repoData.defaultBranchRef?.target?.history;
 
+    // ── Map language edges → LanguageEntry[] with computed percentages ──
+    const languageEdges = repoData.languages?.edges ?? [];
+    const totalBytes = languageEdges.reduce((sum, e) => sum + e.size, 0);
+    const languages: LanguageEntry[] = languageEdges.map((edge) => ({
+      name: edge.node.name,
+      color: edge.node.color ?? null,
+      size: edge.size,
+      percentage:
+        totalBytes > 0
+          ? Math.round((edge.size / totalBytes) * 1000) / 10 // round to 1 dp
+          : 0,
+    }));
+
     // ── Insert project row ──
     // NOTE: neon-http driver does NOT support db.transaction().
     // Inserts are sequential — if a commit batch fails, the project row
@@ -91,6 +105,8 @@ export async function createNewProject(
         totalBranches: repoData.refs.totalCount || 0,
         totalContributors: repoData.mentionableUsers.totalCount || 0,
         totalCommits: history?.totalCount || 0,
+        languages, // ← tech stack breakdown
+        // totalFiles: 0 is the column default; updated by getRepositoryFiles()
         embeddingStatus: "pending",
         embeddingProgress: 0,
         createdAt: new Date(),

@@ -203,6 +203,29 @@ export async function processProjectForRag(
       .where(eq(projectFiles.projectId, projectId));
 
     console.log(`[RAG] Found ${files.length} files to process`);
+
+    if (files.length === 0) {
+      const errorMsg =
+        "No source files found for this project. Please ensure the project has been synced from GitHub.";
+      console.error(`[RAG] ❌ ${errorMsg}`);
+      await db
+        .update(projectTables)
+        .set({
+          embeddingStatus: "failed",
+          embeddingError: errorMsg,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectTables.id, projectId));
+
+      return {
+        totalFiles: 0,
+        processedFiles: 0,
+        totalChunks: 0,
+        totalEmbeddings: 0,
+        errors: [errorMsg],
+      };
+    }
+
     console.log(`[RAG] Processing in batches of 5 files...`);
 
     let processedFiles = 0;
@@ -269,12 +292,42 @@ export async function processProjectForRag(
     }
 
     console.log(`[RAG] ========================================`);
-    console.log(`[RAG] Embedding generation COMPLETED!`);
+    console.log(`[RAG] Embedding generation finished`);
     console.log(`[RAG] Files processed: ${processedFiles}`);
     console.log(`[RAG] Total chunks: ${totalChunks}`);
     console.log(`[RAG] Total embeddings: ${totalEmbeddings}`);
     console.log(`[RAG] Errors: ${errors.length}`);
     console.log(`[RAG] ========================================`);
+
+    // Verify that embeddings were actually stored in the database
+    const actualCountResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(codeEmbeddings)
+      .where(eq(codeEmbeddings.projectId, projectId));
+
+    const actualCount = actualCountResult[0]?.count ?? 0;
+
+    if (actualCount === 0) {
+      const errorMsg = `Embedding generation produced 0 embeddings from ${files.length} files. ${errors.length > 0 ? `Errors: ${errors.slice(0, 3).join("; ")}` : "Files may be empty or unsupported."}`;
+      console.error(`[RAG] ❌ ${errorMsg}`);
+      await db
+        .update(projectTables)
+        .set({
+          embeddingStatus: "failed",
+          embeddingError: errorMsg,
+          embeddingProgress: 0,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectTables.id, projectId));
+
+      return {
+        totalFiles: files.length,
+        processedFiles,
+        totalChunks,
+        totalEmbeddings: 0,
+        errors: [errorMsg, ...errors],
+      };
+    }
 
     // Calculate total token count across all embeddings for the project size gate
     const tokenSumResult = await db

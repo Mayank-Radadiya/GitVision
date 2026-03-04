@@ -89,6 +89,33 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
   const isEmbeddingReady = currentStatus === "completed";
   const isProcessing = currentStatus === "processing";
 
+  // Verify actual embedding status when a project is selected
+  // (catches stale "completed" status when DB is empty)
+  useEffect(() => {
+    if (!selectedProject) return;
+
+    const verifyStatus = async () => {
+      try {
+        const res = await fetch(`/api/embeddings?projectId=${selectedProject}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        setEmbeddingStates((prev) => ({
+          ...prev,
+          [selectedProject]: {
+            status: data.status,
+            progress: data.progress ?? 0,
+            error: data.error,
+          },
+        }));
+      } catch {
+        // Ignore verification errors
+      }
+    };
+
+    verifyStatus();
+  }, [selectedProject]);
+
   // Poll for embedding progress
   useEffect(() => {
     if (!generatingFor) return;

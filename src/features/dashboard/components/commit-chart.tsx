@@ -42,7 +42,7 @@ function MiniBarChart({ data }: { data: { date: string; commits: number }[] }) {
   }
 
   return (
-    <div className="flex items-end gap-2 h-20">
+    <div className="flex items-end gap-2 h-28">
       {data.map((point) => {
         const height = Math.max((point.commits / max) * 100, 6);
         return (

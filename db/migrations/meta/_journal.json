@@ -36,6 +36,13 @@
       "when": 1772161765158,
       "tag": "0004_pink_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772374690741,
+      "tag": "0005_tense_rumiko_fujikawa",
+      "breakpoints": true
     }
   ]
 }

@@ -60,11 +60,11 @@ export interface PickUpData {
   cards: PickUpCard[];
 }
 
-/** Single language entry for the breakdown chart */
+/** Single language entry for the breakdown chart — matches DB schema in db/schema.ts */
 export interface LanguageEntry {
-  language: string;
-  ext: string;
-  count: number;
+  name: string;
+  color: string | null;
+  size: number;
   percentage: number;
 }
 
