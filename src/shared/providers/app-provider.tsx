@@ -54,15 +54,9 @@ const Provider = ({ children }: ProviderProps) => {
   // Using this to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
 
-  // Create storage persister
-  const [persistor] = useState(() => {
-    if (typeof window === "undefined") return;
-
-    return createSyncStoragePersister({
-      storage: window.localStorage,
-      key: "GITVISION_REACT_QUERY_CACHE",
-    });
-  });
+  // Create storage persister safely on the client side
+  const [persistor, setPersistor] =
+    useState<ReturnType<typeof createSyncStoragePersister> | null>(null);
 
   // Create tRPC client
   const [trpcClient] = useState(() =>
@@ -78,6 +72,28 @@ const Provider = ({ children }: ProviderProps) => {
 
   useEffect(() => {
     setMounted(true);
+
+    const isBrowser =
+      typeof window !== "undefined" &&
+      typeof document !== "undefined" &&
+      !(typeof process !== "undefined" && process.versions && process.versions.node);
+
+    if (isBrowser) {
+      try {
+        if (
+          window.localStorage &&
+          typeof window.localStorage.getItem === "function"
+        ) {
+          const p = createSyncStoragePersister({
+            storage: window.localStorage,
+            key: "GITVISION_REACT_QUERY_CACHE",
+          });
+          setPersistor(p);
+        }
+      } catch {
+        // Storage might be restricted (e.g. private browsing)
+      }
+    }
 
     const updateToastThemeVars = () => {
       const isDark = document.documentElement.classList.contains("dark");
@@ -110,10 +126,25 @@ const Provider = ({ children }: ProviderProps) => {
     </ThemeProvider>
   );
 
+  if (!mounted) {
+    return (
+      <ClerkProvider>
+        {themed(<div style={{ visibility: "hidden" }} />)}
+      </ClerkProvider>
+    );
+  }
+
+  const content = themed(
+    <>
+      <MemoizedToaster />
+      {children}
+    </>,
+  );
+
   return (
     <ClerkProvider>
-      {mounted && persistor ? (
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        {persistor ? (
           <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
@@ -121,17 +152,12 @@ const Provider = ({ children }: ProviderProps) => {
               maxAge: 24 * 60 * 60 * 1000,
             }}
           >
-            {themed(
-              <>
-                <MemoizedToaster />
-                {children}
-              </>,
-            )}
+            {content}
           </PersistQueryClientProvider>
-        </trpc.Provider>
-      ) : (
-        themed(<div style={{ visibility: "hidden" }} />)
-      )}
+        ) : (
+          content
+        )}
+      </trpc.Provider>
     </ClerkProvider>
   );
 };

@@ -49,7 +49,7 @@ export const projectTables = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     projectName: varchar("name", { length: 255 }).notNull().default("project"),
     githubUrl: varchar("github_url", { length: 255 }).notNull(),
     ownerId: varchar("owner_id", { length: 255 })
@@ -90,7 +90,7 @@ export const projectFiles = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     fileName: varchar("file_name", { length: 255 }).notNull(),
     code: text("code").notNull(),
     language: varchar("language", { length: 50 }), // Language detection
@@ -114,7 +114,7 @@ export const codeEmbeddings = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     projectId: uuid("project_id")
       .notNull()
       .references(() => projectTables.id, { onDelete: "cascade" }),
@@ -147,7 +147,7 @@ export const commitsTable = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     commitHash: varchar("commit_hash", { length: 255 }).notNull(),
     commitMessage: text("commit_message").notNull(),
     AiSummary: text("ai_summary"),
@@ -178,7 +178,7 @@ export const projectChats = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     projectId: uuid("project_id").references(() => projectTables.id, {
       onDelete: "cascade",
     }), // Nullable for general chats
@@ -204,7 +204,7 @@ export const chatMessages = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     chatId: uuid("chat_id")
       .notNull()
       .references(() => projectChats.id, { onDelete: "cascade" }),
@@ -225,7 +225,7 @@ export const chatMessages = pgTable(
 export const chatHistoryTable = pgTable("chat_history", {
   id: uuid("id")
     .primaryKey()
-    .default(sql`gen_random_uuid()`),
+    .defaultRandom(),
   userId: varchar("user_id")
     .notNull()
     .references(() => usersTable.id, { onDelete: "cascade" }),
@@ -254,7 +254,7 @@ export const issuesTable = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     issueNumber: integer("issue_number").notNull(),
     title: text("title").notNull(),
     body: text("body"), // Can be empty or null
@@ -291,7 +291,7 @@ export const issueCommentsTable = pgTable(
   {
     id: uuid("id")
       .primaryKey()
-      .default(sql`gen_random_uuid()`),
+      .defaultRandom(),
     issueId: uuid("issue_id")
       .notNull()
       .references(() => issuesTable.id, { onDelete: "cascade" }),

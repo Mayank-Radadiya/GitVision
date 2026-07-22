@@ -74,7 +74,10 @@ function RetrievalSkeleton() {
           {/* Shimmer lines */}
           <div className="mt-3 space-y-2">
             <div className="h-2.5 w-48 rounded-full bg-muted-foreground/10 animate-pulse" />
-            <div className="h-2.5 w-36 rounded-full bg-muted-foreground/8 animate-pulse" style={{ animationDelay: "100ms" }} />
+            <div
+              className="h-2.5 w-36 rounded-full bg-muted-foreground/8 animate-pulse"
+              style={{ animationDelay: "100ms" }}
+            />
           </div>
         </div>
       </div>
@@ -143,7 +146,7 @@ export function ChatRoom({
   useEffect(() => {
     if (!data || data.length === 0) return;
 
-    for (const event of data as DataEvent[]) {
+    for (const event of data as unknown as DataEvent[]) {
       if (event.type === "sources" && Array.isArray(event.files)) {
         setLiveSources(event.files);
       }
@@ -183,7 +186,10 @@ export function ChatRoom({
 
   // For persisted messages (loaded from DB), read relatedFiles from
   // initialMessages. For the live streaming message, use liveSources.
-  const getRelatedFiles = (messageId: string, isLiveMessage: boolean): string[] => {
+  const getRelatedFiles = (
+    messageId: string,
+    isLiveMessage: boolean,
+  ): string[] => {
     if (isLiveMessage && liveSources.length > 0) return liveSources;
     const original = initialMessages.find((m) => m.id === messageId);
     if (original?.relatedFiles && Array.isArray(original.relatedFiles)) {
@@ -195,8 +201,7 @@ export function ChatRoom({
   // The current response is in "retrieval phase" when loading, the last
   // message is from the user (waiting for assistant), and no token has arrived
   const isRetrieving =
-    isLoading &&
-    messages[messages.length - 1]?.role === "user";
+    isLoading && messages[messages.length - 1]?.role === "user";
 
   // The current response is actively streaming tokens
   const isStreaming =
@@ -289,7 +294,9 @@ export function ChatRoom({
                       role={m.role as "user" | "assistant"}
                       content={m.content}
                       relatedFiles={getRelatedFiles(m.id, isLiveAssistantMsg)}
-                      isStreaming={isLastMsg && isStreaming && m.role === "assistant"}
+                      isStreaming={
+                        isLastMsg && isStreaming && m.role === "assistant"
+                      }
                     />
                   </motion.div>
                 );
