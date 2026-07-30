@@ -1,6 +1,6 @@
 {
-  "name": "x",
-  "version": "0.1.0",
+  "name": "Git Vision",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -11,7 +11,7 @@
     "db:init": "bun scripts/db-init.ts",
     "db:push": "bun scripts/db-init.ts && drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "clean": "rm -rf dist && rm -rf .next && rm -rf ~/.bun/cache",
+    "clean": "rm -rf dist .next node_modules .turbo .vercel out coverage *.tsbuildinfo bun.lock package-lock.json pnpm-lock.yaml yarn.lock ~/.bun/cache ~/.cache/next",
     "inngest": "npx inngest-cli@latest dev"
   },
   "dependencies": {

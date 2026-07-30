@@ -71,6 +71,35 @@ export function createProjectService() {
       userId: string,
     ) {
       try {
+        // Ensure user exists in database to prevent foreign key constraints
+        // This is a fallback in case the Clerk webhook hasn't processed yet
+        const userExists = await db
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1);
+
+        if (userExists.length === 0) {
+          const { clerkClient } = await import("@clerk/nextjs/server");
+          const client = await clerkClient();
+          const clerkUser = await client.users.getUser(userId);
+          const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+          const name =
+            [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+            "unknown";
+
+          await db
+            .insert(usersTable)
+            .values({
+              id: userId,
+              email,
+              name,
+              credits: 100,
+              isProUser: false,
+            })
+            .onConflictDoNothing();
+        }
+
         const { projectId } = await createGitHubProject(
           data.repoUrl,
           data.projectName,
