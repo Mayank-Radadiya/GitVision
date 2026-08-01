@@ -1,4 +1,10 @@
-import { streamText, generateText, createDataStreamResponse } from "ai";
+import {
+  streamText,
+  generateText,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  toUIMessageStream,
+} from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
@@ -428,15 +434,21 @@ export async function POST(req: Request) {
     // Stream response with data events for the sources UI
     // -----------------------------------------------------------------------
 
-    const dataStream = createDataStreamResponse({
-      execute(stream) {
+    const stream = createUIMessageStream({
+      execute({ writer }) {
         // Fire "searching" event immediately so the client shows the skeleton
-        stream.writeData({ type: "status", value: "searching" });
+        writer.write({
+          type: "data-status",
+          data: { type: "status", value: "searching" },
+        });
 
         // Once sources are known, send them (they were resolved above before
         // this callback runs — in the RAG path — so we emit them right away)
         if (relatedFiles.length > 0) {
-          stream.writeData({ type: "sources", files: relatedFiles });
+          writer.write({
+            type: "data-sources",
+            data: { type: "sources", files: relatedFiles },
+          });
         }
 
         // Stream LLM tokens
@@ -481,11 +493,11 @@ export async function POST(req: Request) {
           },
         });
 
-        result.mergeIntoDataStream(stream);
+        writer.merge(toUIMessageStream({ stream: result.stream }));
       },
     });
 
-    return dataStream;
+    return createUIMessageStreamResponse({ stream });
   } catch (error) {
     console.error("Chat API error:", error);
     return new Response(JSON.stringify({ error: "Something went wrong" }), {

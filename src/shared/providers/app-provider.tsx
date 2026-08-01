@@ -114,49 +114,36 @@ const Provider = ({ children }: ProviderProps) => {
     return () => observer.disconnect();
   }, []);
 
-  const themed = (content: React.ReactNode) => (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem
-      enableColorScheme
-      disableTransitionOnChange={false}
-    >
-      {content}
-    </ThemeProvider>
-  );
-
-  if (!mounted) {
-    return (
-      <ClerkProvider>
-        {themed(<div style={{ visibility: "hidden" }} />)}
-      </ClerkProvider>
-    );
-  }
-
-  const content = themed(
-    <>
-      <MemoizedToaster />
-      {children}
-    </>,
-  );
-
   return (
     <ClerkProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        {persistor ? (
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{
-              persister: persistor,
-              maxAge: 24 * 60 * 60 * 1000,
-            }}
-          >
-            {content}
-          </PersistQueryClientProvider>
-        ) : (
-          content
-        )}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          enableColorScheme
+          disableTransitionOnChange={false}
+        >
+          {!mounted ? (
+            <div style={{ visibility: "hidden" }} />
+          ) : persistor ? (
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                persister: persistor,
+                maxAge: 24 * 60 * 60 * 1000,
+              }}
+            >
+              <MemoizedToaster />
+              {children}
+            </PersistQueryClientProvider>
+          ) : (
+            <>
+              <MemoizedToaster />
+              {children}
+            </>
+          )}
+        </ThemeProvider>
       </trpc.Provider>
     </ClerkProvider>
   );

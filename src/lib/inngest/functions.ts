@@ -13,8 +13,8 @@ export const projectCreated = inngest.createFunction(
   {
     id: "project-created",
     retries: 3,
+    triggers: [{ event: "project/created" }],
   },
-  { event: "project/created" },
   async ({ event, step }) => {
     const { projectId, repoUrl, owner, repo } = event.data;
 
@@ -64,8 +64,8 @@ export const generateEmbeddings = inngest.createFunction(
         match: "data.projectId",
       },
     ],
+    triggers: [{ event: "embeddings/generate" }],
   },
-  { event: "embeddings/generate" },
   async ({ event, step }) => {
     const { projectId } = event.data;
 

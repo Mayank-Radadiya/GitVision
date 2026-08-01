@@ -1,4 +1,4 @@
-import { Inngest, EventSchemas } from "inngest";
+import { Inngest } from "inngest";
 
 type Events = {
   "project/created": {
@@ -30,5 +30,7 @@ type Events = {
 // Create a client to send and receive events
 export const inngest = new Inngest({
   id: "git-vision",
-  schemas: new EventSchemas().fromRecord<Events>(),
+  schemas: {
+    events: {} as Events,
+  },
 });

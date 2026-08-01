@@ -10,12 +10,12 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     const result = await streamText({
-      model: google("gemini-2.5-flash"),
+      model: google("gemini-flash-latest"),
       system: "You are a helpful assistant.",
       messages,
     });
 
-    return result.toDataStreamResponse();
+    return result.toUIMessageStreamResponse();
   } catch (error) {
     console.error("Streaming error:", error);
     return new Response(JSON.stringify({ error: "Something went wrong" }), {

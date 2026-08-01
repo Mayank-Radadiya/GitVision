@@ -108,16 +108,15 @@ export function ChatRoom({
   // Live sources delivered via the data stream for the current response
   const [liveSources, setLiveSources] = useState<string[]>([]);
 
+  const [input, setInput] = useState("");
+
   const {
     messages,
-    input,
-    setInput,
-    handleSubmit,
-    isLoading,
+    sendMessage,
+    regenerate: reload,
     error,
     stop,
-    reload,
-    data,
+    status,
   } = useChat({
     api: "/api/chat",
     body: {
@@ -140,18 +139,20 @@ export function ChatRoom({
       hasFirstTokenRef.current = false;
       setHasFirstToken(false);
     },
-  });
-
-  // Read data stream events
-  useEffect(() => {
-    if (!data || data.length === 0) return;
-
-    for (const event of data as unknown as DataEvent[]) {
+    onData(event: any) {
       if (event.type === "sources" && Array.isArray(event.files)) {
         setLiveSources(event.files);
       }
     }
-  }, [data]);
+  });
+
+  const isLoading = status === "streaming" || status === "submitted";
+
+  const handleSubmit = () => {
+    if (!input.trim() || isLoading) return;
+    sendMessage({ content: input, role: "user" });
+    setInput("");
+  };
 
   // Detect when the first streaming token arrives for the current reply
   const lastMsg = messages[messages.length - 1];

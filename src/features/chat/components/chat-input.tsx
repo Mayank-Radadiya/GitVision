@@ -16,7 +16,7 @@ interface ChatInputProps {
 }
 
 export function ChatInput({
-  value,
+  value = "",
   onChange,
   onSubmit,
   onStop,
