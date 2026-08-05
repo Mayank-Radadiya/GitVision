@@ -11,6 +11,7 @@ import {
   generateEmbeddingsBatch,
   preprocessCodeForEmbedding,
 } from "./embeddings";
+import { logger } from "@/src/lib/logger";
 
 export interface IngestionResult {
   fileId: string;
@@ -32,7 +33,7 @@ export async function processFileForRag(
   projectId: string,
 ): Promise<IngestionResult> {
   try {
-    console.log(`[RAG-FILE] Processing: ${filePath}`);
+    logger.debug(`[RAG-FILE] Processing: ${filePath}`);
 
     // Compute hash for change detection
     const currentHash = computeHash(code);
@@ -58,7 +59,7 @@ export async function processFileForRag(
       existingEmbeddings.length > 0
     ) {
       // File hasn't changed and embeddings exist, skip processing
-      console.log(`[RAG-FILE] ⏭️  Skipping ${filePath} (unchanged)`);
+      logger.debug(`[RAG-FILE] ⏭️  Skipping ${filePath} (unchanged)`);
       return {
         fileId,
         filePath,
@@ -68,7 +69,7 @@ export async function processFileForRag(
       };
     }
 
-    console.log(`[RAG-FILE] 🔄 Generating embeddings for: ${filePath}`);
+    logger.info(`[RAG-FILE] 🔄 Generating embeddings for: ${filePath}`);
 
     // Detect language
     const language = detectLanguage(filePath);
@@ -135,7 +136,7 @@ export async function processFileForRag(
       }
     }
 
-    console.log(
+    logger.info(
       `[RAG-FILE] ✓ ${filePath}: ${chunks.length} chunks, ${embeddingsResults.length} embeddings`,
     );
 
@@ -147,7 +148,7 @@ export async function processFileForRag(
       skipped: false,
     };
   } catch (error) {
-    console.error(`Error processing file ${filePath}:`, error);
+    logger.error(`Error processing file ${filePath}`, { error, filePath });
     return {
       fileId,
       filePath,

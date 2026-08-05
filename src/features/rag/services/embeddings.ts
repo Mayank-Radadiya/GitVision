@@ -6,13 +6,18 @@
 
 import { OpenRouter } from "@openrouter/sdk";
 
-if (!process.env.OPENROUTER_API_KEY) {
-  throw new Error("OPENROUTER_API_KEY environment variable is required");
-}
+let openrouterClient: OpenRouter | null = null;
 
-const openrouter = new OpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
+export function getOpenRouterClient(): OpenRouter {
+  if (!openrouterClient) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENROUTER_API_KEY environment variable is required");
+    }
+    openrouterClient = new OpenRouter({ apiKey });
+  }
+  return openrouterClient;
+}
 
 const EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
 const EMBEDDING_DIMENSIONS = 768;
@@ -61,7 +66,8 @@ function applyRateLimit(): Promise<void> {
 export async function generateEmbedding(text: string): Promise<number[]> {
   await applyRateLimit();
 
-  const result = await openrouter.embeddings.generate({
+  const client = getOpenRouterClient();
+  const result = await client.embeddings.generate({
     requestBody: {
       model: EMBEDDING_MODEL,
       input: text,

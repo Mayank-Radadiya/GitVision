@@ -1,9 +1,10 @@
 import { db } from "@/db";
-import { projectTables, projectFiles, codeEmbeddings } from "@/db/schema";
-import { eq, and, ne, sql, sum } from "drizzle-orm";
+import { projectTables, projectFiles, codeEmbeddings, rateLimitsTable } from "@/db/schema";
+import { eq, and, ne, sql, sum, lt } from "drizzle-orm";
 import { getRepositoryFiles, syncIssuesAndComments } from "../github";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
+import { logger } from "@/src/lib/logger";
 
 // ---------------------------------------------------------------------------
 // 1. Project Created — imports files, syncs issues, auto-triggers embeddings
@@ -20,19 +21,19 @@ export const projectCreated = inngest.createFunction(
 
     // Step 1: Import all repository files
     await step.run("Import Files", async () => {
-      console.log(`[Inngest] Starting file import for ${projectId}`);
+      logger.info(`[Inngest] Starting file import for ${projectId}`);
       await getRepositoryFiles(owner, repo, projectId);
     });
 
     // Step 2: Sync issues and comments
     await step.run("Sync Issues", async () => {
-      console.log(`[Inngest] Starting issue sync for ${projectId}`);
+      logger.info(`[Inngest] Starting issue sync for ${projectId}`);
       await syncIssuesAndComments(repoUrl, projectId);
     });
 
     // Step 3: Finalize & auto-trigger embedding generation
     await step.run("Finalize Project", async () => {
-      console.log(`[Inngest] Finalizing project ${projectId}`);
+      logger.info(`[Inngest] Finalizing project ${projectId}`);
       await db
         .update(projectTables)
         .set({ updatedAt: new Date() })
@@ -95,7 +96,7 @@ export const generateEmbeddings = inngest.createFunction(
         .returning({ id: projectTables.id });
 
       if (!claimed) {
-        console.log(
+        logger.info(
           `[Inngest] Embeddings already processing for ${projectId}, skipping`,
         );
         return { claimed: false, files: [] };
@@ -111,7 +112,7 @@ export const generateEmbeddings = inngest.createFunction(
         .from(projectFiles)
         .where(eq(projectFiles.projectId, projectId));
 
-      console.log(
+      logger.info(
         `[Inngest] Found ${allFiles.length} files for embedding in project ${projectId}`,
       );
       return { claimed: true, files: allFiles };
@@ -185,7 +186,7 @@ export const generateEmbeddings = inngest.createFunction(
             .set({ embeddingProgress: progress, updatedAt: new Date() })
             .where(eq(projectTables.id, projectId));
 
-          console.log(
+          logger.info(
             `[Inngest] Batch ${batchIndex + 1}: ${Math.min(i + BATCH_SIZE, files.length)}/${files.length} files (${progress}%)`,
           );
 
@@ -248,7 +249,7 @@ export const generateEmbeddings = inngest.createFunction(
         })
         .where(eq(projectTables.id, projectId));
 
-      console.log(
+      logger.info(
         `[Inngest] ✅ Embeddings complete for ${projectId}: ${actualCount} embeddings, ${totalChunks} chunks`,
       );
 
@@ -265,3 +266,34 @@ export const generateEmbeddings = inngest.createFunction(
     };
   },
 );
+
+// ---------------------------------------------------------------------------
+// 3. Cleanup Stale Data — Automated Data Retention Policy Job
+// Runs daily at 03:00 AM UTC
+// ---------------------------------------------------------------------------
+
+export const cleanupStaleData = inngest.createFunction(
+  {
+    id: "cleanup-stale-data",
+    triggers: [{ cron: "0 3 * * *" }],
+  },
+  async ({ step }) => {
+    // 1. Purge expired rate limit windows (> 24h old)
+    const rateLimitResult = await step.run("Clean Expired Rate Limits", async () => {
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const deleted = await db
+        .delete(rateLimitsTable)
+        .where(lt(rateLimitsTable.createdAt, dayAgo))
+        .returning({ id: rateLimitsTable.id });
+
+      logger.info(`[Retention] Cleaned ${deleted.length} expired rate limit entries`);
+      return { count: deleted.length };
+    });
+
+    return {
+      success: true,
+      cleanedRateLimits: rateLimitResult.count,
+    };
+  },
+);
+
