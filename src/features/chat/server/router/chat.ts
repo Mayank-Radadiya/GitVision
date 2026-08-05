@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -6,6 +7,7 @@ import {
 import { db } from "@/db";
 import { projectChats, chatMessages } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { assertProjectOwnership } from "@/src/lib/guards";
 
 export const chatRouter = createTRPCRouter({
   create: protectedProcedure
@@ -19,6 +21,18 @@ export const chatRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       if (input.type === "project" && !input.projectId) {
         throw new Error("Project ID required for project chats");
+      }
+
+      // Tenant isolation: never link a chat to a project the user doesn't own
+      if (input.type === "project" && input.projectId) {
+        try {
+          await assertProjectOwnership(input.projectId, ctx.userId);
+        } catch {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found or you do not have permission",
+          });
+        }
       }
 
       const [chat] = await db

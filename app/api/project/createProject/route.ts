@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createNewProject, syncIssuesAndComments } from "@/src/lib/github";
+import { projectCreateSchema } from "@/src/lib/validation/schemas";
+import { rateLimit, keys } from "@/src/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,38 +16,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse request body
-    const body = await req.json();
-    const { ProjectName, repoUrl } = body;
-
-    // Validate inputs
-    if (
-      !ProjectName ||
-      typeof ProjectName !== "string" ||
-      ProjectName.trim() === ""
-    ) {
+    // Per-user cap on heavy GitHub-backed project creation (10/hour)
+    const rl = await rateLimit(keys.projectCreate(userId), 10, 3600);
+    if (!rl.allowed) {
       return NextResponse.json(
-        { error: "Project name is required" },
+        {
+          error: "Project creation limit reached. Please try again later.",
+        },
+        { status: 429 },
+      );
+    }
+
+    // Validate body against the strict schema (github.com-only URLs)
+    const parsed = projectCreateSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 },
       );
     }
 
-    if (!repoUrl || typeof repoUrl !== "string" || repoUrl.trim() === "") {
-      return NextResponse.json(
-        { error: "Repository URL is required" },
-        { status: 400 },
-      );
-    }
+    const { projectName, repoUrl } = parsed.data;
 
     // Create project + fetch metadata + initial 100 commits via GraphQL
-    const { projectId } = await createNewProject(
-      repoUrl.trim(),
-      ProjectName.trim(),
-      userId,
-    );
+    const { projectId } = await createNewProject(repoUrl, projectName, userId);
 
     // Fetch issues/PRs + comments via GraphQL in background
-    syncIssuesAndComments(repoUrl.trim(), projectId).catch((error) => {
+    syncIssuesAndComments(repoUrl, projectId).catch((error) => {
       console.error("Error fetching issues in background:", error);
     });
 

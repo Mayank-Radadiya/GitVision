@@ -43,6 +43,13 @@
       "when": 1772374690741,
       "tag": "0005_tense_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785901344448,
+      "tag": "0006_tiresome_makkari",
+      "breakpoints": true
     }
   ]
 }

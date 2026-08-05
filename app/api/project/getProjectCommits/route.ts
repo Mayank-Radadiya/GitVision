@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { commitsTable } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
+import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 
 export async function GET(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -17,25 +24,28 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Tenant isolation: 404 if the project isn't owned by this user
+    await assertProjectOwnership(projectId, userId);
+
     // Calculate offset for pagination
     const offset = (page - 1) * limit;
 
-    // Fetch commits with pagination
-    const commits = await db
-      .select()
-      .from(commitsTable)
-      .where(eq(commitsTable.projectId, projectId))
-      .orderBy(desc(commitsTable.authorDate))
-      .limit(limit)
-      .offset(offset);
+    // Fetch commits + count in parallel
+    const [commits, countRows] = await Promise.all([
+      db
+        .select()
+        .from(commitsTable)
+        .where(eq(commitsTable.projectId, projectId))
+        .orderBy(desc(commitsTable.authorDate))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(commitsTable)
+        .where(eq(commitsTable.projectId, projectId)),
+    ]);
 
-    // Get total count for pagination
-    const totalCommits = await db
-      .select()
-      .from(commitsTable)
-      .where(eq(commitsTable.projectId, projectId));
-
-    const total = totalCommits.length;
+    const total = countRows[0]?.total ?? 0;
     const totalPages = Math.ceil(total / limit);
 
     return NextResponse.json({
@@ -60,6 +70,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Error fetching project commits:", error);
     return NextResponse.json(
       { error: "Internal server error" },
