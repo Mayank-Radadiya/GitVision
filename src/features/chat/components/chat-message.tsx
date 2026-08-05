@@ -2,7 +2,6 @@
 
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark-dimmed.min.css";
 import { User, Bot, Copy, Check, FileText } from "lucide-react";
 import { useState } from "react";
 import { CodeBlock } from "./code-block";

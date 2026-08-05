@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Copy, FileCode2 } from "lucide-react";
 
 interface CodeBlockProps {
@@ -23,6 +23,15 @@ function extractText(node: ReactNode): string {
 
 export function CodeBlock({ children, language, className }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+
+  // Load the highlight.js theme CSS only when a code block actually renders.
+  // Next.js emits the CSS import as a lazy chunk, so pages that never render
+  // a chat code block never download it.
+  useEffect(() => {
+    import("highlight.js/styles/github-dark-dimmed.min.css").catch(() => {
+      // Theme CSS is optional — code stays readable without it.
+    });
+  }, []);
 
   const lang = language || className?.replace("language-", "") || "";
   const textContent = extractText(children);
