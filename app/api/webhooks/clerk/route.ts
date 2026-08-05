@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { usersTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -47,29 +48,42 @@ export async function POST(req: Request) {
 
   const eventType = evt.type;
 
-  if (eventType === "user.created" || eventType === "user.updated") {
-    const { id, email_addresses, first_name, last_name } = evt.data;
-    const email = email_addresses?.[0]?.email_address;
-    const name = [first_name, last_name].filter(Boolean).join(" ") || "unknown";
+  try {
+    if (eventType === "user.created" || eventType === "user.updated") {
+      const { id, email_addresses, first_name, last_name } = evt.data;
+      const email = email_addresses?.[0]?.email_address;
+      const name =
+        [first_name, last_name].filter(Boolean).join(" ") || "unknown";
 
-    if (email) {
-      await db
-        .insert(usersTable)
-        .values({
-          id,
-          email,
-          name,
-          credits: 100,
-          isProUser: false,
-        })
-        .onConflictDoUpdate({
-          target: usersTable.email,
-          set: {
+      if (email) {
+        await db
+          .insert(usersTable)
+          .values({
+            id,
+            email,
             name,
-            updatedAt: new Date(),
-          },
-        });
+            credits: 100,
+            isProUser: false,
+          })
+          .onConflictDoUpdate({
+            target: usersTable.email,
+            set: {
+              name,
+              email,
+              updatedAt: new Date(),
+            },
+          });
+      }
+    } else if (eventType === "user.deleted") {
+      // Cascade removes the user's projects, files, chats, and embeddings.
+      const deletedId = (evt.data as { id?: string }).id;
+      if (deletedId) {
+        await db.delete(usersTable).where(eq(usersTable.id, deletedId));
+      }
     }
+  } catch (err) {
+    // Log and swallow — a failed webhook must not poison the Svix retry queue.
+    console.error("Error processing Clerk webhook:", err);
   }
 
   return NextResponse.json({ message: "Webhook received" }, { status: 200 });

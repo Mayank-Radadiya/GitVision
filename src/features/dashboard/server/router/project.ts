@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -9,6 +10,7 @@ import {
   projectCommitsSchema,
   generateAiSummarySchema,
 } from "@/src/lib/validation/schemas";
+import { rateLimit, keys } from "@/src/lib/rate-limit";
 import { createProjectService } from "./services/projectService";
 
 // Instantiate the service once, saving memory and CPU cycles
@@ -30,6 +32,14 @@ export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(projectCreateSchema)
     .mutation(async ({ input, ctx }) => {
+      // Per-user cap on heavy GitHub-backed project creation (10/hour)
+      const rl = await rateLimit(keys.projectCreate(ctx.userId), 10, 3600);
+      if (!rl.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Project creation limit reached. Please try again later.",
+        });
+      }
       return projectService.createProject(input, ctx.userId);
     }),
 

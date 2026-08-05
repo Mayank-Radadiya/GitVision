@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { projectTables } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
-// Temporary endpoint to reset stuck "processing" projects
+// Reset stuck "processing" projects — scoped to the requesting user's own
+// projects only (previously reset every project in the system).
 export async function POST() {
   try {
     const { userId } = await auth();
@@ -19,7 +20,12 @@ export async function POST() {
         embeddingProgress: 0,
         embeddingError: null,
       })
-      .where(eq(projectTables.embeddingStatus, "processing"))
+      .where(
+        and(
+          eq(projectTables.embeddingStatus, "processing"),
+          eq(projectTables.ownerId, userId), // ← tenant isolation
+        ),
+      )
       .returning({
         id: projectTables.id,
         name: projectTables.projectName,

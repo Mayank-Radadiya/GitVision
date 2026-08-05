@@ -4,8 +4,12 @@ import { db } from "@/db";
 import { projectTables, codeEmbeddings } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { processProjectForRag } from "@/src/features/rag/services/rag-ingestion";
+import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
+import { rateLimit, keys } from "@/src/lib/rate-limit";
 
-// Store active generation promises to prevent GC
+// Store active generation promises to prevent GC.
+// ponytail: module-level Map is per-instance only — reliable dedupe would
+// need a DB lock; the DB status field already prevents duplicate work.
 const activeGenerations = new Map<string, Promise<unknown>>();
 
 export async function POST(req: Request) {
@@ -13,6 +17,15 @@ export async function POST(req: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Per-user cap on Gemini-backed embedding generation (5/10min)
+    const rl = await rateLimit(keys.embeddings(userId), 5, 600);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Embedding generation limit reached. Please wait." },
+        { status: 429 },
+      );
     }
 
     const { projectId } = await req.json();
@@ -23,18 +36,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const [project] = await db
-      .select({
-        id: projectTables.id,
-        embeddingStatus: projectTables.embeddingStatus,
-      })
-      .from(projectTables)
-      .where(eq(projectTables.id, projectId))
-      .limit(1);
-
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+    // Tenant isolation: 404 if the project isn't owned by this user
+    const project = await assertProjectOwnership(projectId, userId);
 
     if (
       project.embeddingStatus === "processing" ||
@@ -89,6 +92,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ status: "started" });
   } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Embedding API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -113,19 +119,8 @@ export async function GET(req: Request) {
       );
     }
 
-    const [project] = await db
-      .select({
-        embeddingStatus: projectTables.embeddingStatus,
-        embeddingProgress: projectTables.embeddingProgress,
-        embeddingError: projectTables.embeddingError,
-      })
-      .from(projectTables)
-      .where(eq(projectTables.id, projectId))
-      .limit(1);
-
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+    // Tenant isolation: 404 if the project isn't owned by this user
+    const project = await assertProjectOwnership(projectId, userId);
 
     // Auto-correct: if marked as "completed" but no embeddings exist, reset to "pending"
     if (project.embeddingStatus === "completed") {
@@ -159,6 +154,9 @@ export async function GET(req: Request) {
       error: project.embeddingError,
     });
   } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Embedding status error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -186,6 +184,9 @@ export async function DELETE(req: Request) {
       );
     }
 
+    // Tenant isolation: 404 if the project isn't owned by this user
+    await assertProjectOwnership(projectId, userId);
+
     // Remove from active generations map
     activeGenerations.delete(projectId);
 
@@ -204,6 +205,9 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ status: "cancelled" });
   } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Embedding cancel error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

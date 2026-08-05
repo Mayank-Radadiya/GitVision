@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { projectFiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 
 export async function GET(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
 
@@ -14,6 +21,10 @@ export async function GET(req: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Tenant isolation: 404 if the project isn't owned by this user.
+    // This route returns full source code — must never leak cross-tenant.
+    await assertProjectOwnership(projectId, userId);
 
     // Fetch all files for the project
     const files = await db
@@ -52,6 +63,9 @@ export async function GET(req: NextRequest) {
           : undefined,
     });
   } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error("Error fetching project files:", error);
     return NextResponse.json(
       { error: "Internal server error" },

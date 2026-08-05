@@ -286,6 +286,18 @@ export const issuesTable = pgTable(
   },
 );
 
+/**
+ * Sliding-window rate limiting counters.
+ * One row per (route × subject) key; window resets when it ages out.
+ */
+export const rateLimitsTable = pgTable("rate_limits", {
+  limitKey: varchar("limit_key", { length: 255 }).primaryKey(),
+  windowStart: timestamp("window_start", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  count: integer("count").notNull().default(0),
+});
+
 export const issueCommentsTable = pgTable(
   "issue_comments",
   {
