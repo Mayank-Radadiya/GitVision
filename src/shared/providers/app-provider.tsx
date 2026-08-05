@@ -4,8 +4,6 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { memo, useEffect, useState } from "react";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/src/lib/trpc/client";
@@ -49,16 +47,11 @@ const MemoizedToaster = memo(() => (
 MemoizedToaster.displayName = "MemoizedToaster";
 
 const Provider = ({ children }: ProviderProps) => {
-  // Create a client using the factory to ensure consistent configuration (transformers, etc.)
+  // Create a client using the factory to ensure consistent configuration
+  // (transformers, etc.). Query data is NOT persisted to localStorage — pages
+  // prefetch fresh data server-side (RSC) and hydrate, so a persisted cache
+  // would only risk hydrating stale project/chat data.
   const [queryClient] = useState(() => makeQueryClient());
-
-  // Create storage persister safely on the client side.
-  // Persister is null on the server and on the first client render, so the
-  // tree below renders children directly — SSR output is real, not a hidden
-  // placeholder. The persister is created in an effect, which never runs
-  // during SSR, so the branch is always consistent between server & client.
-  const [persistor, setPersistor] =
-    useState<ReturnType<typeof createSyncStoragePersister> | null>(null);
 
   // Create tRPC client
   const [trpcClient] = useState(() =>
@@ -72,29 +65,8 @@ const Provider = ({ children }: ProviderProps) => {
     }),
   );
 
+  // Keep the toast theme CSS vars in sync with the active theme class.
   useEffect(() => {
-    const isBrowser =
-      typeof window !== "undefined" &&
-      typeof document !== "undefined" &&
-      !(typeof process !== "undefined" && process.versions && process.versions.node);
-
-    if (isBrowser) {
-      try {
-        if (
-          window.localStorage &&
-          typeof window.localStorage.getItem === "function"
-        ) {
-          const p = createSyncStoragePersister({
-            storage: window.localStorage,
-            key: "GITVISION_REACT_QUERY_CACHE",
-          });
-          setPersistor(p);
-        }
-      } catch {
-        // Storage might be restricted (e.g. private browsing)
-      }
-    }
-
     const updateToastThemeVars = () => {
       const isDark = document.documentElement.classList.contains("dark");
       document.documentElement.style.setProperty("--toast-bg", "transparent");
@@ -125,23 +97,8 @@ const Provider = ({ children }: ProviderProps) => {
             enableColorScheme
             disableTransitionOnChange={false}
           >
-            {persistor ? (
-              <PersistQueryClientProvider
-                client={queryClient}
-                persistOptions={{
-                  persister: persistor,
-                  maxAge: 24 * 60 * 60 * 1000,
-                }}
-              >
-                <MemoizedToaster />
-                {children}
-              </PersistQueryClientProvider>
-            ) : (
-              <>
-                <MemoizedToaster />
-                {children}
-              </>
-            )}
+            <MemoizedToaster />
+            {children}
           </ThemeProvider>
         </trpc.Provider>
       </MotionConfig>
