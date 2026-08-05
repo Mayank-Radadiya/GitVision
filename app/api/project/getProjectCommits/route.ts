@@ -4,8 +4,11 @@ import { db } from "@/db";
 import { commitsTable } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
+import { projectIdSchema } from "@/src/lib/validation/schemas";
+import { logger } from "@/src/lib/logger";
 
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -13,16 +16,21 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const page = parseInt(searchParams.get("page") || "1");
+    const projectIdRaw = searchParams.get("projectId");
+    const limitRaw = parseInt(searchParams.get("limit") || "10", 10);
+    const pageRaw = parseInt(searchParams.get("page") || "1", 10);
 
-    if (!projectId) {
+    const parsedProject = projectIdSchema.safeParse({ projectId: projectIdRaw });
+    if (!parsedProject.success) {
       return NextResponse.json(
-        { error: "Project ID is required" },
+        { error: parsedProject.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
+
+    const { projectId } = parsedProject.data;
+    const limit = isNaN(limitRaw) || limitRaw < 1 ? 10 : Math.min(limitRaw, 100);
+    const page = isNaN(pageRaw) || pageRaw < 1 ? 1 : pageRaw;
 
     // Tenant isolation: 404 if the project isn't owned by this user
     await assertProjectOwnership(projectId, userId);
@@ -73,7 +81,7 @@ export async function GET(req: NextRequest) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching project commits:", error);
+    logger.error("Error fetching project commits:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

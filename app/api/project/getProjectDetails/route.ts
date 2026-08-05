@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
+import { projectIdSchema } from "@/src/lib/validation/schemas";
+import { logger } from "@/src/lib/logger";
 
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -10,14 +13,17 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
+    const projectIdRaw = searchParams.get("projectId");
 
-    if (!projectId) {
+    const parsed = projectIdSchema.safeParse({ projectId: projectIdRaw });
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Project ID is required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
+
+    const { projectId } = parsed.data;
 
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
@@ -41,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching project details:", error);
+    logger.error("Error fetching project details:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

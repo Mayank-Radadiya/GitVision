@@ -4,8 +4,11 @@ import { db } from "@/db";
 import { projectFiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
+import { projectIdSchema } from "@/src/lib/validation/schemas";
+import { logger } from "@/src/lib/logger";
 
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -13,17 +16,19 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
+    const projectIdRaw = searchParams.get("projectId");
 
-    if (!projectId) {
+    const parsed = projectIdSchema.safeParse({ projectId: projectIdRaw });
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Project ID is required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
 
-    // Tenant isolation: 404 if the project isn't owned by this user.
-    // This route returns full source code — must never leak cross-tenant.
+    const { projectId } = parsed.data;
+
+    // Tenant isolation: 404 if the project isn't owned by this user
     await assertProjectOwnership(projectId, userId);
 
     // Fetch all files for the project
@@ -33,12 +38,10 @@ export async function GET(req: NextRequest) {
       .where(eq(projectFiles.projectId, projectId));
 
     // Transform files to Sandpack format
-    // Sandpack expects: { "/path/to/file.js": { code: "content" } }
     const sandpackFiles: Record<string, { code: string }> = {};
 
     if (files && files.length > 0) {
       for (const file of files) {
-        // Ensure path starts with /
         const filePath = file.fileName.startsWith("/")
           ? file.fileName
           : `/${file.fileName}`;
@@ -48,7 +51,6 @@ export async function GET(req: NextRequest) {
         };
       }
     } else {
-      // Return a helpful placeholder file when no files exist
       sandpackFiles["/README.md"] = {
         code: `# Project Files Not Yet Processed\n\nThis project's files are being processed. Please check back in a few moments.\n\nIf this message persists, the project may not have been fully imported from GitHub.`,
       };
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Error fetching project files:", error);
+    logger.error("Error fetching project files:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

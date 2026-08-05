@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { createNewProject, syncIssuesAndComments } from "@/src/lib/github";
+import { createNewProject } from "@/src/lib/github";
 import { projectCreateSchema } from "@/src/lib/validation/schemas";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { inngest } from "@/src/lib/inngest/client";
+import { logger } from "@/src/lib/logger";
 
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     // Authenticate user
     const { userId } = await auth();
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate body against the strict schema (github.com-only URLs)
+    // Validate body against the strict schema (github.com-only URLs with validators.githubUrl)
     const parsed = projectCreateSchema.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json(
@@ -41,9 +44,37 @@ export async function POST(req: NextRequest) {
     // Create project + fetch metadata + initial 100 commits via GraphQL
     const { projectId } = await createNewProject(repoUrl, projectName, userId);
 
-    // Fetch issues/PRs + comments via GraphQL in background
-    syncIssuesAndComments(repoUrl, projectId).catch((error) => {
-      console.error("Error fetching issues in background:", error);
+    const cleanUrl = repoUrl.endsWith(".git")
+      ? repoUrl.slice(0, -4)
+      : repoUrl;
+    const parts = cleanUrl.trim().split("/");
+    const owner = parts[parts.length - 2]!;
+    const repo = parts[parts.length - 1]!;
+
+    // Dispatch durable Inngest event for background issue & comment syncing
+    try {
+      await inngest.send({
+        name: "project/created",
+        data: {
+          projectId,
+          repoUrl,
+          owner,
+          repo,
+        },
+      });
+    } catch (inngestError) {
+      logger.error(
+        "Failed to dispatch Inngest project/created event",
+        inngestError,
+        { requestId, projectId },
+      );
+      // Non-fatal for client response as project is created, but recorded in logs
+    }
+
+    logger.info("Project created successfully", {
+      requestId,
+      userId,
+      projectId,
     });
 
     return NextResponse.json({
@@ -52,7 +83,7 @@ export async function POST(req: NextRequest) {
       message: "Project created successfully",
     });
   } catch (error) {
-    console.error("Error creating project:", error);
+    logger.error("Error creating project:", error, { requestId });
 
     // Handle specific error types from github.ts
     if (error instanceof Error) {

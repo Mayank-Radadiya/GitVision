@@ -6,12 +6,11 @@ import { eq, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
 import { inngest } from "@/src/lib/inngest/client";
-
-// ponytail: dedupe relies on the DB embedding_status field checked inside
-// generateEmbeddings; the in-process Map was dropped when this route became a
-// thin Inngest dispatcher (single durable pipeline).
+import { projectIdSchema } from "@/src/lib/validation/schemas";
+import { logger } from "@/src/lib/logger";
 
 export async function POST(req: Request) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -27,13 +26,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const { projectId } = await req.json();
-    if (!projectId) {
+    const body = await req.json().catch(() => ({}));
+    const parsed = projectIdSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Project ID required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
+
+    const { projectId } = parsed.data;
 
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     // Safety check: if status is "completed" but no embeddings actually exist,
-    // reset status to allow re-generation (fixes the green-dot-but-empty-DB bug)
+    // reset status to allow re-generation
     if (project.embeddingStatus === "completed") {
       const [countResult] = await db
         .select({ count: sql<number>`count(*)` })
@@ -54,8 +56,9 @@ export async function POST(req: Request) {
         .where(eq(codeEmbeddings.projectId, projectId));
 
       if ((countResult?.count ?? 0) === 0) {
-        console.warn(
+        logger.warn(
           `[Embeddings] Project ${projectId} marked as completed but has 0 embeddings — resetting to pending`,
+          { requestId, projectId },
         );
         await db
           .update(projectTables)
@@ -75,20 +78,20 @@ export async function POST(req: Request) {
         data: { projectId },
       });
     } catch (error) {
-      console.error("Failed to queue embedding generation:", error);
+      logger.error("Failed to queue embedding generation:", error, { requestId, projectId });
       return NextResponse.json(
         { error: "Failed to queue embedding generation" },
         { status: 500 },
       );
     }
 
-    console.log(`⏳ Embedding generation queued for ${projectId}`);
+    logger.info(`Embedding generation queued for ${projectId}`, { requestId, projectId });
     return NextResponse.json({ status: "started" });
   } catch (error) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Embedding API error:", error);
+    logger.error("Embedding API error:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -97,6 +100,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -104,13 +108,16 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-    if (!projectId) {
+    const projectIdRaw = searchParams.get("projectId");
+    const parsed = projectIdSchema.safeParse({ projectId: projectIdRaw });
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Project ID required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
+
+    const { projectId } = parsed.data;
 
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
@@ -150,7 +157,7 @@ export async function GET(req: Request) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Embedding status error:", error);
+    logger.error("Embedding status error:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -158,10 +165,8 @@ export async function GET(req: Request) {
   }
 }
 
-/**
- * DELETE — Cancel / Reset a stuck embedding generation
- */
 export async function DELETE(req: Request) {
+  const requestId = req.headers.get("x-request-id") || undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -169,13 +174,16 @@ export async function DELETE(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get("projectId");
-    if (!projectId) {
+    const projectIdRaw = searchParams.get("projectId");
+    const parsed = projectIdSchema.safeParse({ projectId: projectIdRaw });
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Project ID required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid or missing project ID" },
         { status: 400 },
       );
     }
+
+    const { projectId } = parsed.data;
 
     // Tenant isolation: 404 if the project isn't owned by this user
     await assertProjectOwnership(projectId, userId);
@@ -187,7 +195,7 @@ export async function DELETE(req: Request) {
         data: { projectId },
       });
     } catch (error) {
-      console.error("Failed to send embeddings/cancel event:", error);
+      logger.error("Failed to send embeddings/cancel event:", error, { requestId, projectId });
     }
 
     await db
@@ -200,14 +208,14 @@ export async function DELETE(req: Request) {
       })
       .where(eq(projectTables.id, projectId));
 
-    console.log(`🛑 Embedding generation cancelled for ${projectId}`);
+    logger.info(`Embedding generation cancelled for ${projectId}`, { requestId, projectId });
 
     return NextResponse.json({ status: "cancelled" });
   } catch (error) {
     if (error instanceof ProjectAccessError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
-    console.error("Embedding cancel error:", error);
+    logger.error("Embedding cancel error:", error, { requestId });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
