@@ -1,20 +1,21 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is Missing");
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: "gemini-flash-latest",
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 export const aISummariesCommit = async (diff: string) => {
   try {
     // https//github.com/OwnerName/repoName/commit/commitHash/diff
     //https://github.com/Mayank-Radadiya/Sundown-Studio/commit/5c18b1c3e7efacd7e621f7a9aaeeedbd55ac2211.diff
-    const response = await model.generateContent([
-      `You are an expert code reviewer analyzing a Git commit diff for GitVision - a tool that helps developers understand code changes at a glance.
+    const { text } = await generateText({
+      model: google("gemini-2.5-flash"),
+      prompt: `You are an expert code reviewer analyzing a Git commit diff for GitVision - a tool that helps developers understand code changes at a glance.
 
 📋 YOUR TASK:
 Generate a clear, concise, developer-friendly summary that explains what changed, why it matters, and the impact. Focus on helping developers quickly understand the commit without reading the entire diff.
@@ -68,7 +69,7 @@ EXAMPLE SUMMARY (for reference, don't copy):
 ♻️ **Refactored database queries** - Replaced raw SQL with Prisma ORM for type safety [db/queries.ts, models/user.ts]
    → Impact: Reduced potential SQL injection vulnerabilities and improved code maintainability
 
-� **Fixed memory leak in WebSocket connections** - Added proper cleanup in useEffect hook [hooks/useWebSocket.ts]
+🐛 **Fixed memory leak in WebSocket connections** - Added proper cleanup in useEffect hook [hooks/useWebSocket.ts]
    → Impact: Prevents browser crashes on long-running sessions
 \`\`\`
 
@@ -94,8 +95,8 @@ ${diff}
 ---
 
 Remember: Your summary should help developers understand this commit in 30 seconds or less. Be clear, specific, and focus on what matters.`,
-    ]);
-    return response.response.text();
+    });
+    return text;
   } catch (error: unknown) {
     // Handle specific error types
     const err = error as { status?: number; message?: string };

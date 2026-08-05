@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true, // Helps catch issues early (dev only)
   experimental: {
-    useTypeScriptCli: true,
     staleTimes: {
       static: 30 * 1000,
       dynamic: 10 * 1000,
