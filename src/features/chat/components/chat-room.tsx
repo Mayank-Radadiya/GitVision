@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/src/shared/components/ui/button";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
+import { ChatErrorCard } from "./chat-error";
+import { parseChatError, type ChatErrorInfo } from "@/src/shared/lib/chat-errors";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatRoomProps {
@@ -146,6 +148,9 @@ export function ChatRoom({
 
   const [input, setInput] = useState("");
 
+  // Categorized streaming/HTTP error for the current reply (null = no error)
+  const [chatError, setChatError] = useState<ChatErrorInfo | null>(null);
+
   // v7 uses a transport; the request body (chatId/projectId/mode) travels with it.
   const transport = useMemo(
     () =>
@@ -164,7 +169,6 @@ export function ChatRoom({
     messages,
     sendMessage,
     regenerate,
-    error,
     stop,
     status,
   } = useChat({
@@ -175,6 +179,15 @@ export function ChatRoom({
       role: m.role,
       parts: [{ type: "text" as const, text: m.content }],
     })),
+    onError(err) {
+      // Server sends a JSON `{ code, message }` payload for both pre-stream
+      // HTTP errors and stream failures; parseChatError turns it into a
+      // categorized card (null for user-initiated stops → no banner).
+      setChatError(parseChatError(err));
+      // Never leave the UI stuck in a "streaming" state after a failure.
+      hasFirstTokenRef.current = false;
+      setHasFirstToken(false);
+    },
     onFinish() {
       hasFirstTokenRef.current = false;
       setHasFirstToken(false);
@@ -202,6 +215,7 @@ export function ChatRoom({
     setHasFirstToken(false);
     setLiveSources([]);
     setRetrievalPhase("searching");
+    setChatError(null);
     regenerate();
   };
 
@@ -245,6 +259,7 @@ export function ChatRoom({
     setLiveSources([]);
     setHasFirstToken(false);
     setRetrievalPhase("searching");
+    setChatError(null);
     handleSubmit();
   };
 
@@ -403,19 +418,7 @@ export function ChatRoom({
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="px-4 pb-2">
-          <div className="mx-auto max-w-3xl rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5 text-center text-sm text-red-500">
-            Something went wrong.{" "}
-            <button
-              onClick={() => reload()}
-              className="cursor-pointer underline hover:no-underline"
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      )}
+      {chatError && <ChatErrorCard error={chatError} onRetry={reload} />}
 
       {/* Input */}
       <div className="border-t border-border/40 px-4 py-4">

@@ -13,6 +13,8 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
+import { LLM_SETTINGS } from "@/src/lib/llm/config";
+import { categorizeModelError } from "@/src/shared/lib/chat-errors";
 import {
   searchSimilarCode,
   searchSimilarCodeInFile,
@@ -131,6 +133,7 @@ INSTRUCTIONS:
 async function rewriteQueryForRetrieval(
   userMessage: string,
   conversationHistory: string,
+  abortSignal?: AbortSignal,
 ): Promise<string> {
   // If there's no real history, the current message is already standalone
   if (
@@ -142,7 +145,11 @@ async function rewriteQueryForRetrieval(
 
   try {
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: google(LLM_SETTINGS.queryRewrite.model),
+      maxRetries: LLM_SETTINGS.queryRewrite.maxRetries,
+      maxOutputTokens: LLM_SETTINGS.queryRewrite.maxOutputTokens,
+      timeout: LLM_SETTINGS.queryRewrite.timeout,
+      abortSignal,
       system: `You are a search query optimizer for a code repository.
 Given a conversation and the user's latest message, output ONLY a concise
 standalone search query (max 20 words) that captures what the user wants to
@@ -319,16 +326,20 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", code: "unauthorized" }),
+        { status: 401 },
+      );
     }
 
     // Per-user cap on LLM-backed chat messages (20/min)
     const rl = await rateLimit(keys.chat(userId), 20, 60);
     if (!rl.allowed) {
       return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please slow down." }),
+        JSON.stringify({
+          error: "Rate limit exceeded. Please slow down.",
+          code: "rate_limited",
+        }),
         { status: 429, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -337,18 +348,23 @@ export async function POST(req: Request) {
     const { messages, chatId, projectId, mode = "general" } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "Messages required" }), {
-        status: 400,
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Messages required",
+          code: "invalid_request",
+        }),
+        { status: 400 },
+      );
     }
 
     const userMessage = messages[messages.length - 1]?.content as
       | string
       | undefined;
     if (!userMessage) {
-      return new Response(JSON.stringify({ error: "Empty message" }), {
-        status: 400,
-      });
+      return new Response(
+        JSON.stringify({ error: "Empty message", code: "invalid_request" }),
+        { status: 400 },
+      );
     }
 
     // Verify chat ownership and store user message
@@ -360,9 +376,13 @@ export async function POST(req: Request) {
         .limit(1);
 
       if (!chat || chat.userId !== userId) {
-        return new Response(JSON.stringify({ error: "Chat not found" }), {
-          status: 404,
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Chat not found",
+            code: "chat_not_found",
+          }),
+          { status: 404 },
+        );
       }
 
       await db.insert(chatMessages).values({
@@ -380,6 +400,7 @@ export async function POST(req: Request) {
       return new Response(
         JSON.stringify({
           error: "You're out of credits. Please top up to continue chatting.",
+          code: "out_of_credits",
         }),
         { status: 402, headers: { "Content-Type": "application/json" } },
       );
@@ -417,6 +438,18 @@ export async function POST(req: Request) {
     }
 
     const stream = createUIMessageStream({
+      // Replaces the SDK default `() => "An error occurred."` so the client
+      // learns the real cause (timeout / model failure) instead of a generic
+      // message. Payload is JSON so the client can parse code + message.
+      onError: (error) => {
+        if (req.signal.aborted) {
+          // User-initiated stop — the client ignores this.
+          return JSON.stringify({ code: "aborted", message: "" });
+        }
+        const { code, message } = categorizeModelError(error);
+        console.error("[Chat] Stream error:", error);
+        return JSON.stringify({ code, message });
+      },
       async execute({ writer }) {
         let systemPrompt = SYSTEM_PROMPT_GENERAL;
         let relatedFiles: string[] = [];
@@ -478,6 +511,7 @@ export async function POST(req: Request) {
                 const standaloneQuery = await rewriteQueryForRetrieval(
                   userMessage,
                   conversationHistory,
+                  req.signal,
                 );
 
                 writer.write({
@@ -527,7 +561,13 @@ export async function POST(req: Request) {
 
         // Stream LLM tokens
         const result = streamText({
-          model: google("gemini-2.5-flash"),
+          model: google(LLM_SETTINGS.chat.model),
+          maxRetries: LLM_SETTINGS.chat.maxRetries,
+          maxOutputTokens: LLM_SETTINGS.chat.maxOutputTokens,
+          timeout: LLM_SETTINGS.chat.timeout,
+          // Client Stop/unmount aborts the upstream Gemini call — no ghost
+          // streams or wasted tokens.
+          abortSignal: req.signal,
           system: systemPrompt,
           messages,
           onFinish: async ({ text }) => {
@@ -574,15 +614,27 @@ export async function POST(req: Request) {
     return createUIMessageStreamResponse({ stream });
   } catch (error) {
     if (error instanceof ProjectAccessError) {
-      return new Response(JSON.stringify({ error: "Project not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Project not found",
+          code: "project_not_found",
+        }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
     console.error("Chat API error:", error);
-    return new Response(JSON.stringify({ error: "Something went wrong" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Something went wrong",
+        code: "server_error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

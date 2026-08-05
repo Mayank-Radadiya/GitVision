@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { LLM_SETTINGS } from "@/src/lib/llm/config";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is Missing");
@@ -14,7 +15,10 @@ export const aISummariesCommit = async (diff: string) => {
     // https//github.com/OwnerName/repoName/commit/commitHash/diff
     //https://github.com/Mayank-Radadiya/Sundown-Studio/commit/5c18b1c3e7efacd7e621f7a9aaeeedbd55ac2211.diff
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: google(LLM_SETTINGS.commitSummary.model),
+      maxRetries: LLM_SETTINGS.commitSummary.maxRetries,
+      maxOutputTokens: LLM_SETTINGS.commitSummary.maxOutputTokens,
+      timeout: LLM_SETTINGS.commitSummary.timeout,
       prompt: `You are an expert code reviewer analyzing a Git commit diff for GitVision - a tool that helps developers understand code changes at a glance.
 
 📋 YOUR TASK:
