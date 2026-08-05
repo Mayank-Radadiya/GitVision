@@ -386,116 +386,138 @@ export async function POST(req: Request) {
     }
 
     // -----------------------------------------------------------------------
-    // Build system prompt
+    // Fast project metadata read — kept OUTSIDE the stream so ownership errors
+    // still return a real 404 and the response starts streaming immediately.
+    // The slow retrieval work happens inside execute() below so the client
+    // receives live phase statuses instead of a silent wait.
     // -----------------------------------------------------------------------
 
-    let systemPrompt = SYSTEM_PROMPT_GENERAL;
-    let relatedFiles: string[] = [];
+    let projectInfo: {
+      projectName: string;
+      embeddingStatus: string | null;
+      estimatedTokens: number | null;
+    } | null = null;
 
     if (mode === "project" && projectId) {
       // Tenant isolation — the requesting user must own this project.
-      // Throws ProjectAccessError → 404 via the outer catch (no general fallback).
+      // Throws ProjectAccessError → 404 via the outer catch (no fallback).
       await assertProjectOwnership(projectId, userId);
 
-      try {
-        // Load project metadata (single indexed read)
-        const [project] = await db
-          .select({
-            projectName: projectTables.projectName,
-            embeddingStatus: projectTables.embeddingStatus,
-            estimatedTokens: projectTables.estimatedTokens,
-          })
-          .from(projectTables)
-          .where(eq(projectTables.id, projectId))
-          .limit(1);
+      const [project] = await db
+        .select({
+          projectName: projectTables.projectName,
+          embeddingStatus: projectTables.embeddingStatus,
+          estimatedTokens: projectTables.estimatedTokens,
+        })
+        .from(projectTables)
+        .where(eq(projectTables.id, projectId))
+        .limit(1);
 
-        if (!project || project.embeddingStatus !== "completed") {
-          systemPrompt = `You are GitVision AI. The project "${
-            project?.projectName ?? "Unknown"
-          }" has not been fully indexed yet (status: ${
-            project?.embeddingStatus ?? "unknown"
-          }). Please let the user know that embeddings need to be generated before codebase-aware chat can work. You can still answer general programming questions.`;
-        } else {
-          // Conversation history for both prompts and query rewrite
-          let conversationHistory = "No previous conversation.";
-          if (chatId) {
-            try {
-              conversationHistory = await getRecentChatHistoryForContext(
-                chatId,
-                4,
-              );
-            } catch (historyError) {
-              console.warn(
-                "[RAG] Failed to load conversation history, proceeding without it:",
-                historyError,
-              );
-            }
-          }
-
-          // ------------------------------------------------------------------
-          // FAST PATH: small project — dump entire codebase into context
-          // ------------------------------------------------------------------
-          if (isSmallProject(project.estimatedTokens)) {
-            const fullContext = await getAllProjectFilesForContext(projectId);
-            systemPrompt = buildSmallProjectSystemPrompt(
-              project.projectName,
-              fullContext,
-              conversationHistory,
-            );
-            // No specific files to highlight — the whole project is in context
-          } else {
-            // ------------------------------------------------------------------
-            // RAG PATH: large project — rewrite query → classify → retrieve
-            // ------------------------------------------------------------------
-
-            // Rewrite only when there's real history (skips the LLM call on
-            // first message, saving ~100ms)
-            const standaloneQuery = await rewriteQueryForRetrieval(
-              userMessage,
-              conversationHistory,
-            );
-
-            const { context, relatedFiles: files } = await retrieveContext(
-              projectId,
-              userMessage,
-              standaloneQuery,
-            );
-
-            relatedFiles = files;
-
-            const projectStats = await getProjectContext(projectId);
-
-            systemPrompt = buildRagSystemPrompt(
-              project.projectName,
-              context,
-              projectStats,
-              conversationHistory,
-            );
-          }
-        }
-      } catch (ragError) {
-        console.error(
-          "[RAG] Retrieval error, falling back to general mode:",
-          ragError,
-        );
-        // systemPrompt stays as SYSTEM_PROMPT_GENERAL — graceful degradation
-      }
+      projectInfo = project ?? null;
     }
 
-    // -----------------------------------------------------------------------
-    // Stream response with data events for the sources UI
-    // -----------------------------------------------------------------------
-
     const stream = createUIMessageStream({
-      execute({ writer }) {
-        // Fire "searching" event immediately so the client shows the skeleton
-        writer.write({
-          type: "data-status",
-          data: { type: "status", value: "searching" },
-        });
+      async execute({ writer }) {
+        let systemPrompt = SYSTEM_PROMPT_GENERAL;
+        let relatedFiles: string[] = [];
 
-        // Once sources are known, send them (they were resolved above before
-        // this callback runs — in the RAG path — so we emit them right away)
+        if (mode === "project" && projectId && projectInfo) {
+          try {
+            if (projectInfo.embeddingStatus !== "completed") {
+              systemPrompt = `You are GitVision AI. The project "${
+                projectInfo.projectName
+              }" has not been fully indexed yet (status: ${
+                projectInfo.embeddingStatus ?? "unknown"
+              }). Please let the user know that embeddings need to be generated before codebase-aware chat can work. You can still answer general programming questions.`;
+            } else {
+              // Conversation history for both prompts and query rewrite
+              let conversationHistory = "No previous conversation.";
+              if (chatId) {
+                try {
+                  conversationHistory = await getRecentChatHistoryForContext(
+                    chatId,
+                    4,
+                  );
+                } catch (historyError) {
+                  console.warn(
+                    "[RAG] Failed to load conversation history, proceeding without it:",
+                    historyError,
+                  );
+                }
+              }
+
+              // ----------------------------------------------------------------
+              // FAST PATH: small project — dump entire codebase into context
+              // ----------------------------------------------------------------
+              if (isSmallProject(projectInfo.estimatedTokens)) {
+                writer.write({
+                  type: "data-status",
+                  data: { type: "status", value: "searching" },
+                });
+
+                const fullContext = await getAllProjectFilesForContext(
+                  projectId,
+                );
+                systemPrompt = buildSmallProjectSystemPrompt(
+                  projectInfo.projectName,
+                  fullContext,
+                  conversationHistory,
+                );
+                // No specific files to highlight — the whole project is in context
+              } else {
+                // ----------------------------------------------------------------
+                // RAG PATH: large project — rewrite query → classify → retrieve
+                // ----------------------------------------------------------------
+                writer.write({
+                  type: "data-status",
+                  data: { type: "status", value: "rewriting" },
+                });
+
+                // Rewrite only when there's real history (skips the LLM call on
+                // first message, saving ~100ms)
+                const standaloneQuery = await rewriteQueryForRetrieval(
+                  userMessage,
+                  conversationHistory,
+                );
+
+                writer.write({
+                  type: "data-status",
+                  data: { type: "status", value: "searching" },
+                });
+
+                const { context, relatedFiles: files } = await retrieveContext(
+                  projectId,
+                  userMessage,
+                  standaloneQuery,
+                );
+                relatedFiles = files;
+
+                writer.write({
+                  type: "data-status",
+                  data: { type: "status", value: "ranking" },
+                });
+
+                const projectStats = await getProjectContext(projectId);
+
+                systemPrompt = buildRagSystemPrompt(
+                  projectInfo.projectName,
+                  context,
+                  projectStats,
+                  conversationHistory,
+                );
+              }
+            }
+          } catch (ragError) {
+            console.error(
+              "[RAG] Retrieval error, falling back to general mode:",
+              ragError,
+            );
+            // systemPrompt stays as SYSTEM_PROMPT_GENERAL — graceful degradation
+          }
+        }
+
+        // Once sources are known, send them (resolved above before the LLM
+        // token stream starts)
         if (relatedFiles.length > 0) {
           writer.write({
             type: "data-sources",

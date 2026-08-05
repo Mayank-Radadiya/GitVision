@@ -34,7 +34,7 @@ interface ChatRoomProps {
 
 interface StatusEvent {
   type: "data-status";
-  data: { type: "status"; value: "searching" };
+  data: { type: "status"; value: "rewriting" | "searching" | "ranking" };
 }
 
 interface SourcesEvent {
@@ -62,7 +62,20 @@ function getMessageText(message: {
 // Shimmer skeleton shown while retrieval is running (before first token)
 // ---------------------------------------------------------------------------
 
-function RetrievalSkeleton() {
+const RETRIEVAL_PHASE_LABELS: Record<
+  "rewriting" | "searching" | "ranking",
+  string
+> = {
+  rewriting: "Rewriting query...",
+  searching: "Searching codebase...",
+  ranking: "Ranking results...",
+};
+
+function RetrievalSkeleton({
+  phase = "searching",
+}: {
+  phase?: "rewriting" | "searching" | "ranking";
+}) {
   return (
     <div className="group flex gap-3 px-4 py-5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
@@ -86,7 +99,7 @@ function RetrievalSkeleton() {
               />
             </div>
             <span className="text-xs text-muted-foreground/60 animate-pulse">
-              Searching codebase...
+              {RETRIEVAL_PHASE_LABELS[phase]}
             </span>
           </div>
           {/* Shimmer lines */}
@@ -126,6 +139,11 @@ export function ChatRoom({
   // Live sources delivered via the data stream for the current response
   const [liveSources, setLiveSources] = useState<string[]>([]);
 
+  // Latest retrieval phase reported by the server data stream
+  const [retrievalPhase, setRetrievalPhase] = useState<
+    "rewriting" | "searching" | "ranking"
+  >("searching");
+
   const [input, setInput] = useState("");
 
   // v7 uses a transport; the request body (chatId/projectId/mode) travels with it.
@@ -162,6 +180,16 @@ export function ChatRoom({
       setHasFirstToken(false);
     },
     onData(event: any) {
+      if (event.type === "data-status" && event.data?.type === "status") {
+        const value = event.data.value;
+        if (
+          value === "rewriting" ||
+          value === "searching" ||
+          value === "ranking"
+        ) {
+          setRetrievalPhase(value);
+        }
+      }
       if (event.type === "data-sources" && Array.isArray(event.data?.files)) {
         setLiveSources(event.data.files);
       }
@@ -173,6 +201,7 @@ export function ChatRoom({
     hasFirstTokenRef.current = false;
     setHasFirstToken(false);
     setLiveSources([]);
+    setRetrievalPhase("searching");
     regenerate();
   };
 
@@ -215,6 +244,7 @@ export function ChatRoom({
     if (!input.trim()) return;
     setLiveSources([]);
     setHasFirstToken(false);
+    setRetrievalPhase("searching");
     handleSubmit();
   };
 
@@ -345,7 +375,7 @@ export function ChatRoom({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <RetrievalSkeleton />
+                  <RetrievalSkeleton phase={retrievalPhase} />
                 </motion.div>
               )}
 
