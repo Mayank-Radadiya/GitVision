@@ -179,7 +179,10 @@ export function ChatRoom({
   const isLoading = status === "streaming" || status === "submitted";
 
   const handleSubmit = () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) return;
+    if (isLoading && stop) {
+      stop();
+    }
     sendMessage({ text: input });
     setInput("");
   };
@@ -209,7 +212,7 @@ export function ChatRoom({
   }, [messages, scrollToBottom]);
 
   const onSubmit = () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) return;
     setLiveSources([]);
     setHasFirstToken(false);
     handleSubmit();
@@ -247,6 +250,7 @@ export function ChatRoom({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Back to chats"
           onClick={() => router.push("/chat")}
           className="h-8 w-8 shrink-0 cursor-pointer"
         >

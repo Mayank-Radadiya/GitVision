@@ -10,6 +10,7 @@ import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/src/lib/trpc/client";
 import { makeQueryClient } from "@/src/lib/trpc/query-client";
+import { MotionConfig } from "framer-motion";
 
 interface ProviderProps {
   children: React.ReactNode;
@@ -115,33 +116,35 @@ const Provider = ({ children }: ProviderProps) => {
 
   return (
     <ClerkProvider>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          enableColorScheme
-          disableTransitionOnChange={false}
-        >
-          {persistor ? (
-            <PersistQueryClientProvider
-              client={queryClient}
-              persistOptions={{
-                persister: persistor,
-                maxAge: 24 * 60 * 60 * 1000,
-              }}
-            >
-              <MemoizedToaster />
-              {children}
-            </PersistQueryClientProvider>
-          ) : (
-            <>
-              <MemoizedToaster />
-              {children}
-            </>
-          )}
-        </ThemeProvider>
-      </trpc.Provider>
+      <MotionConfig reducedMotion="user">
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            enableColorScheme
+            disableTransitionOnChange={false}
+          >
+            {persistor ? (
+              <PersistQueryClientProvider
+                client={queryClient}
+                persistOptions={{
+                  persister: persistor,
+                  maxAge: 24 * 60 * 60 * 1000,
+                }}
+              >
+                <MemoizedToaster />
+                {children}
+              </PersistQueryClientProvider>
+            ) : (
+              <>
+                <MemoizedToaster />
+                {children}
+              </>
+            )}
+          </ThemeProvider>
+        </trpc.Provider>
+      </MotionConfig>
     </ClerkProvider>
   );
 };

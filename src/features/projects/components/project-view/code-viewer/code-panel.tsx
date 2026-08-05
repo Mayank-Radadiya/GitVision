@@ -216,6 +216,7 @@ function CodePanel({ filePath, content = "", language }: CodePanelProps) {
           {/* Copy button */}
           <button
             onClick={handleCopy}
+            aria-label={copied ? "Code copied to clipboard" : "Copy file code"}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs",
               "border border-border/40 bg-background/50",

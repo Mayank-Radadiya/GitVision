@@ -49,6 +49,7 @@ export function SidebarSignOut({ isCollapsed }: SidebarSignOutProps) {
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
             <Button
+              aria-label="Sign out"
               // variant="ghost"
               className="bg-transparent justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:cursor-pointer hover:text-red-500 hover:bg-red-500/30"
             >

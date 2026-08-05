@@ -112,6 +112,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
         {/* Sidebar toggle — mobile + desktop */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label={sidebarOpen ? "Hide files sidebar" : "Show files sidebar"}
           className={cn(
             "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs",
             "border border-border/40 bg-background/50",

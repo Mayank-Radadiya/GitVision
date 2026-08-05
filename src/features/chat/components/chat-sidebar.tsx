@@ -55,6 +55,7 @@ export function ChatSidebar({
                 onClick={onNewChat}
                 variant="ghost"
                 size="icon"
+                aria-label="Start new chat"
                 className="h-7 w-7 rounded-lg"
               >
                 <Plus className="h-4 w-4" />
@@ -161,6 +162,7 @@ function ChatListItem({
           e.stopPropagation();
           onDelete();
         }}
+        aria-label="Delete chat conversation"
         className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
       >
         <Trash2 className="h-3 w-3" />

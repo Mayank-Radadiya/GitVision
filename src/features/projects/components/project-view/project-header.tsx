@@ -76,6 +76,7 @@ function ProjectOptionsDropdown({
         <Button
           variant="outline"
           size="sm"
+          aria-label="Project actions menu"
           className="h-8 w-8 p-0 border-border/50 hover:bg-muted/50 transition-colors"
         >
           <MoreVertical className="h-4 w-4 text-muted-foreground" />

@@ -245,7 +245,8 @@ export function ChatMessage({
           {/* Copy button */}
           <button
             onClick={handleCopy}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+            aria-label={copied ? "Message copied to clipboard" : "Copy message content"}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
           >
             {copied ? (
               <Check className="h-3.5 w-3.5 text-emerald-400" />

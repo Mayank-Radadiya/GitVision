@@ -40,7 +40,7 @@ export function ChatInput({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (value.trim() && !isLoading) {
+      if (value.trim()) {
         onSubmit();
       }
     }
@@ -59,15 +59,15 @@ export function ChatInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        disabled={isLoading}
         rows={1}
         className="max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50"
       />
-      {isLoading && onStop ? (
+      {isLoading && !value.trim() && onStop ? (
         <Button
           onClick={onStop}
           size="icon"
           variant="ghost"
+          aria-label="Stop generating response"
           className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive cursor-pointer"
         >
           <Square className="h-3.5 w-3.5 fill-current" />
@@ -75,8 +75,9 @@ export function ChatInput({
       ) : (
         <Button
           onClick={onSubmit}
-          disabled={!value.trim() || isLoading}
+          disabled={!value.trim()}
           size="icon"
+          aria-label="Send message"
           className={cn(
             "h-8 w-8 shrink-0 rounded-lg transition-colors cursor-pointer",
             value.trim()
