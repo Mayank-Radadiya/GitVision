@@ -31,10 +31,18 @@ export const GITHUB_CONFIG = {
    */
   INITIAL_COMMIT_COUNT: 100,
   /**
-   * Issues + PRs to pull via GraphQL during initial sync.
-   * Ordered by most recently updated. Older items synced lazily.
+   * Issues + PRs pulled per GraphQL page during sync.
+   * Ordered by most recently updated. The sync loops pages until it has
+   * fetched everything (or hits MAX_ISSUE_PAGES as a safety valve).
    */
   INITIAL_ISSUE_COUNT: 50,
+  /**
+   * Hard cap on pagination pages when syncing issues/PRs.
+   * Prevents a multi-thousand-issue repo from running away during project
+   * creation; 50 * 40 = up to 2,000 issues + 2,000 PRs.
+   * ponytail: ceiling — raise/remove if a repo legitimately needs more.
+   */
+  MAX_ISSUE_PAGES: 40,
   /** Comments to fetch per issue/PR inline via GraphQL */
   COMMENTS_PER_ISSUE: 10,
 } as const;

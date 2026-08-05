@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { projectTables, projectFiles, codeEmbeddings } from "@/db/schema";
-import { eq, sql, sum } from "drizzle-orm";
+import { eq, and, ne, sql, sum } from "drizzle-orm";
 import { getRepositoryFiles, syncIssuesAndComments } from "../github";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
@@ -57,6 +57,9 @@ export const generateEmbeddings = inngest.createFunction(
   {
     id: "generate-embeddings",
     retries: 2,
+    // Cap concurrent embedding pipelines — a burst of project creations must
+    // not spawn unbounded parallel jobs against the embedding provider.
+    concurrency: 2,
     // Allow up to 30 minutes for large repos
     cancelOn: [
       {
@@ -69,24 +72,12 @@ export const generateEmbeddings = inngest.createFunction(
   async ({ event, step }) => {
     const { projectId } = event.data;
 
-    // Step 1: Mark as processing and load files
-    const files = await step.run("Prepare", async () => {
-      // Check if already processing (prevent duplicate runs)
-      const [project] = await db
-        .select({ embeddingStatus: projectTables.embeddingStatus })
-        .from(projectTables)
-        .where(eq(projectTables.id, projectId))
-        .limit(1);
-
-      if (project?.embeddingStatus === "processing") {
-        console.log(
-          `[Inngest] Embeddings already processing for ${projectId}, skipping`,
-        );
-        return [];
-      }
-
-      // Update status to processing
-      await db
+    // Step 1: Atomically claim the "processing" state and load files.
+    // UPDATE ... WHERE status != 'processing' RETURNING is atomic, so two
+    // concurrent embeddings/generate events can't both pass the old
+    // check-then-set race (TOCTOU) — the loser gets `claimed: false`.
+    const prepared = await step.run("Prepare", async () => {
+      const [claimed] = await db
         .update(projectTables)
         .set({
           embeddingStatus: "processing",
@@ -95,9 +86,22 @@ export const generateEmbeddings = inngest.createFunction(
           lastEmbeddingAttempt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(projectTables.id, projectId));
+        .where(
+          and(
+            eq(projectTables.id, projectId),
+            ne(projectTables.embeddingStatus, "processing"),
+          ),
+        )
+        .returning({ id: projectTables.id });
 
-      // Load all files
+      if (!claimed) {
+        console.log(
+          `[Inngest] Embeddings already processing for ${projectId}, skipping`,
+        );
+        return { claimed: false, files: [] };
+      }
+
+      // We own the pipeline — load all files
       const allFiles = await db
         .select({
           id: projectFiles.id,
@@ -110,24 +114,17 @@ export const generateEmbeddings = inngest.createFunction(
       console.log(
         `[Inngest] Found ${allFiles.length} files for embedding in project ${projectId}`,
       );
-      return allFiles;
+      return { claimed: true, files: allFiles };
     });
 
-    if (files.length === 0) {
-      // Could be "already processing" or no files — check which
+    if (!prepared.claimed) {
+      return { success: false, projectId, reason: "already-processing" };
+    }
+
+    if (prepared.files.length === 0) {
+      // We claimed the pipeline but found no files — mark failed so the
+      // project isn't left stuck in "processing" forever.
       await step.run("Handle Empty", async () => {
-        const [project] = await db
-          .select({ embeddingStatus: projectTables.embeddingStatus })
-          .from(projectTables)
-          .where(eq(projectTables.id, projectId))
-          .limit(1);
-
-        if (project?.embeddingStatus === "processing") {
-          // Already running elsewhere — just return
-          return;
-        }
-
-        // No files at all
         await db
           .update(projectTables)
           .set({
@@ -141,6 +138,8 @@ export const generateEmbeddings = inngest.createFunction(
 
       return { success: false, projectId, reason: "no-files" };
     }
+
+    const files = prepared.files;
 
     // Step 2: Process files in batches (each batch is a durable step)
     const BATCH_SIZE = 5;

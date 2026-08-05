@@ -35,30 +35,28 @@ export default function DashboardLayout({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const sidebarWidth = isCollapsed
+    ? SIDEBAR_WIDTH_COLLAPSED
+    : SIDEBAR_WIDTH_EXPANDED;
+
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
       <div className="relative min-h-screen">
-        {/* Desktop Sidebar - Fixed position */}
-        <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-50 md:flex">
-          <Sidebar
-            isCollapsed={isCollapsed}
-            onToggle={() => setIsCollapsed(!isCollapsed)}
-          />
-        </div>
+        {/* The Sidebar renders both the fixed desktop rail and the mobile
+            drawer internally — mounting it once avoids duplicated mobile
+            triggers/overlays. */}
+        <Sidebar
+          isCollapsed={isCollapsed}
+          onToggle={() => setIsCollapsed(!isCollapsed)}
+        />
 
-        {/* Mobile Sidebar */}
-        <div className="md:hidden">
-          <Sidebar isCollapsed={false} onToggle={() => {}} />
-        </div>
-
-        {/* Main content - padding adjusts based on sidebar width */}
+        {/* Main content - desktop padding only; none on mobile (the sidebar is
+            hidden below md, so a static paddingLeft would push content
+            off-screen). The width is injected via CSS var so it stays in sync
+            with SIDEBAR_WIDTH_* constants. */}
         <main
-          className="min-h-screen transition-all duration-300"
-          style={{
-            paddingLeft: isCollapsed
-              ? SIDEBAR_WIDTH_COLLAPSED
-              : SIDEBAR_WIDTH_EXPANDED,
-          }}
+          className="min-h-screen transition-all duration-300 md:pl-[var(--sidebar-w)]"
+          style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
         >
           <div className="h-full">{children}</div>
         </main>

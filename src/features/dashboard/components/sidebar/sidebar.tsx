@@ -163,7 +163,7 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
         }}
         transition={SIDEBAR_SPRING_CONFIG}
-        className="hidden h-screen md:block"
+        className="hidden h-screen md:fixed md:inset-y-0 md:left-0 md:z-50 md:block"
       >
         {/* Glass Effect Container */}
         <div className="glass-sidebar relative h-full border-r border-border/40 bg-background/80 backdrop-blur-xl">

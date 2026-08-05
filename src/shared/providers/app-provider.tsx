@@ -51,10 +51,11 @@ const Provider = ({ children }: ProviderProps) => {
   // Create a client using the factory to ensure consistent configuration (transformers, etc.)
   const [queryClient] = useState(() => makeQueryClient());
 
-  // Using this to avoid hydration mismatch
-  const [mounted, setMounted] = useState(false);
-
-  // Create storage persister safely on the client side
+  // Create storage persister safely on the client side.
+  // Persister is null on the server and on the first client render, so the
+  // tree below renders children directly — SSR output is real, not a hidden
+  // placeholder. The persister is created in an effect, which never runs
+  // during SSR, so the branch is always consistent between server & client.
   const [persistor, setPersistor] =
     useState<ReturnType<typeof createSyncStoragePersister> | null>(null);
 
@@ -71,8 +72,6 @@ const Provider = ({ children }: ProviderProps) => {
   );
 
   useEffect(() => {
-    setMounted(true);
-
     const isBrowser =
       typeof window !== "undefined" &&
       typeof document !== "undefined" &&
@@ -124,9 +123,7 @@ const Provider = ({ children }: ProviderProps) => {
           enableColorScheme
           disableTransitionOnChange={false}
         >
-          {!mounted ? (
-            <div style={{ visibility: "hidden" }} />
-          ) : persistor ? (
+          {persistor ? (
             <PersistQueryClientProvider
               client={queryClient}
               persistOptions={{

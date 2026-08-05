@@ -86,8 +86,9 @@ export async function processFileForRag(
     // Delete old embeddings for this file (if re-processing)
     await db.delete(codeEmbeddings).where(eq(codeEmbeddings.fileId, fileId));
 
-    // Chunk the code
-    const chunks = chunkCode(code, filePath, 400, 50);
+    // Chunk the code (overlap 100 = the chunkCode default; 50 would create
+    // inconsistent chunk boundaries vs. other callers)
+    const chunks = chunkCode(code, filePath, 400, 100);
 
     if (chunks.length === 0) {
       return {

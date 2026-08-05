@@ -3,15 +3,6 @@ import { Geist, Geist_Mono, Fira_Code, Fira_Sans } from "next/font/google";
 import "./globals.css";
 import Provider from "@/shared/providers/app-provider";
 
-// Fix for Node.js 22+ experimental localStorage throwing "localStorage.getItem is not a function" during SSR
-if (
-  typeof globalThis !== "undefined" &&
-  (globalThis as any).localStorage &&
-  typeof (globalThis as any).localStorage.getItem !== "function"
-) {
-  delete (globalThis as any).localStorage;
-}
-
 // Optimize font loading with preload strategy
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -24,6 +24,12 @@ const RATE_LIMIT = {
 
 let lastRequestTime = 0;
 
+// Serializes rate-limit enforcement. A plain read-then-sleep-then-write raced:
+// concurrent callers (e.g. the 5-in-parallel batches in generateEmbeddingsBatch)
+// all read the same lastRequestTime, slept the same amount, then fired together.
+// Chaining on a promise makes the check-and-update atomic.
+let rateLimitQueue: Promise<void> = Promise.resolve();
+
 /**
  * Sleep for a specified duration
  */
@@ -32,18 +38,24 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Apply rate limiting before making API calls
+ * Apply rate limiting before making API calls.
+ * Callers await the previous caller's delay before measuring — so concurrent
+ * calls are spaced RATE_LIMIT.minDelayMs apart instead of bursting.
  */
-async function applyRateLimit(): Promise<void> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
+function applyRateLimit(): Promise<void> {
+  const run = rateLimitQueue.then(async () => {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
 
-  if (timeSinceLastRequest < RATE_LIMIT.minDelayMs) {
-    const delay = RATE_LIMIT.minDelayMs - timeSinceLastRequest;
-    await sleep(delay);
-  }
+    if (timeSinceLastRequest < RATE_LIMIT.minDelayMs) {
+      await sleep(RATE_LIMIT.minDelayMs - timeSinceLastRequest);
+    }
 
-  lastRequestTime = Date.now();
+    lastRequestTime = Date.now();
+  });
+  // Keep the chain alive even if one link rejects.
+  rateLimitQueue = run.catch(() => {});
+  return run;
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {

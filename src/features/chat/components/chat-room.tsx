@@ -1,7 +1,8 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { DefaultChatTransport } from "ai";
+import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { ArrowLeft, FolderGit2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/shared/components/ui/button";
@@ -25,20 +26,37 @@ interface ChatRoomProps {
 }
 
 // ---------------------------------------------------------------------------
-// Types matching the data events sent by the server
+// Types matching the data events sent by the server.
+// The AI SDK data-stream protocol names custom parts "data-<name>" and wraps
+// the payload in a `data` field, so the server's `{ type: "data-sources",
+// data: { files } }` arrives here as that exact shape.
 // ---------------------------------------------------------------------------
 
 interface StatusEvent {
-  type: "status";
-  value: "searching";
+  type: "data-status";
+  data: { type: "status"; value: "searching" };
 }
 
 interface SourcesEvent {
-  type: "sources";
-  files: string[];
+  type: "data-sources";
+  data: { type: "sources"; files: string[] };
 }
 
 type DataEvent = StatusEvent | SourcesEvent;
+
+// ---------------------------------------------------------------------------
+// v7 UIMessage helpers — text lives in `parts`, not `content`
+// ---------------------------------------------------------------------------
+
+/** Concatenate the text parts of a UI message (empty string while streaming). */
+function getMessageText(message: {
+  parts?: Array<{ type?: string; text?: string }>;
+}): string {
+  return (message.parts ?? [])
+    .filter((p) => p.type === "text")
+    .map((p) => p.text ?? "")
+    .join("");
+}
 
 // ---------------------------------------------------------------------------
 // Shimmer skeleton shown while retrieval is running (before first token)
@@ -110,47 +128,59 @@ export function ChatRoom({
 
   const [input, setInput] = useState("");
 
+  // v7 uses a transport; the request body (chatId/projectId/mode) travels with it.
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: {
+          chatId,
+          projectId: projectId ?? undefined,
+          mode: type,
+        },
+      }),
+    [chatId, projectId, type],
+  );
+
   const {
     messages,
     sendMessage,
-    regenerate: reload,
+    regenerate,
     error,
     stop,
     status,
   } = useChat({
-    api: "/api/chat",
-    body: {
-      chatId,
-      projectId: projectId ?? undefined,
-      mode: type,
-    },
-    initialMessages: initialMessages.map((m) => ({
+    transport,
+    // v7 messages are UIMessage-shaped (parts, not `content`)
+    messages: initialMessages.map((m) => ({
       id: m.id,
       role: m.role,
-      content: m.content,
+      parts: [{ type: "text" as const, text: m.content }],
     })),
-    onResponse() {
-      // Server has started responding — reset first-token tracker
-      hasFirstTokenRef.current = false;
-      setHasFirstToken(false);
-      setLiveSources([]);
-    },
     onFinish() {
       hasFirstTokenRef.current = false;
       setHasFirstToken(false);
     },
     onData(event: any) {
-      if (event.type === "sources" && Array.isArray(event.files)) {
-        setLiveSources(event.files);
+      if (event.type === "data-sources" && Array.isArray(event.data?.files)) {
+        setLiveSources(event.data.files);
       }
-    }
+    },
   });
+
+  // v7 has no onResponse — reset retrieval state when (re)generating
+  const reload = () => {
+    hasFirstTokenRef.current = false;
+    setHasFirstToken(false);
+    setLiveSources([]);
+    regenerate();
+  };
 
   const isLoading = status === "streaming" || status === "submitted";
 
   const handleSubmit = () => {
     if (!input.trim() || isLoading) return;
-    sendMessage({ content: input, role: "user" });
+    sendMessage({ text: input });
     setInput("");
   };
 
@@ -160,7 +190,7 @@ export function ChatRoom({
     if (
       isLoading &&
       lastMsg?.role === "assistant" &&
-      lastMsg.content.length > 0 &&
+      getMessageText(lastMsg).length > 0 &&
       !hasFirstTokenRef.current
     ) {
       hasFirstTokenRef.current = true;
@@ -293,7 +323,7 @@ export function ChatRoom({
                   >
                     <ChatMessage
                       role={m.role as "user" | "assistant"}
-                      content={m.content}
+                      content={getMessageText(m)}
                       relatedFiles={getRelatedFiles(m.id, isLiveAssistantMsg)}
                       isStreaming={
                         isLastMsg && isStreaming && m.role === "assistant"

@@ -37,20 +37,6 @@ export const syncIssuesAndComments = async (
       projectId,
     });
 
-    // ── Single GraphQL call for issues + PRs + inline comments ──
-    const gqlResponse = await octokit.graphql<GraphQLIssuesData>(
-      ISSUES_AND_PRS_QUERY,
-      {
-        owner,
-        repo,
-        issueCount: GITHUB_CONFIG.INITIAL_ISSUE_COUNT,
-        prCount: GITHUB_CONFIG.INITIAL_ISSUE_COUNT,
-        commentCount: GITHUB_CONFIG.COMMENTS_PER_ISSUE,
-        issueCursor: null,
-        prCursor: null,
-      },
-    );
-
     const batchSize = GITHUB_CONFIG.COMMIT_BATCH_SIZE;
     let issuesStored = 0;
     let commentsStored = 0;
@@ -113,14 +99,55 @@ export const syncIssuesAndComments = async (
       }
     };
 
-    // Process issues (isPullRequest = false)
-    await processNodes(gqlResponse.repository.issues.nodes, false);
+    // ── Paginate through ALL issues + PRs via cursors ──
+    // Each page returns pageInfo.hasNextPage + endCursor; keep following until
+    // both are exhausted. MAX_ISSUE_PAGES caps runaway repos.
+    const pageSize = GITHUB_CONFIG.INITIAL_ISSUE_COUNT;
+    let issueCursor: string | null = null;
+    let prCursor: string | null = null;
+    let hasMoreIssues = true;
+    let hasMorePrs = true;
+    let pages = 0;
 
-    // Process pull requests (isPullRequest = true)
-    await processNodes(
-      gqlResponse.repository.pullRequests.nodes as IssueOrPrNode[],
-      true,
-    );
+    while (
+      (hasMoreIssues || hasMorePrs) &&
+      pages < GITHUB_CONFIG.MAX_ISSUE_PAGES
+    ) {
+      pages++;
+
+      const gqlResponse: GraphQLIssuesData = await octokit.graphql<GraphQLIssuesData>(
+        ISSUES_AND_PRS_QUERY,
+        {
+          owner,
+          repo,
+          issueCount: pageSize,
+          prCount: pageSize,
+          commentCount: GITHUB_CONFIG.COMMENTS_PER_ISSUE,
+          issueCursor,
+          prCursor,
+        },
+      );
+
+      const { issues, pullRequests } = gqlResponse.repository;
+
+      // Process issues (isPullRequest = false)
+      await processNodes(issues.nodes, false);
+
+      // Process pull requests (isPullRequest = true)
+      await processNodes(pullRequests.nodes as IssueOrPrNode[], true);
+
+      hasMoreIssues = issues.pageInfo.hasNextPage;
+      hasMorePrs = pullRequests.pageInfo.hasNextPage;
+      issueCursor = issues.pageInfo.endCursor;
+      prCursor = pullRequests.pageInfo.endCursor;
+
+      log("info", `Synced issues/PRs page ${pages}`, {
+        owner,
+        repo,
+        projectId,
+        remaining: { issues: hasMoreIssues, prs: hasMorePrs },
+      });
+    }
 
     log(
       "info",
