@@ -5,6 +5,7 @@ import {
   text,
   boolean,
   index,
+  unique,
   uuid,
   timestamp,
   jsonb,
@@ -105,6 +106,9 @@ export const projectFiles = pgTable(
     return {
       projectIdIdx: index("project_files_project_id_idx").on(table.projectId),
       hashIdx: index("project_files_hash_idx").on(table.hash),
+      projectIdFileNameUnique: unique(
+        "project_files_project_id_file_name_unique",
+      ).on(table.projectId, table.fileName),
     };
   },
 );
@@ -168,6 +172,9 @@ export const commitsTable = pgTable(
       projectIdIdx: index("commits_project_id_idx").on(table.projectId),
       commitHashIdx: index("commits_commit_hash_idx").on(table.commitHash),
       authorDateIdx: index("commits_author_date_idx").on(table.authorDate),
+      commitHashProjectIdUnique: unique(
+        "commits_commit_hash_project_id_unique",
+      ).on(table.commitHash, table.projectId),
     };
   },
 );
@@ -220,23 +227,6 @@ export const chatMessages = pgTable(
     };
   },
 );
-
-// Legacy chat history table (kept for backward compatibility - deprecated)
-export const chatHistoryTable = pgTable("chat_history", {
-  id: uuid("id")
-    .primaryKey()
-    .defaultRandom(),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => usersTable.id, { onDelete: "cascade" }),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projectTables.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 255 }).notNull().default("New Chat"),
-  messages: jsonb("messages").notNull().default([]),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
 
 /**
  * One entry in the `languages` JSONB column of `projectTables`.

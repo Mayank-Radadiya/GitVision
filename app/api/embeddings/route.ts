@@ -3,14 +3,13 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { projectTables, codeEmbeddings } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { processProjectForRag } from "@/src/features/rag/services/rag-ingestion";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { inngest } from "@/src/lib/inngest/client";
 
-// Store active generation promises to prevent GC.
-// ponytail: module-level Map is per-instance only — reliable dedupe would
-// need a DB lock; the DB status field already prevents duplicate work.
-const activeGenerations = new Map<string, Promise<unknown>>();
+// ponytail: dedupe relies on the DB embedding_status field checked inside
+// generateEmbeddings; the in-process Map was dropped when this route became a
+// thin Inngest dispatcher (single durable pipeline).
 
 export async function POST(req: Request) {
   try {
@@ -39,10 +38,7 @@ export async function POST(req: Request) {
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
 
-    if (
-      project.embeddingStatus === "processing" ||
-      activeGenerations.has(projectId)
-    ) {
+    if (project.embeddingStatus === "processing") {
       return NextResponse.json(
         { error: "Embeddings are already being generated" },
         { status: 409 },
@@ -73,23 +69,20 @@ export async function POST(req: Request) {
       }
     }
 
-    const generationPromise = processProjectForRag(projectId)
-      .then((result) => {
-        console.log(
-          `✅ Embeddings done for ${projectId}: ${result.totalEmbeddings} embeddings, ${result.processedFiles} files`,
-        );
-        activeGenerations.delete(projectId);
-      })
-      .catch((error) => {
-        console.error(
-          `❌ Embedding generation failed for ${projectId}:`,
-          error,
-        );
-        activeGenerations.delete(projectId);
+    try {
+      await inngest.send({
+        name: "embeddings/generate",
+        data: { projectId },
       });
+    } catch (error) {
+      console.error("Failed to queue embedding generation:", error);
+      return NextResponse.json(
+        { error: "Failed to queue embedding generation" },
+        { status: 500 },
+      );
+    }
 
-    activeGenerations.set(projectId, generationPromise);
-
+    console.log(`⏳ Embedding generation queued for ${projectId}`);
     return NextResponse.json({ status: "started" });
   } catch (error) {
     if (error instanceof ProjectAccessError) {
@@ -187,10 +180,16 @@ export async function DELETE(req: Request) {
     // Tenant isolation: 404 if the project isn't owned by this user
     await assertProjectOwnership(projectId, userId);
 
-    // Remove from active generations map
-    activeGenerations.delete(projectId);
+    // Cancel any running Inngest function, then reset status for a retry
+    try {
+      await inngest.send({
+        name: "embeddings/cancel",
+        data: { projectId },
+      });
+    } catch (error) {
+      console.error("Failed to send embeddings/cancel event:", error);
+    }
 
-    // Reset DB status back to pending
     await db
       .update(projectTables)
       .set({

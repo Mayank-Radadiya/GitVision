@@ -1,1 +1,0 @@
-ALTER TABLE "projects" ADD COLUMN "total_files" integer DEFAULT 0 NOT NULL;

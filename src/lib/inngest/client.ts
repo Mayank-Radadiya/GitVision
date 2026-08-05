@@ -20,11 +20,6 @@ type Events = {
       projectId: string;
     };
   };
-  "test/hello.world": {
-    data: {
-      email: string;
-    };
-  };
 };
 
 // Create a client to send and receive events
