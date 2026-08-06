@@ -11,7 +11,7 @@ export const LLM_SETTINGS = {
    * streaming fields abort a stalled stream rather than a slow-but-moving one.
    */
   chat: {
-    model: "gemini-2.5-flash",
+    model: "gemini-flash-latest",
     maxRetries: 2,
     maxOutputTokens: 2048,
     timeout: { totalMs: 90_000, firstChunkMs: 20_000, chunkMs: 10_000 },
@@ -21,7 +21,7 @@ export const LLM_SETTINGS = {
    * failure, so retrying is not worth the added latency.
    */
   queryRewrite: {
-    model: "gemini-2.5-flash",
+    model: "gemini-flash-latest",
     maxRetries: 1,
     maxOutputTokens: 40,
     timeout: { totalMs: 10_000, stepMs: 10_000 },
@@ -31,7 +31,7 @@ export const LLM_SETTINGS = {
    * abort signal available).
    */
   commitSummary: {
-    model: "gemini-2.5-flash",
+    model: "gemini-flash-latest",
     maxRetries: 2,
     maxOutputTokens: 1500,
     timeout: { totalMs: 30_000, stepMs: 30_000 },

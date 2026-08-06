@@ -8,6 +8,7 @@ import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/src/lib/trpc/client";
 import { makeQueryClient } from "@/src/lib/trpc/query-client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 
 interface ProviderProps {
@@ -89,18 +90,20 @@ const Provider = ({ children }: ProviderProps) => {
   return (
     <ClerkProvider>
       <MotionConfig reducedMotion="user">
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            enableColorScheme
-            disableTransitionOnChange={false}
-          >
-            <MemoizedToaster />
-            {children}
-          </ThemeProvider>
-        </trpc.Provider>
+        <QueryClientProvider client={queryClient}>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              enableColorScheme
+              disableTransitionOnChange={false}
+            >
+              <MemoizedToaster />
+              {children}
+            </ThemeProvider>
+          </trpc.Provider>
+        </QueryClientProvider>
       </MotionConfig>
     </ClerkProvider>
   );

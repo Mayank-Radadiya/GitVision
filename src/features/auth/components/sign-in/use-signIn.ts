@@ -5,7 +5,7 @@ import { signInZodSchema } from "@/features/auth/schemas/sign-in.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
-import { useSignIn } from "@clerk/nextjs";
+import { useSignIn } from "@clerk/nextjs/legacy";
 import toast from "react-hot-toast";
 
 export function useSignInLogic() {
@@ -49,14 +49,25 @@ export function useSignInLogic() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    if (!isLoaded) return;
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded || !signIn) {
+      toast.error("Clerk is loading. Please try again in a moment.");
+      return;
+    }
     setIsLoading(true);
-    signIn.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/dashboard",
-    });
+    setError(undefined);
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/dashboard",
+      });
+    } catch (err) {
+      console.error("Error signing in with Google:", err);
+      if (isClerkAPIResponseError(err)) setError(err.errors);
+      toast.error("Error signing in with Google. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   return {

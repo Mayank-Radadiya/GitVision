@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp } from "@clerk/nextjs";
+import { useSignUp } from "@clerk/nextjs/legacy";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,16 +59,25 @@ export function useSignUpLogic() {
     }
   };
 
-  const handleGoogleSignUp = () => {
-    if (!isLoaded) return;
+  const handleGoogleSignUp = async () => {
+    if (!isLoaded || !signUp) {
+      toast.error("Clerk is loading. Please try again in a moment.");
+      return;
+    }
     setIsLoading(true);
-    signUp.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/dashboard",
-    });
-
-    setIsLoading(false);
+    setError(undefined);
+    try {
+      await signUp.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/dashboard",
+      });
+    } catch (err) {
+      console.error("Error signing up with Google:", err);
+      if (isClerkAPIResponseError(err)) setError(err.errors);
+      toast.error("Error signing up with Google. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {

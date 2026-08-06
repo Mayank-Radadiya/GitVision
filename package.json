@@ -75,6 +75,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clerk/types": "^4.101.20",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.0",

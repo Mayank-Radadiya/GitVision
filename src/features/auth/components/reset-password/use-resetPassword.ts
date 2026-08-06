@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
 import { useRouter } from "next/navigation";
-import { useSignIn } from "@clerk/nextjs";
+import { useSignIn } from "@clerk/nextjs/legacy";
 import toast from "react-hot-toast";
 
 export function useResetPasswordLogic() {
