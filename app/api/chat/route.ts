@@ -30,6 +30,12 @@ import {
   type CodeContext,
 } from "@/src/features/rag/services/rag/context-fetcher";
 import { getRecentChatHistoryForContext } from "@/src/shared/lib/chat-history";
+import { computeBudget } from "@/src/lib/llm/budget";
+import { RequestTracer } from "@/src/lib/llm/tracing";
+import {
+  extractMessageText,
+  normalizeMessagesForModel,
+} from "@/src/shared/lib/message-extractor";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -237,6 +243,7 @@ async function retrieveContext(
   projectId: string,
   userMessage: string,
   standaloneQuery: string,
+  maxContextTokens?: number,
 ): Promise<{ context: string; relatedFiles: string[] }> {
   // 1. Classify the standalone query
   const classified = classifyQuery(standaloneQuery);
@@ -265,7 +272,10 @@ async function retrieveContext(
         );
 
         if (inFileResults.length > 0) {
-          const inFileContext = formatRetrievedContext(inFileResults);
+          const inFileContext = formatRetrievedContext(
+            inFileResults,
+            maxContextTokens,
+          );
           return {
             context: inFileContext,
             relatedFiles: [targetFile],
@@ -298,7 +308,7 @@ async function retrieveContext(
     0.45,
   );
   const ranked = reRankResults(rawResults, standaloneQuery, 8);
-  const context = formatRetrievedContext(ranked);
+  const context = formatRetrievedContext(ranked, maxContextTokens);
   const relatedFiles = [...new Set(ranked.map((r) => r.filePath))];
 
   return { context, relatedFiles };
@@ -323,12 +333,25 @@ async function spendCredit(userId: string): Promise<number | null> {
 }
 
 export async function POST(req: Request) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  const tracer = new RequestTracer(requestId);
+  const budget = computeBudget(
+    LLM_SETTINGS.chat.model,
+    LLM_SETTINGS.chat.maxOutputTokens,
+  );
+
   try {
     const { userId } = await auth();
     if (!userId) {
       return new Response(
         JSON.stringify({ error: "Unauthorized", code: "unauthorized" }),
-        { status: 401 },
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
       );
     }
 
@@ -340,7 +363,13 @@ export async function POST(req: Request) {
           error: "Rate limit exceeded. Please slow down.",
           code: "rate_limited",
         }),
-        { status: 429, headers: { "Content-Type": "application/json" } },
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
       );
     }
 
@@ -353,17 +382,28 @@ export async function POST(req: Request) {
           error: "Messages required",
           code: "invalid_request",
         }),
-        { status: 400 },
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
       );
     }
 
-    const userMessage = messages[messages.length - 1]?.content as
-      | string
-      | undefined;
+    const lastMessage = messages[messages.length - 1];
+    const userMessage = extractMessageText(lastMessage);
     if (!userMessage) {
       return new Response(
         JSON.stringify({ error: "Empty message", code: "invalid_request" }),
-        { status: 400 },
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
       );
     }
 
@@ -381,7 +421,13 @@ export async function POST(req: Request) {
             error: "Chat not found",
             code: "chat_not_found",
           }),
-          { status: 404 },
+          {
+            status: 404,
+            headers: {
+              "Content-Type": "application/json",
+              "x-request-id": requestId,
+            },
+          },
         );
       }
 
@@ -402,16 +448,15 @@ export async function POST(req: Request) {
           error: "You're out of credits. Please top up to continue chatting.",
           code: "out_of_credits",
         }),
-        { status: 402, headers: { "Content-Type": "application/json" } },
+        {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
       );
     }
-
-    // -----------------------------------------------------------------------
-    // Fast project metadata read — kept OUTSIDE the stream so ownership errors
-    // still return a real 404 and the response starts streaming immediately.
-    // The slow retrieval work happens inside execute() below so the client
-    // receives live phase statuses instead of a silent wait.
-    // -----------------------------------------------------------------------
 
     let projectInfo: {
       projectName: string;
@@ -420,8 +465,6 @@ export async function POST(req: Request) {
     } | null = null;
 
     if (mode === "project" && projectId) {
-      // Tenant isolation — the requesting user must own this project.
-      // Throws ProjectAccessError → 404 via the outer catch (no fallback).
       await assertProjectOwnership(projectId, userId);
 
       const [project] = await db
@@ -437,13 +480,11 @@ export async function POST(req: Request) {
       projectInfo = project ?? null;
     }
 
+    let activeRetrievalPath: "rag" | "small-dump" | "not-indexed" = "not-indexed";
+
     const stream = createUIMessageStream({
-      // Replaces the SDK default `() => "An error occurred."` so the client
-      // learns the real cause (timeout / model failure) instead of a generic
-      // message. Payload is JSON so the client can parse code + message.
       onError: (error) => {
         if (req.signal.aborted) {
-          // User-initiated stop — the client ignores this.
           return JSON.stringify({ code: "aborted", message: "" });
         }
         const { code, message } = categorizeModelError(error);
@@ -457,19 +498,24 @@ export async function POST(req: Request) {
         if (mode === "project" && projectId && projectInfo) {
           try {
             if (projectInfo.embeddingStatus !== "completed") {
+              activeRetrievalPath = "not-indexed";
               systemPrompt = `You are GitVision AI. The project "${
                 projectInfo.projectName
               }" has not been fully indexed yet (status: ${
                 projectInfo.embeddingStatus ?? "unknown"
               }). Please let the user know that embeddings need to be generated before codebase-aware chat can work. You can still answer general programming questions.`;
             } else {
-              // Conversation history for both prompts and query rewrite
               let conversationHistory = "No previous conversation.";
               if (chatId) {
                 try {
-                  conversationHistory = await getRecentChatHistoryForContext(
-                    chatId,
-                    4,
+                  conversationHistory = await tracer.timeStage(
+                    "load_history",
+                    () =>
+                      getRecentChatHistoryForContext(
+                        chatId,
+                        4,
+                        budget.history,
+                      ),
                   );
                 } catch (historyError) {
                   console.warn(
@@ -479,39 +525,36 @@ export async function POST(req: Request) {
                 }
               }
 
-              // ----------------------------------------------------------------
-              // FAST PATH: small project — dump entire codebase into context
-              // ----------------------------------------------------------------
               if (isSmallProject(projectInfo.estimatedTokens)) {
+                activeRetrievalPath = "small-dump";
                 writer.write({
                   type: "data-status",
                   data: { type: "status", value: "searching" },
                 });
 
-                const fullContext = await getAllProjectFilesForContext(
-                  projectId,
+                const fullContext = await tracer.timeStage("small_dump", () =>
+                  getAllProjectFilesForContext(projectId, budget.context),
                 );
                 systemPrompt = buildSmallProjectSystemPrompt(
                   projectInfo.projectName,
                   fullContext,
                   conversationHistory,
                 );
-                // No specific files to highlight — the whole project is in context
               } else {
-                // ----------------------------------------------------------------
-                // RAG PATH: large project — rewrite query → classify → retrieve
-                // ----------------------------------------------------------------
+                activeRetrievalPath = "rag";
                 writer.write({
                   type: "data-status",
                   data: { type: "status", value: "rewriting" },
                 });
 
-                // Rewrite only when there's real history (skips the LLM call on
-                // first message, saving ~100ms)
-                const standaloneQuery = await rewriteQueryForRetrieval(
-                  userMessage,
-                  conversationHistory,
-                  req.signal,
+                const standaloneQuery = await tracer.timeStage(
+                  "rewrite",
+                  () =>
+                    rewriteQueryForRetrieval(
+                      userMessage,
+                      conversationHistory,
+                      req.signal,
+                    ),
                 );
 
                 writer.write({
@@ -519,10 +562,15 @@ export async function POST(req: Request) {
                   data: { type: "status", value: "searching" },
                 });
 
-                const { context, relatedFiles: files } = await retrieveContext(
-                  projectId,
-                  userMessage,
-                  standaloneQuery,
+                const { context, relatedFiles: files } = await tracer.timeStage(
+                  "retrieve",
+                  () =>
+                    retrieveContext(
+                      projectId,
+                      userMessage,
+                      standaloneQuery,
+                      budget.context,
+                    ),
                 );
                 relatedFiles = files;
 
@@ -531,7 +579,10 @@ export async function POST(req: Request) {
                   data: { type: "status", value: "ranking" },
                 });
 
-                const projectStats = await getProjectContext(projectId);
+                const projectStats = await tracer.timeStage(
+                  "project_stats",
+                  () => getProjectContext(projectId),
+                );
 
                 systemPrompt = buildRagSystemPrompt(
                   projectInfo.projectName,
@@ -546,12 +597,9 @@ export async function POST(req: Request) {
               "[RAG] Retrieval error, falling back to general mode:",
               ragError,
             );
-            // systemPrompt stays as SYSTEM_PROMPT_GENERAL — graceful degradation
           }
         }
 
-        // Once sources are known, send them (resolved above before the LLM
-        // token stream starts)
         if (relatedFiles.length > 0) {
           writer.write({
             type: "data-sources",
@@ -559,51 +607,54 @@ export async function POST(req: Request) {
           });
         }
 
-        // Stream LLM tokens
         const result = streamText({
           model: google(LLM_SETTINGS.chat.model),
           maxRetries: LLM_SETTINGS.chat.maxRetries,
           maxOutputTokens: LLM_SETTINGS.chat.maxOutputTokens,
           timeout: LLM_SETTINGS.chat.timeout,
-          // Client Stop/unmount aborts the upstream Gemini call — no ghost
-          // streams or wasted tokens.
           abortSignal: req.signal,
           system: systemPrompt,
-          messages,
+          messages: normalizeMessagesForModel(messages),
           onFinish: async ({ text }) => {
-            if (!chatId) return;
+            if (chatId) {
+              await Promise.all([
+                db.insert(chatMessages).values({
+                  chatId,
+                  role: "assistant",
+                  content: text,
+                  relatedFiles,
+                  createdAt: new Date(),
+                }),
+                db
+                  .update(projectChats)
+                  .set({ updatedAt: new Date() })
+                  .where(eq(projectChats.id, chatId)),
+              ]);
 
-            await Promise.all([
-              db.insert(chatMessages).values({
-                chatId,
-                role: "assistant",
-                content: text,
-                relatedFiles,
-                createdAt: new Date(),
-              }),
-              db
-                .update(projectChats)
-                .set({ updatedAt: new Date() })
-                .where(eq(projectChats.id, chatId)),
-            ]);
+              const [chat] = await db
+                .select({ title: projectChats.title })
+                .from(projectChats)
+                .where(eq(projectChats.id, chatId))
+                .limit(1);
 
-            // Auto-generate title from first message
-            const [chat] = await db
-              .select({ title: projectChats.title })
-              .from(projectChats)
-              .where(eq(projectChats.id, chatId))
-              .limit(1);
-
-            if (
-              chat?.title === "General Chat" ||
-              chat?.title === "Project Chat" ||
-              chat?.title === "New Chat"
-            ) {
-              await db
-                .update(projectChats)
-                .set({ title: userMessage.slice(0, 80).trim() })
-                .where(eq(projectChats.id, chatId));
+              if (
+                chat?.title === "General Chat" ||
+                chat?.title === "Project Chat" ||
+                chat?.title === "New Chat"
+              ) {
+                await db
+                  .update(projectChats)
+                  .set({ title: userMessage.slice(0, 80).trim() })
+                  .where(eq(projectChats.id, chatId));
+              }
             }
+
+            tracer.logTurnSummary({
+              chatId,
+              projectId,
+              retrievalPath: activeRetrievalPath,
+              hitCount: relatedFiles.length,
+            });
           },
         });
 
@@ -611,7 +662,9 @@ export async function POST(req: Request) {
       },
     });
 
-    return createUIMessageStreamResponse({ stream });
+    const response = createUIMessageStreamResponse({ stream });
+    response.headers.set("x-request-id", requestId);
+    return response;
   } catch (error) {
     if (error instanceof ProjectAccessError) {
       return new Response(
@@ -621,7 +674,10 @@ export async function POST(req: Request) {
         }),
         {
           status: 404,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
         },
       );
     }
@@ -633,7 +689,10 @@ export async function POST(req: Request) {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-request-id": requestId,
+        },
       },
     );
   }

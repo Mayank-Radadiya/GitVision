@@ -6,6 +6,7 @@
 import { db } from "@/db";
 import { codeEmbeddings, projectFiles } from "@/db/schema";
 import { cosineDistance, desc, gt, sql, eq, and, inArray } from "drizzle-orm";
+import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 
 export interface SearchResult {
   id: string;
@@ -205,25 +206,39 @@ export async function getProjectContext(projectId: string): Promise<{
  * Creates a formatted string of code chunks with metadata
  * 
  * @param results - Search results from vector search
+ * @param maxTokens - Optional token budget for formatted context
  * @returns Formatted context string
  */
-export function formatRetrievedContext(results: SearchResult[]): string {
+export function formatRetrievedContext(
+  results: SearchResult[],
+  maxTokens?: number,
+): string {
   if (results.length === 0) {
     return "No relevant code found for this query.";
   }
-  
-  return results
-    .map(
-      (result, index) => `
+
+  let items = results.map((result, index) => {
+    const text = `
 --- CODE CHUNK ${index + 1} ---
 File: ${result.filePath}
 Similarity: ${(result.similarity * 100).toFixed(1)}%
 Token Count: ${result.tokenCount}
 
 ${result.chunkContent}
-`,
-    )
-    .join("\n");
+`;
+    return { text, approxTokens: result.tokenCount || estimateTokens(text) };
+  });
+
+  if (maxTokens !== undefined && maxTokens > 0) {
+    const fit = fitToBudget(items, maxTokens);
+    items = fit.included;
+  }
+
+  if (items.length === 0) {
+    return "No relevant code found for this query.";
+  }
+  
+  return items.map((i) => i.text).join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -364,9 +379,13 @@ export function isSmallProject(estimatedTokens: number | null): boolean {
  * Fetch all project files and format them as a single context string.
  * Only called on the fast path when isSmallProject() is true.
  * Files are sorted so smaller files (less noise) come first.
+ *
+ * @param projectId - Project ID
+ * @param maxTokens - Optional budget limit for context dump
  */
 export async function getAllProjectFilesForContext(
   projectId: string,
+  maxTokens?: number,
 ): Promise<string> {
   try {
     const files = await db
@@ -385,12 +404,22 @@ export async function getAllProjectFilesForContext(
     // Sort by file size ascending so important small config/type files appear first
     files.sort((a, b) => a.code.length - b.code.length);
 
-    const formatted = files.map((f) => {
+    let items = files.map((f) => {
       const lang = f.language ?? f.fileName.split(".").pop() ?? "text";
-      return `\`\`\`${lang}\n// File: ${f.fileName}\n${f.code}\n\`\`\``;
+      const text = `\`\`\`${lang}\n// File: ${f.fileName}\n${f.code}\n\`\`\``;
+      return { text, approxTokens: estimateTokens(text) };
     });
 
-    return formatted.join("\n\n");
+    if (maxTokens !== undefined && maxTokens > 0) {
+      const fit = fitToBudget(items, maxTokens);
+      items = fit.included;
+    }
+
+    if (items.length === 0) {
+      return "No files could be fitted within the budget for this project.";
+    }
+
+    return items.map((i) => i.text).join("\n\n");
   } catch (error) {
     console.error("Error fetching all project files:", error);
     throw new Error(
