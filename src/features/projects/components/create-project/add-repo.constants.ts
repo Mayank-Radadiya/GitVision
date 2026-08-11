@@ -15,8 +15,8 @@ export type CreateProjectInput = z.infer<typeof projectCreateSchema>;
 
 export interface Step {
   id: number;
-  title: string;
-  description: string;
+  /** Mono, uppercase, tracked-out label — e.g. "01 DETAILS" */
+  label: string;
 }
 
 export interface RepoInfo {
@@ -24,32 +24,10 @@ export interface RepoInfo {
   repo: string;
 }
 
-// ─── Steps Configuration ─────────────────────────────────────────────────────
+// ─── Steps — drawn as commit nodes on the branch timeline (brief §5.2) ──────
 
 export const FORM_STEPS: Step[] = [
-  { id: 1, title: "Enter Details", description: "Name and URL" },
-  { id: 2, title: "Validation", description: "Check repository" },
-  { id: 3, title: "Analysis", description: "Process data" },
+  { id: 1, label: "01 DETAILS" },
+  { id: 2, label: "02 VALIDATION" },
+  { id: 3, label: "03 ANALYSIS" },
 ];
-
-// ─── Animation Configuration ─────────────────────────────────────────────────
-
-export const CARD_ANIMATION = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4, delay: 0.1 },
-} as const;
-
-export const HEADER_ICON_ANIMATION = {
-  initial: { scale: 0.8, opacity: 0 },
-  animate: { scale: 1, opacity: 1 },
-  transition: { duration: 0.3, delay: 0.2 },
-} as const;
-
-// ─── Style Configuration ─────────────────────────────────────────────────────
-
-export const STEP_COLORS = {
-  completed: "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",
-  active: "bg-primary text-white shadow-lg shadow-primary/30",
-  inactive: "bg-muted text-muted-foreground",
-} as const;

@@ -1,23 +1,31 @@
 /**
- * Repository URL Field — Input with live GitHub URL preview.
- * Shows repo preview card when a valid GitHub URL is detected.
- * Uses AnimatePresence for smooth enter/exit of preview and errors.
+ * =============================================================================
+ * REPOSITORY URL FIELD — Live Terminal & Interface Voice (Brief § Signature Moment)
+ * =============================================================================
+ *
+ * Features:
+ * 1. Monospace terminal echo line directly under the input field.
+ * 2. Typewriter animation (~30 cps): "resolving {owner}/{repo}…" → "found."
+ * 3. Detected badge: "Found {owner}/{repo}" in git-diff green (--diff-add-500).
+ * 4. Validation failure: Single border pulse in --diff-remove-500 and inline copy
+ *    "Can't find that repository. Check the URL and try again."
+ * 5. Reduced motion: Instant text display without typewriter delays.
  */
 
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { Github, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
-import { cn } from "@/shared/lib/utils";
-import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { CreateProjectInput, RepoInfo } from "../add-repo.constants";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AlertCircle, CheckCircle2, Terminal } from "lucide-react";
+import { Field } from "./Field";
+import type { UseFormRegister, FieldErrors } from "react-hook-form";
+import type { CreateProjectInput, RepoInfo } from "../add-repo.constants";
+import { extractRepoInfo } from "../add-repo.utils";
 
 interface RepositoryUrlFieldProps {
   register: UseFormRegister<CreateProjectInput>;
   errors: FieldErrors<CreateProjectInput>;
-  isDirty: boolean;
+  value: string;
   isLoading: boolean;
   repoPreview: RepoInfo | null;
 }
@@ -25,97 +33,126 @@ interface RepositoryUrlFieldProps {
 export function RepositoryUrlField({
   register,
   errors,
-  isDirty,
+  value,
   isLoading,
   repoPreview,
 }: RepositoryUrlFieldProps) {
+  const reduced = useReducedMotion();
   const hasError = !!errors.repoUrl;
-  const isValid = isDirty && !hasError;
+  const isValid = repoPreview !== null && !hasError;
+  const rawInfo = extractRepoInfo(value);
+
+  // ─── Terminal Typewriter Effect (~30 cps = ~33ms/char) ───────────────────
+  const [displayedText, setDisplayedText] = useState("");
+  const [isDoneTyping, setIsDoneTyping] = useState(false);
+
+  // Formulate full target terminal string
+  const targetMessage = rawInfo
+    ? `resolving ${rawInfo.owner}/${rawInfo.repo}…`
+    : value.length > 5
+      ? `resolving target repository…`
+      : "";
+
+  useEffect(() => {
+    if (!targetMessage) {
+      setDisplayedText("");
+      setIsDoneTyping(false);
+      return;
+    }
+
+    if (reduced) {
+      setDisplayedText(targetMessage);
+      setIsDoneTyping(true);
+      return;
+    }
+
+    // Reset and typewriter increment
+    setDisplayedText("");
+    setIsDoneTyping(false);
+    let index = 0;
+    const timer = setInterval(() => {
+      index++;
+      if (index <= targetMessage.length) {
+        setDisplayedText(targetMessage.slice(0, index));
+      } else {
+        setIsDoneTyping(true);
+        clearInterval(timer);
+      }
+    }, 33); // ~30 cps
+
+    return () => clearInterval(timer);
+  }, [targetMessage, reduced]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: 0.6 }}
-      className="space-y-2"
-    >
-      <Label
-        htmlFor="repoUrl"
-        className="flex items-center gap-2 text-sm font-semibold"
-      >
-        <Github className="h-4 w-4 text-muted-foreground" />
-        GitHub Repository URL
-      </Label>
-      <div className="relative">
-        <Input
-          id="repoUrl"
-          type="url"
-          {...register("repoUrl")}
-          placeholder="https://github.com/username/repository"
-          className={cn(
-            "h-12 pl-4 pr-10",
-            "bg-background/50 backdrop-blur-sm",
-            "border-border/60 hover:border-primary/50 focus:border-primary",
-            "transition-all duration-200",
-            "placeholder:text-muted-foreground/50",
-            hasError && "border-destructive focus:border-destructive",
-            isValid && "border-emerald-500/50 focus:border-emerald-500",
-          )}
-          disabled={isLoading}
-        />
-        <AnimatePresence>
-          {isValid && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-            >
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-      <AnimatePresence mode="wait">
-        {errors.repoUrl?.message && (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-1.5 text-xs text-destructive"
-          >
-            <AlertCircle className="h-3.5 w-3.5" />
-            {errors.repoUrl.message}
-          </motion.p>
-        )}
-      </AnimatePresence>
-
-      {/* Repository Preview */}
-      <AnimatePresence>
-        {repoPreview && !hasError && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 overflow-hidden"
-          >
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Github className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  {repoPreview.owner}/{repoPreview.repo}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Repository detected
-                </p>
-              </div>
-              <ExternalLink className="h-4 w-4 text-muted-foreground" />
+    <div className="space-y-3">
+      <Field
+        id="repoUrl"
+        label="GitHub Repository URL"
+        type="url"
+        autoComplete="off"
+        value={value}
+        disabled={isLoading}
+        ariaInvalid={hasError}
+        registration={register("repoUrl")}
+        helper={
+          hasError ? (
+            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-ember animate-pulse-once">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>Can&apos;t find that repository. Check the URL and try again.</span>
             </div>
+          ) : isValid ? (
+            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-moss">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-gv-moss" />
+              <span>Found {repoPreview.owner}/{repoPreview.repo}</span>
+            </div>
+          ) : (
+            <span className="font-gv-mono text-xs text-gv-fog">
+              Full GitHub URL, e.g. https://github.com/owner/repo
+            </span>
+          )
+        }
+      />
+
+      {/* ─── Signature Terminal Echo Line ──────────────────────────────────── */}
+      {value.trim().length > 0 && !hasError && (
+        <div className="flex items-center gap-2 rounded-md border border-gv-hairline bg-gv-graphite-2 px-3 py-2 font-gv-mono text-xs text-gv-bone">
+          <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire" />
+          <div className="flex items-center gap-1">
+            <span className="text-gv-fog">{displayedText}</span>
+            {isValid && isDoneTyping && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="font-semibold text-gv-moss"
+              >
+                found.
+              </motion.span>
+            )}
+            {!isDoneTyping && !reduced && (
+              <span className="inline-block h-3 w-1.5 animate-pulse bg-gv-wire" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Detected Badge: "Found {owner}/{repo}" ────────────────────────── */}
+      <AnimatePresence>
+        {isValid && repoPreview && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-gv-moss/30 bg-gv-moss/10 px-2.5 py-1 font-gv-mono text-xs text-gv-moss">
+              <span className="opacity-70">Found</span>
+              <span className="font-semibold">{repoPreview.owner}</span>
+              <span className="opacity-50">/</span>
+              <span className="font-semibold">{repoPreview.repo}</span>
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

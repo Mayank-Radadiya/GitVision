@@ -50,6 +50,29 @@ body {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* GitVision add-repo identity — see brief */
+  --font-gv-display: var(--font-gv-display);
+  --font-gv-body: var(--font-gv-body);
+  --font-gv-mono: var(--font-gv-mono);
+  --color-gv-void: var(--gv-void);
+  --color-gv-graphite: var(--gv-graphite);
+  --color-gv-graphite-2: var(--gv-graphite-2);
+  --color-gv-hairline: var(--gv-hairline);
+  --color-gv-fog: var(--gv-fog);
+  --color-gv-bone: var(--gv-bone);
+  --color-gv-amber: var(--gv-amber);
+  --color-gv-moss: var(--gv-moss);
+  --color-gv-ember: var(--gv-ember);
+  --color-gv-wire: var(--gv-wire);
+  --color-ink-950: var(--ink-950);
+  --color-ink-900: var(--ink-900);
+  --color-ink-800: var(--ink-800);
+  --color-ember-500: var(--ember-500);
+  --color-diff-add-500: var(--diff-add-500);
+  --color-diff-remove-500: var(--diff-remove-500);
+  --color-wire-400: var(--wire-400);
+  --color-text-100: var(--text-100);
+  --color-text-500: var(--text-500);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -77,8 +100,6 @@ body {
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -87,6 +108,28 @@ body {
 
 :root {
   --radius: 0.5rem;
+  /* GitVision redesign palette — cold blue-violet dark tone (brief §2) */
+  --ink-950: #0A0B0F;
+  --ink-900: #14161F;
+  --ink-800: #1D2029;
+  --ember-500: #E8A33D;
+  --diff-add-500: #5FBF7A;
+  --diff-remove-500: #E2607A;
+  --wire-400: #4FD1D9;
+  --text-100: #F1EFE9;
+  --text-500: #8A8D98;
+
+  /* Backwards-compatible mappings for existing components */
+  --gv-void: var(--ink-950);
+  --gv-graphite: var(--ink-900);
+  --gv-graphite-2: var(--ink-800);
+  --gv-hairline: #262c36;
+  --gv-fog: var(--text-500);
+  --gv-bone: var(--text-100);
+  --gv-amber: var(--ember-500);
+  --gv-moss: var(--diff-add-500);
+  --gv-ember: var(--diff-remove-500);
+  --gv-wire: var(--wire-400);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -187,6 +230,121 @@ body {
 /* Custom Spotlight Card Styles */
 .custom-spotlight-card {
   background-color: transparent !important;
+}
+
+/* ─── GitVision add-repo page ───────────────────────────────────────────── */
+
+/* Dark-first identity page: force dark color-scheme regardless of theme */
+.gv-page {
+  color-scheme: dark;
+  background: var(--ink-950);
+  color: var(--text-100);
+}
+
+/* Ambient graph float — ±4px vertical drift over 8s loops (brief Signature Moment) */
+@keyframes gv-ambient-drift {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.gv-drift {
+  animation: gv-ambient-drift 8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Wire traveling light pulse — soft light traveling along an edge on ~4s loop */
+@keyframes gv-wire-pulse {
+  0% {
+    stroke-dashoffset: 160;
+    opacity: 0.1;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  70% {
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: -160;
+    opacity: 0.1;
+  }
+}
+.gv-wire-pulse {
+  stroke-dasharray: 40 120;
+  animation: gv-wire-pulse 4s linear infinite;
+}
+
+/* Active step node — slow HEAD-pointer pulse (2s) */
+@keyframes gv-head-pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.45);
+  }
+}
+.gv-head-pulse {
+  animation: gv-head-pulse 2s ease-in-out infinite;
+}
+
+/* Submit button scan-line sweep (left-to-right progress bar reading a diff) */
+@keyframes gv-scanline-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.gv-scanline-sweep {
+  animation: gv-scanline-sweep 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Validation error single border pulse */
+@keyframes gv-error-border-pulse {
+  0%, 100% {
+    border-color: var(--diff-remove-500);
+    box-shadow: 0 0 0 2px rgba(226, 96, 122, 0.25);
+  }
+  50% {
+    border-color: var(--diff-remove-500);
+    box-shadow: 0 0 0 4px rgba(226, 96, 122, 0.45);
+  }
+}
+.gv-input-error {
+  animation: gv-error-border-pulse 0.4s ease-out 1;
+}
+
+/* Primary CTA — amber fill sweeps left→right on hover */
+.gv-cta {
+  background-image: linear-gradient(
+    90deg,
+    var(--ember-500) 0%,
+    var(--ember-500) 50%,
+    transparent 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  transition:
+    background-position 250ms ease-out,
+    color 250ms ease-out,
+    border-color 250ms ease-out,
+    opacity 200ms ease-out;
+}
+.gv-cta:hover:not(:disabled) {
+  background-position: 0 0;
+  color: var(--ink-950);
+}
+.gv-cta:disabled {
+  background-image: none;
 }
 
 /* Custom Animations */
@@ -313,7 +471,12 @@ body {
   .animate-shimmer-text,
   .animate-pulse,
   .animate-bounce,
-  .animate-spin {
+  .animate-spin,
+  .gv-drift,
+  .gv-wire-pulse,
+  .gv-scanline-sweep,
+  .gv-input-error,
+  .gv-head-pulse {
     animation: none !important;
   }
 }

@@ -4,42 +4,66 @@
  * Create New Project — Form Orchestrator
  *
  * Architecture:
- * - This file: form state + tRPC mutation wiring
+ * - This file: form state + tRPC mutation wiring + staggered entrance animation
  * - use-create-project.ts: mutation hook (toasts, cache, redirect)
  * - components/: presentational form fields (no data fetching)
  *
- * tRPC mutation replaces the old axios.post("/api/project/createProject").
- * Progress steps now reflect real mutation state instead of fake delays.
+ * Staggered entrance animation:
+ * - Uses expo-out curve cubic-bezier(0.16, 1, 0.3, 1)
+ * - Stagger interval ~120ms, duration 450ms
  */
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectCreateSchema } from "@/src/lib/validation/schemas";
-import { cn } from "@/shared/lib/utils";
 
-import { CreateProjectInput, CARD_ANIMATION } from "./add-repo.constants";
+import {
+  CreateProjectInput,
+  RepoInfo,
+} from "./add-repo.constants";
 import { extractRepoInfo } from "./add-repo.utils";
 import { useCreateProject } from "@/features/projects/hooks/use-create-project";
 import {
+  BackLink,
+  CreditsGauge,
+  FeatureChips,
   FormHeader,
-  ProgressSteps,
+  GitGraphBackground,
   ProjectNameField,
   RepositoryUrlField,
+  StepTimeline,
   SubmitButton,
-  InfoCards,
 } from "./components";
 
-/**
- * Main form component for creating a new project.
- * Uses tRPC project.create mutation via useCreateProject() hook.
- */
+const EXPO_OUT = [0.16, 1, 0.3, 1] as const;
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: EXPO_OUT,
+    },
+  },
+};
+
+/** Main form component for creating a new project. */
 export default function CreateNewProjectForm() {
-  const router = useRouter();
   const createProject = useCreateProject();
 
   // ─── Form setup ─────────────────────────────────────────────────────────
@@ -47,29 +71,39 @@ export default function CreateNewProjectForm() {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isValid, dirtyFields },
+    formState: { errors, isValid },
   } = useForm<CreateProjectInput>({
     defaultValues: { projectName: "", repoUrl: "" },
     resolver: zodResolver(projectCreateSchema),
     mode: "onChange",
   });
 
-  // ─── Repo preview (extracted from URL) ──────────────────────────────────
+  const projectName = watch("projectName");
   const repoUrl = watch("repoUrl");
-  const [repoPreview, setRepoPreview] = useState<{
-    owner: string;
-    repo: string;
-  } | null>(null);
+
+  // ─── Repo validation → feeds the living graph (debounced 300ms) ───────────
+  const [repoPreview, setRepoPreview] = useState<RepoInfo | null>(null);
+  const [repoValid, setRepoValid] = useState(false);
 
   useEffect(() => {
-    if (repoUrl && !errors.repoUrl) {
-      setRepoPreview(extractRepoInfo(repoUrl));
-    } else {
+    if (!repoUrl) {
       setRepoPreview(null);
+      setRepoValid(false);
+      return;
     }
+    const t = setTimeout(() => {
+      if (!errors.repoUrl) {
+        setRepoPreview(extractRepoInfo(repoUrl));
+        setRepoValid(true);
+      } else {
+        setRepoPreview(null);
+        setRepoValid(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
   }, [repoUrl, errors.repoUrl]);
 
-  // ─── Derive step from mutation state (real progress, not fake delays) ──
+  // ─── Derive step from real mutation state ────────────────────────────────
   const currentStep = createProject.isPending
     ? 2
     : createProject.isSuccess
@@ -77,87 +111,72 @@ export default function CreateNewProjectForm() {
       : 1;
   const isLoading = createProject.isPending;
 
-  // ─── Submit handler ─────────────────────────────────────────────────────
   const onSubmit = (data: CreateProjectInput) => {
     createProject.mutate(data);
   };
 
   return (
-    <div className="min-h-screen p-6 lg:p-8">
-      <div className="mx-auto max-w-2xl">
-        {/* Back Button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
+    <div className="gv-page relative min-h-screen">
+      {/* Signature element — the living branch graph behind everything */}
+      <GitGraphBackground
+        projectName={projectName}
+        repoValid={repoValid}
+        repoInfo={repoPreview}
+        isSubmitting={createProject.isPending}
+        isSubmitted={createProject.isSuccess}
+      />
+
+      {/* Content — form panel left-of-center so the graph stays in view */}
+      <div className="relative z-10 mx-auto w-full max-w-[1200px] px-6 py-8 lg:px-10 lg:py-12">
+        <BackLink />
+
+        <motion.section
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="mt-10 w-full max-w-[520px] rounded-lg border border-gv-hairline bg-gv-graphite p-7 shadow-2xl sm:p-9 lg:mt-16"
         >
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/dashboard")}
-            className="mb-6 gap-2 hover:bg-accent/50 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-        </motion.div>
+          <motion.div variants={itemVariants}>
+            <FormHeader />
+          </motion.div>
 
-        {/* Main Card */}
-        <motion.div {...CARD_ANIMATION} className="group">
-          <div
-            className={cn(
-              "relative overflow-hidden rounded-3xl border",
-              "bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl",
-              "border-border/50",
-              "shadow-2xl shadow-black/10 dark:shadow-black/40",
-              "hover:shadow-primary/5 transition-shadow duration-500",
-            )}
-          >
-            {/* Gradient Accents */}
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 opacity-60 blur-3xl" />
-            <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 opacity-40 blur-3xl" />
+          <motion.div variants={itemVariants} className="mt-9">
+            <StepTimeline currentStep={currentStep} />
+          </motion.div>
 
-            {/* Content */}
-            <div className="relative z-10 p-8 lg:p-10">
-              <FormHeader />
-              <ProgressSteps currentStep={currentStep} />
+          <form onSubmit={handleSubmit(onSubmit)} className="mt-9 space-y-7">
+            <motion.div variants={itemVariants}>
+              <ProjectNameField
+                register={register}
+                errors={errors}
+                value={projectName}
+                isLoading={isLoading}
+              />
+            </motion.div>
 
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <ProjectNameField
-                  register={register}
-                  errors={errors}
-                  isDirty={!!dirtyFields.projectName}
-                  isLoading={isLoading}
-                />
+            <motion.div variants={itemVariants}>
+              <RepositoryUrlField
+                register={register}
+                errors={errors}
+                value={repoUrl}
+                isLoading={isLoading}
+                repoPreview={repoPreview}
+              />
+            </motion.div>
 
-                <RepositoryUrlField
-                  register={register}
-                  errors={errors}
-                  isDirty={!!dirtyFields.repoUrl}
-                  isLoading={isLoading}
-                  repoPreview={repoPreview}
-                />
+            <motion.div variants={itemVariants}>
+              <SubmitButton isLoading={isLoading} isValid={isValid} />
+            </motion.div>
+          </form>
 
-                <SubmitButton
-                  isLoading={isLoading}
-                  isValid={isValid}
-                  currentStep={currentStep}
-                />
-              </form>
+          <motion.div variants={itemVariants} className="mt-9">
+            <FeatureChips />
+          </motion.div>
 
-              <InfoCards />
-            </div>
-
-            {/* Bottom Gradient Line — visible when form is valid */}
-            <div
-              className={cn(
-                "absolute bottom-0 left-0 right-0 h-1",
-                "bg-gradient-to-r from-primary via-orange-500 to-primary",
-                "opacity-0 transition-opacity duration-500",
-                isValid && !isLoading && "opacity-100",
-              )}
-            />
-          </div>
-        </motion.div>
+          <motion.div variants={itemVariants} className="mt-8 border-t border-gv-hairline pt-6">
+            <CreditsGauge />
+          </motion.div>
+        </motion.section>
       </div>
     </div>
   );

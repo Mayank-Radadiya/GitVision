@@ -1,59 +1,80 @@
 /**
  * =============================================================================
- * SUBMIT BUTTON COMPONENT
+ * PRIMARY CTA — "Add Repository" (Brief § Signature Moment & §5.5)
  * =============================================================================
+ *
+ * Behavior:
+ * - Idle: dark graphite fill (--ink-900), 1px amber border (--ember-500), warm off-white text.
+ * - Hover: amber fill sweeps left-to-right (.gv-cta), text flips to --ink-950.
+ * - Submitting: button plays a left-to-right scan-line sweep inside itself
+ *   (like a progress bar reading a diff) instead of a generic spinner.
+ * - Reduced motion: cut scan-line animation; render direct state text.
  */
 
 "use client";
 
-import { motion } from "framer-motion";
-import { Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { motion, useReducedMotion } from "framer-motion";
+import { GitCommit } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
-import { getLoadingMessage } from "../add-repo.utils";
 
 interface SubmitButtonProps {
   isLoading: boolean;
   isValid: boolean;
-  currentStep: number;
 }
 
-export function SubmitButton({
-  isLoading,
-  isValid,
-  currentStep,
-}: SubmitButtonProps) {
+export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
+  const reduced = useReducedMotion();
+  const idle = isValid && !isLoading;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: 0.7 }}
+    <button
+      type="submit"
+      disabled={isLoading || !isValid}
+      aria-busy={isLoading}
+      className={cn(
+        "relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-lg border font-gv-mono text-sm font-semibold tracking-wide transition-all duration-200",
+        idle
+          ? "gv-cta border-gv-amber bg-gv-graphite text-gv-bone cursor-pointer shadow-sm hover:shadow"
+          : "border-gv-hairline bg-gv-graphite text-gv-fog opacity-50 cursor-not-allowed",
+      )}
     >
-      <Button
-        type="submit"
-        disabled={isLoading || !isValid}
-        className={cn(
-          "h-12 w-full gap-2 rounded-xl font-semibold text-base",
-          "bg-gradient-to-r from-primary to-violet-600",
-          "shadow-lg shadow-primary/25",
-          "hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02]",
-          "active:scale-[0.98]",
-          "transition-all duration-300",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-        )}
-      >
+      {/* ─── Left-to-Right Scan-Line Sweep on Submit ────────────────────── */}
+      {isLoading && (
+        <>
+          {!reduced && (
+            <div
+              aria-hidden
+              className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-gv-amber/30 to-transparent gv-scanline-sweep"
+            />
+          )}
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-gv-amber opacity-80"
+          />
+        </>
+      )}
+
+      {/* ─── Button Content ────────────────────────────────────────────────── */}
+      <span className="relative z-10 flex items-center justify-center gap-2">
         {isLoading ? (
           <>
-            <Loader2 className="h-5 w-5 animate-spin" />
-            {getLoadingMessage(currentStep)}
+            <motion.span
+              animate={reduced ? {} : { rotate: 360 }}
+              transition={reduced ? {} : { duration: 1.5, repeat: Infinity, ease: "linear" }}
+            >
+              <GitCommit className="h-4 w-4 text-gv-amber" />
+            </motion.span>
+            <span className="font-gv-mono text-sm font-semibold tracking-wider text-gv-bone">
+              Resolving diff…
+            </span>
           </>
         ) : (
           <>
-            <Sparkles className="h-5 w-5" />
-            Add Repository
+            <GitCommit className="h-4 w-4 shrink-0 text-gv-amber" />
+            <span>Add Repository</span>
           </>
         )}
-      </Button>
-    </motion.div>
+      </span>
+    </button>
   );
 }

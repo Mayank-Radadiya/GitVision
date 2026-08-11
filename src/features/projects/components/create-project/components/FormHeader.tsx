@@ -1,48 +1,26 @@
 /**
  * =============================================================================
- * FORM HEADER COMPONENT
+ * FORM HEADER — Monospace Display & Technical Voice (Brief § Typography & §5.3)
  * =============================================================================
  */
 
-"use client";
-
-import { motion } from "framer-motion";
-import { FolderGit } from "lucide-react";
-import { cn } from "@/shared/lib/utils";
-import { HEADER_ICON_ANIMATION } from "../add-repo.constants";
+import { GitBranch } from "lucide-react";
 
 export function FormHeader() {
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-4">
-        <motion.div
-          {...HEADER_ICON_ANIMATION}
-          className={cn(
-            "flex h-14 w-14 items-center justify-center rounded-2xl",
-            "bg-gradient-to-br from-primary/20 to-violet-500/20",
-            "text-primary shadow-lg shadow-primary/10",
-          )}
-        >
-          <FolderGit className="h-7 w-7" />
-        </motion.div>
-        <div>
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className="text-2xl font-bold text-foreground"
-          >
-            Add Repository
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.4 }}
-            className="text-sm text-muted-foreground"
-          >
-            Connect your GitHub repository for AI-powered analysis
-          </motion.p>
-        </div>
+    <div className="flex items-start gap-4">
+      {/* Graphite icon tile with subtle ember accent border */}
+      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gv-amber/30 bg-gv-graphite-2 shadow-[inset_0_1px_0_rgba(232,163,61,0.15)]">
+        <GitBranch className="h-5 w-5 text-gv-amber" />
+      </div>
+      <div>
+        <h1 className="font-gv-mono text-2xl font-bold leading-tight tracking-tight text-gv-bone sm:text-[26px]">
+          Add Repository
+        </h1>
+        <p className="mt-1.5 font-gv-body text-[14px] leading-relaxed text-gv-fog">
+          Point GitVision at a repo. We&apos;ll map its structure, dependencies,
+          and contributors.
+        </p>
       </div>
     </div>
   );
