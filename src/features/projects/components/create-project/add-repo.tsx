@@ -35,19 +35,19 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.05,
+      staggerChildren: 0.08,
+      delayChildren: 0.04,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.4,
+      duration: 0.35,
       ease: EXPO_OUT,
     },
   },
@@ -130,7 +130,7 @@ export default function CreateNewProjectForm() {
       />
 
       {/* Main Content Layout */}
-      <div className="relative z-10 mx-auto w-full max-w-[1320px] px-5 py-6 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+      <div className="relative z-10 mx-auto w-full max-w-[1320px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
         <BackLink />
 
         <motion.div
@@ -141,7 +141,7 @@ export default function CreateNewProjectForm() {
         >
           {/* ─── Left Column: Primary Form Card (7 Cols) ──────────────────── */}
           <section className="lg:col-span-7">
-            <div className="rounded-2xl border border-gv-hairline bg-gv-graphite/90 p-6 shadow-2xl backdrop-blur-lg sm:p-8">
+            <div className="gv-card p-6 sm:p-8">
               <FormHeader />
 
               <div className="mt-7">

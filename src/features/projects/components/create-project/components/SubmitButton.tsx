@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * PRIMARY CTA — "Add Repository" Button
+ * PRIMARY CTA — "Connect & Add Repository"
  * =============================================================================
  */
 
@@ -25,13 +25,13 @@ export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
       disabled={isLoading || !isValid}
       aria-busy={isLoading}
       className={cn(
-        "relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border font-gv-mono text-sm font-bold tracking-wider transition-all duration-200",
+        "group relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border font-gv-mono text-sm font-bold tracking-wider transition-all duration-200",
         idle
-          ? "gv-cta border-gv-amber bg-gv-graphite text-gv-bone cursor-pointer shadow-lg shadow-gv-amber/10 hover:shadow-xl hover:shadow-gv-amber/20 hover:-translate-y-0.5 active:translate-y-0"
-          : "border-gv-hairline bg-gv-graphite-2/60 text-gv-fog opacity-50 cursor-not-allowed",
+          ? "gv-cta cursor-pointer border-gv-amber/70 bg-gv-graphite text-gv-bone shadow-lg shadow-gv-amber/10 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gv-amber/20 active:translate-y-0"
+          : "cursor-not-allowed border-gv-hairline bg-gv-graphite-2/40 text-gv-fog/60",
       )}
     >
-      {/* Scan-Line Sweep during loading */}
+      {/* Scan-line sweep during loading */}
       {isLoading && (
         <>
           {!reduced && (
@@ -63,9 +63,11 @@ export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
           </>
         ) : (
           <>
-            <GitCommit className="h-4 w-4 shrink-0 text-gv-amber" />
+            <GitCommit className="h-4 w-4 shrink-0 text-gv-amber transition-colors duration-200 group-hover:text-gv-void" />
             <span>Connect & Add Repository</span>
-            <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
+            <ArrowRight
+              className="h-4 w-4 shrink-0 transition-all duration-200 group-hover:translate-x-1 group-hover:text-gv-void"
+            />
           </>
         )}
       </span>

@@ -28,7 +28,7 @@ export function CreditsGauge() {
   );
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-gv-hairline/60 bg-gv-graphite-2/40 px-4 py-3">
+    <div className="flex items-center justify-between gap-4 py-1">
       <div className="flex items-center gap-2">
         <Coins className="h-4 w-4 text-gv-amber" />
         <span className="font-gv-mono text-xs font-semibold uppercase tracking-wider text-gv-bone">
@@ -49,7 +49,7 @@ export function CreditsGauge() {
                   key={i}
                   className={cn(
                     "h-2.5 w-2.5 rounded-[2px] transition-colors duration-150",
-                    i < filled ? "bg-gv-amber shadow-[0_0_6px_rgba(232,163,61,0.4)]" : "bg-gv-hairline/80",
+                    i < filled ? "bg-gv-amber shadow-[0_0_5px_rgba(232,163,61,0.25)]" : "bg-gv-hairline/80",
                   )}
                 />
               ))}

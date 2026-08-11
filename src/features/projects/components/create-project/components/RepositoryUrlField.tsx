@@ -2,12 +2,15 @@
  * =============================================================================
  * REPOSITORY URL FIELD — Terminal Echo & Interface Voice
  * =============================================================================
+ *
+ * A quiet terminal line that echoes the resolved remote. The cursor blinks only
+ * while the URL is parsing; once the debounced repo check passes, the Verified
+ * chip fades in. No per-keystroke retyping — the echo is deterministic and calm.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Terminal, Clipboard } from "lucide-react";
 import { Field } from "./Field";
 import type { UseFormRegister, FieldErrors, UseFormSetValue } from "react-hook-form";
@@ -31,50 +34,9 @@ export function RepositoryUrlField({
   isLoading,
   repoPreview,
 }: RepositoryUrlFieldProps) {
-  const reduced = useReducedMotion();
   const hasError = !!errors.repoUrl;
-  const isValid = repoPreview !== null && !hasError;
   const rawInfo = extractRepoInfo(value);
-
-  // ─── Terminal Typewriter Effect (~30 cps = ~33ms/char) ───────────────────
-  const [displayedText, setDisplayedText] = useState("");
-  const [isDoneTyping, setIsDoneTyping] = useState(false);
-
-  // Formulate full target terminal string
-  const targetMessage = rawInfo
-    ? `git remote get-url origin → ${rawInfo.owner}/${rawInfo.repo}`
-    : value.length > 5
-      ? `resolving target repository…`
-      : "";
-
-  useEffect(() => {
-    if (!targetMessage) {
-      setDisplayedText("");
-      setIsDoneTyping(false);
-      return;
-    }
-
-    if (reduced) {
-      setDisplayedText(targetMessage);
-      setIsDoneTyping(true);
-      return;
-    }
-
-    setDisplayedText("");
-    setIsDoneTyping(false);
-    let index = 0;
-    const timer = setInterval(() => {
-      index++;
-      if (index <= targetMessage.length) {
-        setDisplayedText(targetMessage.slice(0, index));
-      } else {
-        setIsDoneTyping(true);
-        clearInterval(timer);
-      }
-    }, 33);
-
-    return () => clearInterval(timer);
-  }, [targetMessage, reduced]);
+  const isValid = repoPreview !== null && !hasError;
 
   const handlePaste = async () => {
     try {
@@ -126,26 +88,40 @@ export function RepositoryUrlField({
         }
       />
 
-      {/* ─── Sleek Terminal Preview Box ────────────────────────────────────── */}
+      {/* ─── Terminal Eecho Box ────────────────────────────────────────────── */}
       {value.trim().length > 0 && !hasError && (
-        <div className="flex items-center justify-between rounded-lg border border-gv-hairline bg-gv-graphite-2/80 px-3.5 py-2.5 font-gv-mono text-xs shadow-inner">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire" />
-            <span className="truncate text-gv-fog">{displayedText}</span>
-            {!isDoneTyping && !reduced && (
-              <span className="inline-block h-3 w-1.5 shrink-0 animate-pulse bg-gv-wire" />
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-gv-hairline bg-gv-graphite-2/50 px-3.5 py-2.5 font-gv-mono text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+          <div className="flex min-w-0 items-center gap-2">
+            <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire/80" />
+            <span className="truncate text-gv-fog">
+              git remote get-url origin
+              {rawInfo && (
+                <>
+                  <span className="text-gv-fog/60"> → </span>
+                  <span className="text-gv-bone">
+                    {rawInfo.owner}/{rawInfo.repo}
+                  </span>
+                </>
+              )}
+            </span>
+            {!isValid && (
+              <span
+                aria-hidden
+                className="inline-block h-3 w-1.5 shrink-0 animate-pulse bg-gv-wire/70"
+              />
             )}
           </div>
 
-          {isValid && isDoneTyping && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex shrink-0 items-center gap-1.5 rounded-md border border-gv-moss/30 bg-gv-moss/10 px-2 py-0.5 font-semibold text-gv-moss"
+          {isValid && rawInfo && (
+            <motion.span
+              initial={{ opacity: 0, y: 2 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-gv-moss/25 bg-gv-moss/10 px-2 py-0.5 text-[11px] font-semibold text-gv-moss"
             >
               <CheckCircle2 className="h-3 w-3" />
-              <span>Verified</span>
-            </motion.div>
+              Verified
+            </motion.span>
           )}
         </div>
       )}

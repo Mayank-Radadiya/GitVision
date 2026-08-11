@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * LIVE REPOSITORY PREVIEW & PRESETS PANEL (Brief § Signature Moment & Presets)
+ * LIVE REPOSITORY PREVIEW & PRESETS PANEL (Signature Moment & Presets)
  * =============================================================================
  *
  * Displays live detected repository details when a valid GitHub URL is provided,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { RepoInfo } from "../add-repo.constants";
 import { FeatureChips } from "./FeatureChips";
+import { cn } from "@/shared/lib/utils";
 
 interface LiveRepoPreviewProps {
   repoInfo: RepoInfo | null;
@@ -56,21 +57,30 @@ export function LiveRepoPreview({
   onSelectPreset,
 }: LiveRepoPreviewProps) {
   return (
-    <div className="space-y-6">
-      {/* ─── Live Repository Intelligence Card ──────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-xl border border-gv-hairline bg-gv-graphite/80 p-6 backdrop-blur-md shadow-xl transition-all duration-300">
-        {/* Subtle accent glow top border */}
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-gv-amber/40 to-transparent" />
-
-        <div className="flex items-center justify-between border-b border-gv-hairline pb-4">
+    <div className="space-y-5">
+      {/* ─── Analysis Target ─────────────────────────────────────────────── */}
+      <div className="gv-card p-6">
+        <div className="flex items-center justify-between border-b border-gv-hairline/80 pb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-gv-amber" />
             <span className="font-gv-mono text-xs font-semibold uppercase tracking-wider text-gv-bone">
               Analysis Target
             </span>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gv-moss/30 bg-gv-moss/10 px-2.5 py-0.5 font-gv-mono text-[11px] text-gv-moss">
-            <span className="h-1.5 w-1.5 rounded-full bg-gv-moss animate-pulse" />
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-gv-mono text-[11px]",
+              repoValid
+                ? "border-gv-moss/25 bg-gv-moss/10 text-gv-moss"
+                : "border-gv-hairline bg-gv-graphite-2/50 text-gv-fog",
+            )}
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                repoValid ? "bg-gv-moss animate-pulse" : "bg-gv-fog/50",
+              )}
+            />
             {repoValid ? "Ready to Index" : "Awaiting Repository"}
           </span>
         </div>
@@ -82,10 +92,10 @@ export function LiveRepoPreview({
             className="mt-4 space-y-4"
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-gv-wire" />
-                  <span className="font-gv-mono text-sm font-bold text-gv-bone">
+                  <Globe className="h-4 w-4 shrink-0 text-gv-wire" />
+                  <span className="truncate font-gv-mono text-sm font-bold text-gv-bone">
                     {repoInfo.owner} / {repoInfo.repo}
                   </span>
                 </div>
@@ -93,13 +103,13 @@ export function LiveRepoPreview({
                   Public GitHub Repository
                 </p>
               </div>
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gv-moss/30 bg-gv-moss/10 text-gv-moss">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gv-moss/25 bg-gv-moss/10 text-gv-moss">
                 <CheckCircle2 className="h-4 w-4" />
               </div>
             </div>
 
-            {/* Repository Stats / Metadata Grid */}
-            <div className="grid grid-cols-2 gap-2.5 rounded-lg border border-gv-hairline/60 bg-gv-graphite-2/60 p-3">
+            {/* Estimated analysis metadata */}
+            <div className="grid grid-cols-2 gap-2.5 rounded-lg border border-gv-hairline/70 bg-gv-graphite-2/40 p-3">
               <div className="flex items-center gap-2">
                 <GitBranch className="h-3.5 w-3.5 text-gv-amber" />
                 <div className="font-gv-mono text-xs">
@@ -143,8 +153,8 @@ export function LiveRepoPreview({
         )}
       </div>
 
-      {/* ─── Quick Presets Panel ─────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gv-hairline bg-gv-graphite/60 p-5 backdrop-blur-md">
+      {/* ─── Quick Presets ────────────────────────────────────────────────── */}
+      <div className="gv-card p-5">
         <div className="flex items-center justify-between">
           <span className="font-gv-mono text-xs font-semibold uppercase tracking-wider text-gv-fog">
             Quick Try Presets
@@ -160,12 +170,12 @@ export function LiveRepoPreview({
               key={preset.url}
               type="button"
               onClick={() => onSelectPreset(preset.url, preset.name)}
-              className="group flex w-full cursor-pointer items-center justify-between rounded-lg border border-gv-hairline/80 bg-gv-graphite-2/50 px-3.5 py-2.5 text-left transition-all duration-200 hover:border-gv-amber/40 hover:bg-gv-graphite-2 hover:shadow-sm"
+              className="group flex w-full cursor-pointer items-center justify-between rounded-lg border border-gv-hairline/80 bg-gv-graphite-2/40 px-3.5 py-2.5 text-left transition-all duration-200 hover:border-gv-amber/30 hover:bg-gv-graphite-2"
             >
               <div className="flex items-center gap-2.5">
                 <GitBranch className="h-4 w-4 text-gv-fog transition-colors group-hover:text-gv-amber" />
                 <div>
-                  <div className="font-gv-mono text-xs font-medium text-gv-bone group-hover:text-gv-amber">
+                  <div className="font-gv-mono text-xs font-medium text-gv-bone transition-colors group-hover:text-gv-amber">
                     {preset.owner}/{preset.repo}
                   </div>
                   <div className="font-gv-body text-[11px] text-gv-fog">
@@ -181,8 +191,8 @@ export function LiveRepoPreview({
         </div>
       </div>
 
-      {/* ─── Feature Badges ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gv-hairline/60 bg-gv-graphite/40 p-4">
+      {/* ─── Feature Badges ───────────────────────────────────────────────── */}
+      <div className="gv-card p-4">
         <FeatureChips />
       </div>
     </div>

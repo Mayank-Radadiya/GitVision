@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * FORM FIELD COMPONENT — Clean Dark-Mode Input with Crisp Focus Rings
+ * FORM FIELD COMPONENT — Raised Dark Input with a Soft Focus Ring
  * =============================================================================
  */
 
@@ -71,10 +71,12 @@ export function Field({
             registration.onBlur(e);
           }}
           className={cn(
-            "w-full rounded-lg border border-gv-hairline bg-gv-graphite-2/90 px-4 py-3 font-gv-body text-sm text-gv-bone shadow-inner transition-all duration-200",
+            "h-11 w-full rounded-lg border border-gv-hairline bg-gv-graphite-2/60 px-4 font-gv-body text-[15px] text-gv-bone transition-all duration-200",
             "placeholder:text-gv-fog/40 focus:outline-none",
-            "focus:border-gv-amber/60 focus:bg-gv-graphite-2 focus:ring-2 focus:ring-gv-amber/25",
-            ariaInvalid && "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/25 gv-input-error",
+            "shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
+            "focus:border-gv-amber/60 focus:bg-gv-graphite-2/80 focus:shadow-none focus:ring-[3px] focus:ring-gv-amber/15",
+            ariaInvalid &&
+              "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/15 gv-input-error",
             disabled && "cursor-not-allowed opacity-50",
           )}
         />

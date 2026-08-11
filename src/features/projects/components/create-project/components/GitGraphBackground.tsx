@@ -3,17 +3,19 @@
  * LIVING BRANCH GRAPH — Signature Element (Brief § Signature Moment & §4)
  * =============================================================================
  *
- * A quiet, full-bleed git graph canvas behind the form.
+ * A quiet, full-bleed git graph canvas behind the form — kept low-contrast so
+ * the form card stays the focal surface.
  *
  * Features:
- * 1. Ambient float: ±4px drift on an 8s loop (.gv-drift).
- * 2. Edge light pulse: ~4s traveling pulse along an existing edge.
- * 3. Ghost node preview: The instant URL validation succeeds, a ghost node
+ * 1. Edge light pulse: ~4s traveling pulse along one existing edge (the only
+ *    perpetual ambient motion).
+ * 2. Ghost node preview: The instant URL validation succeeds, a ghost node
  *    fades in (40% opacity) connected by a dashed --wire-400 line.
+ * 3. Live branch: draws itself while a project name is typed.
  * 4. Merge pulse on submit: On clicking "Add Repository", the ghost node
  *    solidifies to 100% opacity with a scale-pop, the dashed wire becomes solid,
  *    and 3–5 cyan particles travel once along the wire from trunk to node.
- * 5. Reduced motion: Cut ambient drift/particles; render end-states directly.
+ * 5. Reduced motion: Cut ambient pulse/particles; render end-states directly.
  */
 
 "use client";
@@ -81,16 +83,16 @@ export function GitGraphBackground({
   return (
     <svg
       aria-hidden
-      className="pointer-events-none fixed inset-0 h-full w-full opacity-[0.2] lg:opacity-100"
+      className="pointer-events-none fixed inset-0 h-full w-full opacity-[0.15] lg:opacity-[0.65]"
       viewBox="0 0 1400 900"
       preserveAspectRatio="xMidYMid slice"
     >
-      <g className={reduced ? undefined : "gv-drift"}>
+      <g>
         {/* Main Trunk */}
         <path
           d={TRUNK}
           className="fill-none stroke-gv-hairline"
-          strokeOpacity={0.35}
+          strokeOpacity={0.28}
           strokeWidth={1.5}
           vectorEffect="non-scaling-stroke"
         />
@@ -100,7 +102,7 @@ export function GitGraphBackground({
           <path
             d={GHOST_1}
             className="fill-none stroke-gv-hairline"
-            strokeOpacity={0.3}
+            strokeOpacity={0.22}
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
@@ -109,7 +111,7 @@ export function GitGraphBackground({
             cy={452}
             r={4}
             className="fill-none stroke-gv-hairline"
-            strokeOpacity={0.4}
+            strokeOpacity={0.32}
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
@@ -120,7 +122,7 @@ export function GitGraphBackground({
           <path
             d={GHOST_2}
             className="fill-none stroke-gv-hairline"
-            strokeOpacity={0.3}
+            strokeOpacity={0.22}
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
@@ -138,7 +140,7 @@ export function GitGraphBackground({
             cy={710}
             r={4}
             className="fill-none stroke-gv-hairline"
-            strokeOpacity={0.4}
+            strokeOpacity={0.32}
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
@@ -178,7 +180,7 @@ export function GitGraphBackground({
                 fill={isMerged ? DIFF_ADD : EMBER}
                 initial={reduced ? { opacity: 0 } : { scale: 0, opacity: 0 }}
                 animate={{
-                  scale: reduced ? 1 : pulse ? 1.35 : 1,
+                  scale: reduced ? 1 : pulse ? 1.25 : 1,
                   opacity: 1,
                 }}
                 transition={
@@ -208,7 +210,7 @@ export function GitGraphBackground({
                 fill="none"
                 strokeWidth={1.5}
                 animate={{
-                  scale: reduced ? 1 : pulse ? 1.6 : 1,
+                  scale: reduced ? 1 : pulse ? 1.5 : 1,
                   stroke: repoValid ? DIFF_ADD : EMBER,
                 }}
                 transition={{
