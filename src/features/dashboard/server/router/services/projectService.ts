@@ -74,10 +74,12 @@ export function createProjectService() {
         // Ensure user exists in database to prevent foreign key constraints
         // This is a fallback in case the Clerk webhook hasn't processed yet
         const userExists = await db
-          .select({ id: usersTable.id })
+          .select({ id: usersTable.id, credits: usersTable.credits })
           .from(usersTable)
           .where(eq(usersTable.id, userId))
           .limit(1);
+
+        let currentCredits = 0;
 
         if (userExists.length === 0) {
           const { clerkClient } = await import("@clerk/nextjs/server");
@@ -88,16 +90,27 @@ export function createProjectService() {
             [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
             "unknown";
 
+          currentCredits = 100;
+
           await db
             .insert(usersTable)
             .values({
               id: userId,
               email,
               name,
-              credits: 100,
+              credits: currentCredits,
               isProUser: false,
             })
             .onConflictDoNothing();
+        } else {
+          currentCredits = userExists[0].credits;
+        }
+
+        if (currentCredits < 10) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Insufficient AI credits. You need 10 credits to create a project.",
+          });
         }
 
         const { projectId } = await createGitHubProject(
@@ -134,6 +147,11 @@ export function createProjectService() {
             cause: inngestError,
           });
         }
+
+        await db
+          .update(usersTable)
+          .set({ credits: sql`${usersTable.credits} - 10` })
+          .where(eq(usersTable.id, userId));
 
         return {
           projectId,
