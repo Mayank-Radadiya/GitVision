@@ -1,13 +1,13 @@
 /**
  * =============================================================================
- * BACK LINK — plain text, no box (brief §5.1)
+ * BACK LINK & BREADCRUMB
  * =============================================================================
  */
 
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export function BackLink() {
   const router = useRouter();
@@ -15,17 +15,10 @@ export function BackLink() {
     <button
       type="button"
       onClick={() => router.push("/dashboard")}
-      className="group inline-flex cursor-pointer items-center gap-1.5 font-gv-body text-sm text-gv-fog transition-colors duration-150 hover:text-gv-bone"
+      className="group inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gv-hairline/60 bg-gv-graphite-2/40 px-3 py-1.5 font-gv-mono text-xs text-gv-fog transition-all duration-200 hover:border-gv-amber/40 hover:bg-gv-graphite-2 hover:text-gv-bone hover:shadow-sm"
     >
-      <ChevronLeft className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-0.5" />
-      <span className="relative">
-        Back to Dashboard
-        {/* underline draws left→right on hover (150ms) */}
-        <span
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-current transition-transform duration-150 group-hover:scale-x-100"
-        />
-      </span>
+      <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-x-1 text-gv-amber" />
+      <span>Back to Projects</span>
     </button>
   );
 }

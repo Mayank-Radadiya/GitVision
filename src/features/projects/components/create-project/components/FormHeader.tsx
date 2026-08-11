@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * FORM HEADER — Monospace Display & Technical Voice (Brief § Typography & §5.3)
+ * FORM HEADER — Technical Voice & Developer Breadcrumbs
  * =============================================================================
  */
 
@@ -8,18 +8,20 @@ import { GitBranch } from "lucide-react";
 
 export function FormHeader() {
   return (
-    <div className="flex items-start gap-4">
-      {/* Graphite icon tile with subtle ember accent border */}
-      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gv-amber/30 bg-gv-graphite-2 shadow-[inset_0_1px_0_rgba(232,163,61,0.15)]">
-        <GitBranch className="h-5 w-5 text-gv-amber" />
+    <div className="space-y-4">
+      {/* Scope Pill Badge */}
+      <div className="inline-flex items-center gap-2 rounded-full border border-gv-amber/30 bg-gv-amber/10 px-3 py-1 font-gv-mono text-[11px] font-medium text-gv-amber">
+        <GitBranch className="h-3.5 w-3.5" />
+        <span>GitVision Workspace / New Project</span>
       </div>
+
       <div>
-        <h1 className="font-gv-mono text-2xl font-bold leading-tight tracking-tight text-gv-bone sm:text-[26px]">
+        <h1 className="font-gv-mono text-2xl font-bold tracking-tight text-gv-bone sm:text-3xl">
           Add Repository
         </h1>
-        <p className="mt-1.5 font-gv-body text-[14px] leading-relaxed text-gv-fog">
-          Point GitVision at a repo. We&apos;ll map its structure, dependencies,
-          and contributors.
+        <p className="mt-2 font-gv-body text-sm leading-relaxed text-gv-fog">
+          Connect a GitHub repository to analyze code quality, map dependencies,
+          and unlock AI-powered codebase vision.
         </p>
       </div>
     </div>

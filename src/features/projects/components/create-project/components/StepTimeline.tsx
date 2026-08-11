@@ -1,12 +1,7 @@
 /**
  * =============================================================================
- * STEP TIMELINE — Commit Nodes on a Branch Stroke (Brief § Typography & §5.2)
+ * STEP TIMELINE — Commit Nodes on a Branch Stroke
  * =============================================================================
- *
- * Completed node: filled --diff-add-500 + check.
- * Active node: filled --ember-500 with soft outer HEAD pulse.
- * Upcoming node: hollow hairline stroke at 40% opacity.
- * Step labels: IBM Plex Mono, uppercase, tracked out.
  */
 
 "use client";
@@ -18,80 +13,74 @@ interface StepTimelineProps {
   currentStep: number;
 }
 
-const LABELS = ["01 DETAILS", "02 VALIDATION", "03 ANALYSIS"];
+const STEPS = [
+  { id: 1, label: "01 DETAILS", title: "Target Repo" },
+  { id: 2, label: "02 VALIDATE", title: "Verify Remote" },
+  { id: 3, label: "03 ANALYZE", title: "Deep Index" },
+];
 
 export function StepTimeline({ currentStep }: StepTimelineProps) {
   return (
-    <ol className="flex items-start">
-      {LABELS.map((label, i) => {
-        const id = i + 1;
-        const isComplete = id < currentStep;
-        const isActive = id === currentStep;
+    <div className="rounded-lg border border-gv-hairline/80 bg-gv-graphite-2/40 p-3.5">
+      <ol className="flex items-center justify-between">
+        {STEPS.map(({ id, label, title }, i) => {
+          const isComplete = id < currentStep;
+          const isActive = id === currentStep;
 
-        const leftTraversed = id <= currentStep;
-        const rightTraversed = isComplete;
-
-        return (
-          <li
-            key={label}
-            className={cn("flex flex-col items-center", i === 0 && "flex-1", i > 0 && "flex-1")}
-          >
-            {/* Branch stroke + commit node */}
-            <div className="flex h-4 w-full items-center">
-              <span
-                className={cn(
-                  "h-px flex-1 transition-colors duration-300",
-                  i === 0 ? "invisible" : leftTraversed ? "bg-gv-moss" : "bg-gv-hairline",
-                )}
-              />
-              <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-                {isActive && (
+          return (
+            <li key={label} className="relative flex flex-1 items-center">
+              <div className="flex flex-col items-center">
+                <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="gv-head-pulse absolute inset-0 rounded-full bg-gv-amber/50"
+                    />
+                  )}
                   <span
-                    aria-hidden
-                    className="gv-head-pulse absolute inset-0 rounded-full bg-gv-amber"
-                  />
-                )}
+                    className={cn(
+                      "relative flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold transition-all duration-200",
+                      isComplete
+                        ? "border-gv-moss bg-gv-moss text-gv-void"
+                        : isActive
+                          ? "border-gv-amber bg-gv-amber text-gv-void shadow-[0_0_12px_rgba(232,163,61,0.4)]"
+                          : "border-gv-hairline bg-gv-graphite-2 text-gv-fog/50",
+                    )}
+                  >
+                    {isComplete ? (
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    ) : (
+                      id
+                    )}
+                  </span>
+                </div>
                 <span
                   className={cn(
-                    "relative flex h-4 w-4 items-center justify-center rounded-full border transition-colors duration-300",
-                    isComplete
-                      ? "border-gv-moss bg-gv-moss text-gv-void"
-                      : isActive
-                        ? "border-gv-amber bg-gv-amber text-gv-void"
-                        : "border-gv-hairline bg-transparent opacity-40",
+                    "mt-1.5 font-gv-mono text-[10px] font-semibold tracking-wider",
+                    isActive
+                      ? "text-gv-amber"
+                      : isComplete
+                        ? "text-gv-moss"
+                        : "text-gv-fog/60",
                   )}
                 >
-                  {isComplete && (
-                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                  )}
+                  {title}
                 </span>
-              </span>
-              <span
-                className={cn(
-                  "h-px flex-1 transition-colors duration-300",
-                  i === LABELS.length - 1
-                    ? "invisible"
-                    : rightTraversed
-                      ? "bg-gv-moss"
-                      : "bg-gv-hairline",
-                )}
-              />
-            </div>
-            <span
-              className={cn(
-                "mt-2.5 whitespace-nowrap font-gv-mono text-[10px] font-semibold tracking-[0.2em]",
-                isActive
-                  ? "text-gv-amber"
-                  : isComplete
-                    ? "text-gv-moss"
-                    : "text-gv-fog/60",
+              </div>
+
+              {/* Connecting line */}
+              {i < STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    "mx-2 h-0.5 flex-1 transition-colors duration-300",
+                    id < currentStep ? "bg-gv-moss" : "bg-gv-hairline/60",
+                  )}
+                />
               )}
-            >
-              {label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

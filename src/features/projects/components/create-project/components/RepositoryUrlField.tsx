@@ -1,29 +1,22 @@
 /**
  * =============================================================================
- * REPOSITORY URL FIELD — Live Terminal & Interface Voice (Brief § Signature Moment)
+ * REPOSITORY URL FIELD — Terminal Echo & Interface Voice
  * =============================================================================
- *
- * Features:
- * 1. Monospace terminal echo line directly under the input field.
- * 2. Typewriter animation (~30 cps): "resolving {owner}/{repo}…" → "found."
- * 3. Detected badge: "Found {owner}/{repo}" in git-diff green (--diff-add-500).
- * 4. Validation failure: Single border pulse in --diff-remove-500 and inline copy
- *    "Can't find that repository. Check the URL and try again."
- * 5. Reduced motion: Instant text display without typewriter delays.
  */
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, CheckCircle2, Terminal } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { AlertCircle, CheckCircle2, Terminal, Clipboard } from "lucide-react";
 import { Field } from "./Field";
-import type { UseFormRegister, FieldErrors } from "react-hook-form";
+import type { UseFormRegister, FieldErrors, UseFormSetValue } from "react-hook-form";
 import type { CreateProjectInput, RepoInfo } from "../add-repo.constants";
 import { extractRepoInfo } from "../add-repo.utils";
 
 interface RepositoryUrlFieldProps {
   register: UseFormRegister<CreateProjectInput>;
+  setValue?: UseFormSetValue<CreateProjectInput>;
   errors: FieldErrors<CreateProjectInput>;
   value: string;
   isLoading: boolean;
@@ -32,6 +25,7 @@ interface RepositoryUrlFieldProps {
 
 export function RepositoryUrlField({
   register,
+  setValue,
   errors,
   value,
   isLoading,
@@ -48,7 +42,7 @@ export function RepositoryUrlField({
 
   // Formulate full target terminal string
   const targetMessage = rawInfo
-    ? `resolving ${rawInfo.owner}/${rawInfo.repo}…`
+    ? `git remote get-url origin → ${rawInfo.owner}/${rawInfo.repo}`
     : value.length > 5
       ? `resolving target repository…`
       : "";
@@ -66,7 +60,6 @@ export function RepositoryUrlField({
       return;
     }
 
-    // Reset and typewriter increment
     setDisplayedText("");
     setIsDoneTyping(false);
     let index = 0;
@@ -78,10 +71,21 @@ export function RepositoryUrlField({
         setIsDoneTyping(true);
         clearInterval(timer);
       }
-    }, 33); // ~30 cps
+    }, 33);
 
     return () => clearInterval(timer);
   }, [targetMessage, reduced]);
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && setValue) {
+        setValue("repoUrl", text.trim(), { shouldValidate: true });
+      }
+    } catch {
+      // Clipboard access denied or unsupported
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -89,70 +93,62 @@ export function RepositoryUrlField({
         id="repoUrl"
         label="GitHub Repository URL"
         type="url"
+        placeholder="https://github.com/owner/repository"
         autoComplete="off"
         value={value}
         disabled={isLoading}
         ariaInvalid={hasError}
         registration={register("repoUrl")}
+        actionButton={
+          setValue ? (
+            <button
+              type="button"
+              onClick={handlePaste}
+              className="inline-flex cursor-pointer items-center gap-1 font-gv-mono text-[10px] text-gv-fog transition-colors hover:text-gv-amber"
+              title="Paste URL from clipboard"
+            >
+              <Clipboard className="h-3 w-3" />
+              <span>Paste URL</span>
+            </button>
+          ) : null
+        }
         helper={
           hasError ? (
-            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-ember animate-pulse-once">
+            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-ember">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>Can&apos;t find that repository. Check the URL and try again.</span>
-            </div>
-          ) : isValid ? (
-            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-moss">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-gv-moss" />
-              <span>Found {repoPreview.owner}/{repoPreview.repo}</span>
+              <span>Can&apos;t find repository. Check the URL (e.g. https://github.com/owner/repo).</span>
             </div>
           ) : (
-            <span className="font-gv-mono text-xs text-gv-fog">
-              Full GitHub URL, e.g. https://github.com/owner/repo
+            <span className="font-gv-mono text-xs text-gv-fog/80">
+              Paste the public HTTPS GitHub URL to connect your codebase.
             </span>
           )
         }
       />
 
-      {/* ─── Signature Terminal Echo Line ──────────────────────────────────── */}
+      {/* ─── Sleek Terminal Preview Box ────────────────────────────────────── */}
       {value.trim().length > 0 && !hasError && (
-        <div className="flex items-center gap-2 rounded-md border border-gv-hairline bg-gv-graphite-2 px-3 py-2 font-gv-mono text-xs text-gv-bone">
-          <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire" />
-          <div className="flex items-center gap-1">
-            <span className="text-gv-fog">{displayedText}</span>
-            {isValid && isDoneTyping && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="font-semibold text-gv-moss"
-              >
-                found.
-              </motion.span>
-            )}
+        <div className="flex items-center justify-between rounded-lg border border-gv-hairline bg-gv-graphite-2/80 px-3.5 py-2.5 font-gv-mono text-xs shadow-inner">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire" />
+            <span className="truncate text-gv-fog">{displayedText}</span>
             {!isDoneTyping && !reduced && (
-              <span className="inline-block h-3 w-1.5 animate-pulse bg-gv-wire" />
+              <span className="inline-block h-3 w-1.5 shrink-0 animate-pulse bg-gv-wire" />
             )}
           </div>
+
+          {isValid && isDoneTyping && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex shrink-0 items-center gap-1.5 rounded-md border border-gv-moss/30 bg-gv-moss/10 px-2 py-0.5 font-semibold text-gv-moss"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              <span>Verified</span>
+            </motion.div>
+          )}
         </div>
       )}
-
-      {/* ─── Detected Badge: "Found {owner}/{repo}" ────────────────────────── */}
-      <AnimatePresence>
-        {isValid && repoPreview && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-gv-moss/30 bg-gv-moss/10 px-2.5 py-1 font-gv-mono text-xs text-gv-moss">
-              <span className="opacity-70">Found</span>
-              <span className="font-semibold">{repoPreview.owner}</span>
-              <span className="opacity-50">/</span>
-              <span className="font-semibold">{repoPreview.repo}</span>
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

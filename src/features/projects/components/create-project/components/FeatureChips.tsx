@@ -1,34 +1,43 @@
 /**
  * =============================================================================
- * FEATURE CHIPS — GitHub-label-style pills (Brief § Tokens & Aesthetics)
+ * FEATURE CHIPS — Developer Badges
  * =============================================================================
  */
 
-import { GitCommit, Link } from "lucide-react";
+import { GitCommit, RefreshCw, ShieldCheck } from "lucide-react";
 
 const CHIPS = [
   {
     icon: GitCommit,
-    text: "Code quality, dependencies, and contributors — mapped automatically.",
+    text: "Automated Tree & Dependency Mapping",
   },
   {
-    icon: Link,
-    text: "Stays in sync with GitHub. No manual re-imports.",
+    icon: RefreshCw,
+    text: "Continuous Webhook Sync",
+  },
+  {
+    icon: ShieldCheck,
+    text: "Read-only Security Guarantee",
   },
 ];
 
 export function FeatureChips() {
   return (
-    <div className="flex flex-wrap gap-2">
-      {CHIPS.map(({ icon: Icon, text }) => (
-        <span
-          key={text}
-          className="inline-flex items-center gap-2 rounded-full border border-gv-hairline bg-gv-graphite-2 px-3.5 py-1.5 font-gv-body text-[13px] leading-snug text-gv-fog transition-all duration-150 hover:-translate-y-px hover:border-gv-amber/30 hover:text-gv-bone"
-        >
-          <Icon className="h-3.5 w-3.5 shrink-0 text-gv-amber" />
-          {text}
-        </span>
-      ))}
+    <div className="space-y-2">
+      <span className="font-gv-mono text-[11px] font-semibold uppercase tracking-wider text-gv-fog">
+        Guarantees & Capabilities
+      </span>
+      <div className="flex flex-col gap-2">
+        {CHIPS.map(({ icon: Icon, text }) => (
+          <div
+            key={text}
+            className="flex items-center gap-2.5 rounded-lg border border-gv-hairline/60 bg-gv-graphite-2/40 px-3 py-2 font-gv-body text-xs text-gv-fog transition-all duration-150 hover:border-gv-amber/30 hover:text-gv-bone"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-gv-amber" />
+            <span>{text}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

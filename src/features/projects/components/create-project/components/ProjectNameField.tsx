@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * PROJECT NAME FIELD — floating label + neutral helper (brief §5.4/§7)
+ * PROJECT NAME FIELD
  * =============================================================================
  */
 
@@ -23,18 +23,27 @@ export function ProjectNameField({
   value,
   isLoading,
 }: ProjectNameFieldProps) {
+  const hasError = !!errors.projectName;
+
   return (
     <Field
       id="projectName"
       label="Project Name"
+      placeholder="e.g. My Main Repository"
       value={value}
       disabled={isLoading}
+      ariaInvalid={hasError}
       registration={register("projectName")}
       helper={
-        <span className="font-gv-mono text-xs text-gv-fog">
-          This is just a label inside GitVision — it doesn&apos;t change anything
-          on GitHub.
-        </span>
+        hasError ? (
+          <span className="font-gv-mono text-xs text-gv-ember">
+            {errors.projectName?.message || "Project name is required"}
+          </span>
+        ) : (
+          <span className="font-gv-mono text-xs text-gv-fog/80">
+            Internal label inside GitVision — doesn&apos;t change your repository on GitHub.
+          </span>
+        )
       }
     />
   );
