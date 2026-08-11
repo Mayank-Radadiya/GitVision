@@ -15,7 +15,7 @@ export function PricingGrid({ isInView }: PricingGridProps) {
         variants={containerVariants}
         initial="hidden"
         animate={isInView ? "visible" : "hidden"}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 items-stretch"
+        className="mt-12 grid grid-cols-1 items-stretch gap-6 md:grid-cols-3"
       >
         {PLANS.map((plan) => (
           <PricingCard key={plan.name} plan={plan} />
@@ -29,11 +29,11 @@ export function PricingGrid({ isInView }: PricingGridProps) {
         transition={{ duration: 0.5, delay: 0.5 }}
         className="mt-14 text-center"
       >
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Need a custom solution for your enterprise?{" "}
           <Button
             variant="link"
-            className="text-primary h-auto p-0 pl-0.5 cursor-pointer"
+            className="text-primary h-auto cursor-pointer p-0 pl-0.5"
           >
             Contact our sales team
           </Button>

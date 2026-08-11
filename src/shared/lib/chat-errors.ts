@@ -49,7 +49,8 @@ export const CHAT_ERROR_META: Record<
   },
   rate_limited: {
     title: "Slow down",
-    message: "You're sending messages too quickly. Please wait a moment and try again.",
+    message:
+      "You're sending messages too quickly. Please wait a moment and try again.",
     retryable: true,
   },
   out_of_credits: {
@@ -114,17 +115,26 @@ export function categorizeModelError(error: unknown): {
   const cause =
     (Array.isArray(err?.errors) && err.errors.length > 0
       ? err.errors[err.errors.length - 1]
-      : null) ?? err?.lastError ?? err?.error ?? error;
+      : null) ??
+    err?.lastError ??
+    err?.error ??
+    error;
 
   const name = (cause as { name?: string })?.name ?? err?.name ?? "";
   const statusCode =
     (cause as { statusCode?: number })?.statusCode ?? err?.statusCode;
 
   if (statusCode === 429) {
-    return { code: "rate_limited", message: CHAT_ERROR_META.rate_limited.message };
+    return {
+      code: "rate_limited",
+      message: CHAT_ERROR_META.rate_limited.message,
+    };
   }
   if (statusCode !== undefined && statusCode >= 500) {
-    return { code: "model_error", message: CHAT_ERROR_META.model_error.message };
+    return {
+      code: "model_error",
+      message: CHAT_ERROR_META.model_error.message,
+    };
   }
   if (name === "TimeoutError" || name.includes("Timeout")) {
     return { code: "timeout", message: CHAT_ERROR_META.timeout.message };
@@ -145,8 +155,13 @@ export function parseChatError(error: unknown): ChatErrorInfo | null {
   if (!error) return null;
 
   const raw =
-    typeof error === "string" ? null : (error as { name?: string; message?: string; statusCode?: number });
-  const message = typeof error === "string" ? error : (raw?.message ?? "Something went wrong.");
+    typeof error === "string"
+      ? null
+      : (error as { name?: string; message?: string; statusCode?: number });
+  const message =
+    typeof error === "string"
+      ? error
+      : (raw?.message ?? "Something went wrong.");
 
   const name = raw?.name ?? "";
   if (name === "AbortError" || /aborted|operation was aborted/i.test(message)) {
@@ -159,10 +174,7 @@ export function parseChatError(error: unknown): ChatErrorInfo | null {
   try {
     const parsed = JSON.parse(message);
     if (parsed && typeof parsed === "object") {
-      if (
-        typeof parsed.code === "string" &&
-        parsed.code in CHAT_ERROR_META
-      ) {
+      if (typeof parsed.code === "string" && parsed.code in CHAT_ERROR_META) {
         code = parsed.code as ChatErrorCode;
       }
       if (typeof parsed.message === "string") serverMessage = parsed.message;
@@ -184,7 +196,8 @@ export function parseChatError(error: unknown): ChatErrorInfo | null {
   }
 
   if (code === "aborted") return null;
-  if (code === "network" && /timed out|timeout/i.test(message)) code = "timeout";
+  if (code === "network" && /timed out|timeout/i.test(message))
+    code = "timeout";
 
   const meta = CHAT_ERROR_META[code];
   return {

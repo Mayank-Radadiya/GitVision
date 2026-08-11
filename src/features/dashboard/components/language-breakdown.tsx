@@ -54,7 +54,7 @@ function StackedBar({
   data: { name: string; color: string | null; percentage: number }[];
 }) {
   return (
-    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-primary/20">
+    <div className="bg-primary/20 flex h-2.5 w-full overflow-hidden rounded-full">
       {data.map((entry) => (
         <div
           key={entry.name}
@@ -87,9 +87,9 @@ function LegendItem({
         className="h-2 w-2 shrink-0 rounded-full"
         style={{ backgroundColor: color }}
       />
-      <span className="text-xs text-muted-foreground">
+      <span className="text-muted-foreground text-xs">
         {name}{" "}
-        <span className="tabular-nums text-foreground/70">{percentage}%</span>
+        <span className="text-foreground/70 tabular-nums">{percentage}%</span>
       </span>
     </div>
   );
@@ -103,13 +103,13 @@ function LanguageBreakdown() {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm",
+        "border-border/50 bg-card/80 rounded-xl border p-5 backdrop-blur-sm",
       )}
     >
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <Code2 className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-medium text-foreground">Tech Stack</h3>
+        <Code2 className="text-primary h-4 w-4" />
+        <h3 className="text-foreground text-sm font-medium">Tech Stack</h3>
       </div>
 
       {isLoading ? (
@@ -122,7 +122,7 @@ function LanguageBreakdown() {
           </div>
         </div>
       ) : !topLangs || topLangs.length === 0 ? (
-        <p className="py-4 text-center text-xs text-muted-foreground/60">
+        <p className="text-muted-foreground/60 py-4 text-center text-xs">
           No files tracked yet
         </p>
       ) : (

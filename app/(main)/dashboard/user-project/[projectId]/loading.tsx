@@ -8,7 +8,7 @@ import { Skeleton } from "@/shared/components/ui/skeleton";
 export default function Loading() {
   return (
     <div className="min-h-screen p-6 lg:p-8">
-      <div className="mx-auto max-w-screen-xl space-y-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         {/* Back button + Header */}
         <div className="space-y-5">
           <Skeleton className="h-8 w-40" />
@@ -29,7 +29,7 @@ export default function Loading() {
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex gap-4">
-              <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+              <Skeleton className="h-10 w-10 rounded-full shrink-0" />
               <Skeleton className="h-32 flex-1 rounded-xl" />
             </div>
           ))}

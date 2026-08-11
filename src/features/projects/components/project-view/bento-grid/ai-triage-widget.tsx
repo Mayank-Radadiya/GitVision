@@ -189,26 +189,26 @@ const MOCK_ITEMS: TriageItem[] = [
 
 function TriageRow({ item }: { item: TriageItem }) {
   return (
-    <div className="group rounded-xl border border-border/40 bg-muted/15 hover:bg-muted/25 hover:border-border/60 p-3.5 transition-all duration-200 cursor-pointer space-y-2.5">
+    <div className="group border-border/40 bg-muted/15 hover:bg-muted/25 hover:border-border/60 cursor-pointer space-y-2.5 rounded-xl border p-3.5 transition-all duration-200">
       {/* Header row */}
       <div className="flex items-start gap-2.5">
-        <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5 ring-1 ring-border/40">
+        <Avatar className="ring-border/40 mt-0.5 h-7 w-7 shrink-0 ring-1">
           <AvatarImage src={item.avatar} alt={item.author} />
           <AvatarFallback className="text-xs">
             {item.author[0].toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground group-hover:text-primary line-clamp-2 text-xs leading-snug font-medium transition-colors">
             {item.title}
           </p>
-          <div className="flex items-center gap-1.5 mt-1">
-            <Clock className="h-2.5 w-2.5 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground/60">
+          <div className="mt-1 flex items-center gap-1.5">
+            <Clock className="text-muted-foreground/50 h-2.5 w-2.5" />
+            <span className="text-muted-foreground/60 text-[10px]">
               {item.age}
             </span>
             <span className="text-muted-foreground/30">·</span>
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-muted-foreground text-[10px]">
               {item.author}
             </span>
           </div>
@@ -241,14 +241,14 @@ function EmptyTriage({ type }: { type: "pr" | "issue" }) {
   const Icon = type === "pr" ? GitPullRequest : AlertCircle;
   const label = type === "pr" ? "pull requests" : "issues";
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-border/40 rounded-xl">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/40">
-        <Icon className="h-4 w-4 text-muted-foreground/30" />
+    <div className="border-border/40 flex flex-col items-center justify-center rounded-xl border border-dashed py-8 text-center">
+      <div className="bg-muted/40 mb-3 flex h-10 w-10 items-center justify-center rounded-xl">
+        <Icon className="text-muted-foreground/30 h-4 w-4" />
       </div>
-      <p className="text-xs font-medium text-muted-foreground">
+      <p className="text-muted-foreground text-xs font-medium">
         No open {label}
       </p>
-      <p className="text-[11px] text-muted-foreground/50 mt-0.5">
+      <p className="text-muted-foreground/50 mt-0.5 text-[11px]">
         All caught up! 🎉
       </p>
     </div>
@@ -262,7 +262,7 @@ function AiTriageWidget() {
   const issues = MOCK_ITEMS.filter((i) => i.type === "issue");
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -270,48 +270,48 @@ function AiTriageWidget() {
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground leading-none">
+            <h3 className="text-foreground text-sm leading-none font-semibold">
               AI Triage Board
             </h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
               PRs & Issues · AI-analyzed
             </p>
           </div>
         </div>
         <Badge
           variant="outline"
-          className="text-[10px] border-amber-500/30 text-amber-400 bg-amber-500/10 h-5 px-1.5"
+          className="h-5 border-amber-500/30 bg-amber-500/10 px-1.5 text-[10px] text-amber-400"
         >
           Mock
         </Badge>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="prs" className="flex-1 flex flex-col">
-        <TabsList className="h-8 w-full bg-muted/30 border border-border/40 p-0.5 mb-3">
+      <Tabs defaultValue="prs" className="flex flex-1 flex-col">
+        <TabsList className="bg-muted/30 border-border/40 mb-3 h-8 w-full border p-0.5">
           <TabsTrigger
             value="prs"
-            className="flex-1 h-7 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5"
+            className="data-[state=active]:bg-background h-7 flex-1 gap-1.5 text-xs data-[state=active]:shadow-sm"
           >
             <GitPullRequest className="h-3 w-3" />
             PRs
-            <span className="rounded-full bg-violet-500/20 text-violet-400 text-[9px] px-1.5 leading-4">
+            <span className="rounded-full bg-violet-500/20 px-1.5 text-[9px] leading-4 text-violet-400">
               {prs.length}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="issues"
-            className="flex-1 h-7 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5"
+            className="data-[state=active]:bg-background h-7 flex-1 gap-1.5 text-xs data-[state=active]:shadow-sm"
           >
             <AlertCircle className="h-3 w-3" />
             Issues
-            <span className="rounded-full bg-red-500/20 text-red-400 text-[9px] px-1.5 leading-4">
+            <span className="rounded-full bg-red-500/20 px-1.5 text-[9px] leading-4 text-red-400">
               {issues.length}
             </span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="prs" className="flex-1 mt-0">
+        <TabsContent value="prs" className="mt-0 flex-1">
           <ScrollArea
             className="h-[calc(100%-0px)]"
             style={{ maxHeight: "400px" }}
@@ -328,7 +328,7 @@ function AiTriageWidget() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="issues" className="flex-1 mt-0">
+        <TabsContent value="issues" className="mt-0 flex-1">
           <ScrollArea style={{ maxHeight: "400px" }}>
             {issues.length === 0 ? (
               <EmptyTriage type="issue" />
@@ -344,12 +344,12 @@ function AiTriageWidget() {
       </Tabs>
 
       {/* Footer */}
-      <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+      <div className="border-border/30 mt-3 flex items-center justify-between border-t pt-3">
+        <div className="text-muted-foreground/60 flex items-center gap-1.5 text-[10px]">
           <CheckCircle2 className="h-3 w-3" />
           Live sync coming soon
         </div>
-        <button className="text-[11px] text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer">
+        <button className="text-primary hover:text-primary/80 cursor-pointer text-[11px] font-medium transition-colors">
           Connect GitHub →
         </button>
       </div>

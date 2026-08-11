@@ -60,26 +60,26 @@ function pickTags(summary: string): string[] {
 
 function AnalyzingState() {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
+    <div className="flex flex-col items-center justify-center gap-4 py-8 text-center">
       <div className="relative">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-          <Sparkles className="h-5 w-5 text-primary" />
+        <div className="bg-primary/10 border-primary/20 flex h-12 w-12 items-center justify-center rounded-2xl border">
+          <Sparkles className="text-primary h-5 w-5" />
         </div>
         {/* Pulse ring */}
-        <span className="absolute inset-0 rounded-2xl animate-ping bg-primary/20 opacity-75" />
+        <span className="bg-primary/20 absolute inset-0 animate-ping rounded-2xl opacity-75" />
       </div>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-foreground">AI Triage Ready</p>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px]">
+        <p className="text-foreground text-sm font-medium">AI Triage Ready</p>
+        <p className="text-muted-foreground max-w-55 text-xs leading-relaxed">
           Generate an AI summary on any commit to see intelligent insights here.
         </p>
       </div>
       {/* Skeleton bars */}
-      <div className="w-full space-y-2 mt-2">
+      <div className="mt-2 w-full space-y-2">
         {[80, 65, 90].map((w, i) => (
           <div
             key={i}
-            className="h-2 rounded-full bg-muted/60 animate-pulse"
+            className="bg-muted/60 h-2 animate-pulse rounded-full"
             style={{ width: `${w}%` }}
           />
         ))}
@@ -99,21 +99,21 @@ function AiInsightsWidget({ latestAiSummary }: AiInsightsWidgetProps) {
     : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <div className="bg-primary/15 text-primary relative flex h-7 w-7 items-center justify-center rounded-lg">
             <Sparkles className="h-3.5 w-3.5" />
             {hasData && (
-              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-background" />
+              <span className="border-background absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border bg-emerald-500" />
             )}
           </div>
-          <h3 className="text-sm font-semibold text-foreground">AI Insights</h3>
+          <h3 className="text-foreground text-sm font-semibold">AI Insights</h3>
         </div>
         <Badge
           variant="outline"
-          className="text-[10px] border-primary/30 text-primary bg-primary/10"
+          className="border-primary/30 text-primary bg-primary/10 text-[10px]"
         >
           Triage
         </Badge>
@@ -130,47 +130,47 @@ function AiInsightsWidget({ latestAiSummary }: AiInsightsWidgetProps) {
           className="flex flex-col gap-4"
         >
           {/* Summary */}
-          <div className="rounded-xl bg-primary/5 border border-primary/15 p-3.5">
-            <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <div className="bg-primary/5 border-primary/15 rounded-xl border p-3.5">
+            <p className="text-primary mb-2 flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase">
               <Sparkles className="h-3 w-3" />
               Quick Summary
             </p>
-            <p className="text-xs text-foreground/85 leading-relaxed line-clamp-4">
+            <p className="text-foreground/85 line-clamp-4 text-xs leading-relaxed">
               {latestAiSummary}
             </p>
           </div>
 
           {/* Risk + Complexity */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-muted/30 border border-border/30 p-3 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+            <div className="bg-muted/30 border-border/30 flex flex-col gap-1.5 rounded-lg border p-3">
+              <div className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium tracking-wider uppercase">
                 <AlertTriangle className="h-3 w-3" />
                 Risk
               </div>
               <Badge
                 variant="outline"
-                className={`w-fit text-xs font-semibold border ${risk!.color}`}
+                className={`w-fit border text-xs font-semibold ${risk!.color}`}
               >
                 {risk!.label}
               </Badge>
             </div>
-            <div className="rounded-lg bg-muted/30 border border-border/30 p-3 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+            <div className="bg-muted/30 border-border/30 flex flex-col gap-1.5 rounded-lg border p-3">
+              <div className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium tracking-wider uppercase">
                 <Zap className="h-3 w-3" />
                 Complexity
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-foreground tabular-nums">
+                <span className="text-foreground text-lg font-bold tabular-nums">
                   {complexityScore}
                 </span>
-                <span className="text-xs text-muted-foreground">/10</span>
+                <span className="text-muted-foreground text-xs">/10</span>
               </div>
             </div>
           </div>
 
           {/* Tags */}
           <div>
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+            <p className="text-muted-foreground mb-2 flex items-center gap-1 text-[10px] font-medium tracking-wider uppercase">
               <Tag className="h-2.5 w-2.5" />
               AI-Generated Tags
             </p>
@@ -178,7 +178,7 @@ function AiInsightsWidget({ latestAiSummary }: AiInsightsWidgetProps) {
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-md bg-muted/40 border border-border/40 px-2 py-0.5 text-[11px] text-muted-foreground font-medium"
+                  className="bg-muted/40 border-border/40 text-muted-foreground rounded-md border px-2 py-0.5 text-[11px] font-medium"
                 >
                   #{tag}
                 </span>

@@ -47,7 +47,7 @@ function Stat({
   return (
     <div className="flex items-center gap-1.5 text-sm" title={label}>
       <Icon className={cn("h-3.5 w-3.5", color)} />
-      <span className="font-medium text-foreground">{fmt(value)}</span>
+      <span className="text-foreground font-medium">{fmt(value)}</span>
     </div>
   );
 }
@@ -78,12 +78,12 @@ function CodeViewerProjectGrid() {
   // ─── Page header (shared across all states) ────────────────────────
   const pageHeader = (
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
         <Code className="h-5 w-5" />
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Code Viewer</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-foreground text-2xl font-bold">Code Viewer</h1>
+        <p className="text-muted-foreground text-sm">
           Select a project to browse its source code
         </p>
       </div>
@@ -92,9 +92,9 @@ function CodeViewerProjectGrid() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-7xl py-8 px-4 space-y-6">
+      <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
         {pageHeader}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-48 rounded-2xl" />
           ))}
@@ -105,16 +105,16 @@ function CodeViewerProjectGrid() {
 
   if (projects.length === 0) {
     return (
-      <div className="container mx-auto max-w-7xl py-8 px-4 space-y-6">
+      <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
         {pageHeader}
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
-            <Code className="h-8 w-8 text-primary/50" />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <div className="bg-primary/10 mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
+            <Code className="text-primary/50 h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">
+          <h3 className="text-foreground mb-2 text-lg font-semibold">
             No projects yet
           </h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
+          <p className="text-muted-foreground max-w-sm text-sm">
             Create a project from a GitHub repository to browse its source code
             here.
           </p>
@@ -124,37 +124,31 @@ function CodeViewerProjectGrid() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl py-8 px-4 space-y-6">
+    <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
       {pageHeader}
       {/* Search */}
       {projects.length > 3 && (
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <input
             type="text"
             value={query}
             onChange={handleQueryChange}
             placeholder="Search projects…"
-            className={cn(
-              "w-full rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm",
-              "pl-10 pr-4 py-2.5 text-sm text-foreground",
-              "placeholder:text-muted-foreground/60",
-              "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30",
-              "transition-all duration-200",
-            )}
+            className="border-border/40 bg-card/50 text-foreground placeholder:text-muted-foreground/60 focus:ring-primary/20 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-10 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
           />
         </div>
       )}
 
       {/* No results */}
       {filtered.length === 0 && query && (
-        <p className="py-12 text-center text-sm text-muted-foreground">
+        <p className="text-muted-foreground py-12 text-center text-sm">
           No projects match &ldquo;{query}&rdquo;
         </p>
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((project, i) => {
           const repoPath = project.githubUrl.replace(
             /^https?:\/\/(www\.)?github\.com\//,
@@ -178,40 +172,21 @@ function CodeViewerProjectGrid() {
                 onKeyDown={(e) =>
                   e.key === "Enter" && router.push(`/code-viewer/${project.id}`)
                 }
-                className={cn(
-                  "group relative cursor-pointer overflow-hidden rounded-2xl border p-5",
-                  "bg-card/80 backdrop-blur-xl",
-                  "border-border/60 hover:border-primary/30",
-                  "shadow-sm hover:shadow-lg transition-all duration-300",
-                  "flex flex-col justify-between min-h-[180px]",
-                )}
+                className="group border-border/60 hover:border-primary/30 bg-card/80 relative flex min-h-45 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-lg"
                 aria-label={`Browse code for ${project.projectName}`}
               >
                 {/* Ambient glow */}
-                <div
-                  className={cn(
-                    "absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-0 blur-2xl",
-                    "transition-opacity duration-300 group-hover:opacity-20",
-                    "bg-gradient-to-br from-primary to-blue-400",
-                  )}
-                />
+                <div className="from-primary absolute -top-6 -right-6 h-24 w-24 rounded-full bg-linear-to-br to-blue-400 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
 
                 <div className="relative z-10 flex flex-col gap-4">
                   {/* Header: Avatar + Name */}
                   <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-                        "bg-gradient-to-br from-primary/15 to-blue-400/15",
-                        "text-primary font-bold text-base",
-                        "transition-transform duration-200 group-hover:scale-105",
-                      )}
-                    >
+                    <div className="from-primary/15 text-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br to-blue-400/15 text-base font-bold transition-transform duration-200 group-hover:scale-105">
                       {project.projectName.charAt(0).toUpperCase()}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
+                      <h3 className="text-foreground group-hover:text-primary truncate font-semibold transition-colors">
                         {project.projectName}
                       </h3>
                       <a
@@ -219,7 +194,7 @@ function CodeViewerProjectGrid() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs transition-colors"
                       >
                         <ExternalLink className="h-3 w-3" />
                         <span className="truncate">{repoPath}</span>
@@ -257,13 +232,13 @@ function CodeViewerProjectGrid() {
                 </div>
 
                 {/* Footer: Time + CTA */}
-                <div className="relative z-10 flex items-center justify-between mt-4 pt-3 border-t border-border/30">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
+                <div className="border-border/30 relative z-10 mt-4 flex items-center justify-between border-t pt-3">
+                  <div className="text-muted-foreground/60 flex items-center gap-1 text-xs">
                     <Clock className="h-3 w-3" />
                     <span>{timeAgo}</span>
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs font-medium text-primary/70 group-hover:text-primary transition-colors">
+                  <div className="text-primary/70 group-hover:text-primary flex items-center gap-1 text-xs font-medium transition-colors">
                     <Code className="h-3.5 w-3.5" />
                     <span>Browse Code</span>
                     <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />

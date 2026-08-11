@@ -51,7 +51,7 @@ export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center border-b border-border/50 p-4",
+        "border-border/50 flex shrink-0 items-center border-b p-4",
         isCollapsed ? "justify-center" : "justify-between",
       )}
     >
@@ -64,8 +64,8 @@ export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
         )}
       >
         {/* Logo Icon Container */}
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent ring-1 ring-primary/20 transition-all duration-300 group-hover:ring-primary/40 group-hover:shadow-lg group-hover:shadow-primary/10">
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 to-transparent" />
+        <div className="from-primary/20 via-primary/10 ring-primary/20 group-hover:ring-primary/40 group-hover:shadow-primary/10 relative flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br to-transparent ring-1 transition-all duration-300 group-hover:shadow-lg">
+          <div className="from-primary/5 absolute inset-0 rounded-xl bg-linear-to-br to-transparent" />
           <Image
             src="/Github.svg"
             alt="GitVision Logo"
@@ -83,7 +83,7 @@ export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={FADE_TRANSITION}
-              className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-lg font-bold tracking-tight text-transparent"
+              className="from-foreground to-foreground/70 bg-linear-to-r bg-clip-text text-lg font-bold tracking-tight text-transparent"
             >
               Git<span className="text-primary">Vision</span>
             </motion.span>
@@ -100,7 +100,7 @@ export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
               size="icon"
               onClick={onToggle}
               aria-label="Collapse sidebar"
-              className="hidden h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground md:flex"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground hidden h-8 w-8 shrink-0 rounded-lg md:flex"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>

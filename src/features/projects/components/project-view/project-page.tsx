@@ -78,12 +78,12 @@ export default function ProjectPage() {
   if (showCodeViewer) {
     return (
       <div className="min-h-screen p-6 lg:p-8">
-        <div className="mx-auto max-w-screen-xl space-y-5">
+        <div className="mx-auto max-w-7xl space-y-5">
           <button
             onClick={() => setShowCodeViewer(false)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5 group"
+            className="text-muted-foreground hover:text-foreground group flex cursor-pointer items-center gap-1.5 text-xs transition-colors"
           >
-            <span className="group-hover:-translate-x-0.5 transition-transform inline-block">
+            <span className="inline-block transition-transform group-hover:-translate-x-0.5">
               ←
             </span>
             Back to {project?.projectName || "Dashboard"}
@@ -97,7 +97,7 @@ export default function ProjectPage() {
   // ─── Main layout ──────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen p-5 lg:p-8">
-      <div className="mx-auto max-w-screen-xl">
+      <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -139,7 +139,7 @@ export default function ProjectPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <BentoCard className="h-64 animate-pulse" />
                     <BentoCard className="h-64 animate-pulse" />
-                    <BentoCard className="sm:col-span-2 h-96 animate-pulse" />
+                    <BentoCard className="h-96 animate-pulse sm:col-span-2" />
                   </div>
                 ) : (
                   <BentoGrid

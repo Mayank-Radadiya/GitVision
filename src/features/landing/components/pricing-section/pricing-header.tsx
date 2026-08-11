@@ -10,16 +10,16 @@ export function PricingHeader({ isInView }: PricingHeaderProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
       transition={{ duration: 0.5 }}
-      className="text-center mb-4"
+      className="mb-4 text-center"
     >
-      <h2 className="text-4xl font-bold tracking-tight sm:text-5xl mb-5">
+      <h2 className="mb-5 text-4xl font-bold tracking-tight sm:text-5xl">
         Simple,{" "}
-        <span className="bg-gradient-to-r from-primary via-blue-400 to-primary bg-clip-text text-transparent">
+        <span className="from-primary to-primary bg-linear-to-r via-blue-400 bg-clip-text text-transparent">
           transparent
         </span>{" "}
         pricing
       </h2>
-      <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+      <p className="text-muted-foreground mx-auto max-w-2xl text-lg">
         Start free and scale as your team grows. All plans include core analysis
         features.
       </p>

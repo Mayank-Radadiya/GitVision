@@ -35,9 +35,12 @@ export function useCreateProject() {
       setTimeout(() => router.push("/dashboard"), 400);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to add repository. Please try again.", {
-        icon: <AlertCircle className="h-4 w-4 text-rose-500" />,
-      });
+      toast.error(
+        error.message || "Failed to add repository. Please try again.",
+        {
+          icon: <AlertCircle className="h-4 w-4 text-rose-500" />,
+        },
+      );
     },
   });
 }

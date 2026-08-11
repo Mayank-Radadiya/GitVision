@@ -30,17 +30,17 @@ function ProjectSearchBar({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Search Input */}
       <div className="relative max-w-sm flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 z-20 text-muted-foreground/50" />
+        <Search className="text-muted-foreground/50 absolute top-1/2 left-3 z-20 h-4 w-4 -translate-y-1/2" />
         <input
           type="text"
           placeholder={`Search ${resultCount} projects...`}
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           className={cn(
-            "w-full rounded-lg border-0 bg-muted/30 py-2 pl-10 pr-4",
-            "text-sm text-foreground placeholder:text-muted-foreground/40",
+            "bg-muted/30 w-full rounded-lg border-0 py-2 pr-4 pl-10",
+            "text-foreground placeholder:text-muted-foreground/40 text-sm",
             "transition-all duration-200",
-            "focus:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/30",
+            "focus:bg-muted/50 focus:ring-primary/30 focus:ring-1 focus:outline-none",
           )}
           aria-label="Search projects"
         />
@@ -48,15 +48,15 @@ function ProjectSearchBar({
 
       {/* Sort */}
       <div className="relative">
-        <ArrowUpDown className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
+        <ArrowUpDown className="text-muted-foreground/50 pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
         <select
           value={sortKey}
           onChange={(e) => onSortChange(e.target.value as ProjectSortKey)}
           className={cn(
-            "appearance-none rounded-lg border-0 bg-muted/30",
-            "py-2 pl-8 pr-8 text-xs text-muted-foreground",
+            "bg-muted/30 appearance-none rounded-lg border-0",
+            "text-muted-foreground py-2 pr-8 pl-8 text-xs",
             "transition-all duration-200",
-            "focus:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/30",
+            "focus:bg-muted/50 focus:ring-primary/30 focus:ring-1 focus:outline-none",
             "cursor-pointer",
           )}
           aria-label="Sort projects"

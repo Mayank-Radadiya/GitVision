@@ -43,19 +43,19 @@ export function CodeBlock({ children, language, className }: CodeBlockProps) {
   };
 
   return (
-    <div className="group/code relative my-3 overflow-hidden rounded-xl border border-white/[0.06] bg-[#0a0a0f]">
+    <div className="group/code relative my-3 overflow-hidden rounded-xl border border-white/6 bg-[#0a0a0f]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-4 py-2">
+      <div className="flex items-center justify-between border-b border-white/6 bg-white/2 px-4 py-2">
         <div className="flex items-center gap-2 text-[11px] text-white/40">
           <FileCode2 className="h-3.5 w-3.5" />
-          <span className="font-mono uppercase tracking-wider">
+          <span className="font-mono tracking-wider uppercase">
             {lang || "code"}
           </span>
         </div>
         <button
           onClick={handleCopy}
           aria-label={copied ? "Code copied to clipboard" : "Copy code block"}
-          className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-white/30 transition-all hover:bg-white/[0.06] hover:text-white/60 cursor-pointer"
+          className="flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-white/30 transition-all hover:bg-white/6 hover:text-white/60"
         >
           {copied ? (
             <>

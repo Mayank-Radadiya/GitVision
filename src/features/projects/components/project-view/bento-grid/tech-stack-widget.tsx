@@ -32,24 +32,24 @@ const MOCK_LANGUAGES: Language[] = [
 
 function TechStackWidget() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400">
           <Code2 className="h-3.5 w-3.5" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-foreground leading-none">
+          <h3 className="text-foreground text-sm leading-none font-semibold">
             Tech Stack
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-muted-foreground mt-0.5 text-[11px]">
             Language distribution
           </p>
         </div>
       </div>
 
       {/* Segmented progress bar */}
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full gap-0.5 mb-4">
+      <div className="mb-4 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full">
         {MOCK_LANGUAGES.map((lang, i) => (
           <motion.div
             key={lang.name}
@@ -66,7 +66,7 @@ function TechStackWidget() {
       </div>
 
       {/* Legend */}
-      <div className="space-y-2.5 flex-1">
+      <div className="flex-1 space-y-2.5">
         {MOCK_LANGUAGES.map((lang, i) => (
           <motion.div
             key={lang.name}
@@ -77,14 +77,14 @@ function TechStackWidget() {
           >
             <div className="flex items-center gap-2">
               <span
-                className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: lang.color }}
               />
-              <span className="text-xs text-foreground/80 font-medium">
+              <span className="text-foreground/80 text-xs font-medium">
                 {lang.name}
               </span>
             </div>
-            <span className="text-xs font-mono text-muted-foreground tabular-nums">
+            <span className="text-muted-foreground font-mono text-xs tabular-nums">
               {lang.percentage}%
             </span>
           </motion.div>

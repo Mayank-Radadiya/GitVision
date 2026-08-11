@@ -137,7 +137,10 @@ function extractImportBlock(code: string, language: string | null): string {
   }
 
   // Strip trailing blank lines
-  while (importLines.length > 0 && importLines[importLines.length - 1].trim() === "") {
+  while (
+    importLines.length > 0 &&
+    importLines[importLines.length - 1].trim() === ""
+  ) {
     importLines.pop();
   }
 
@@ -201,7 +204,8 @@ function findTypeScriptBoundaries(code: string): Boundary[] {
       nameGroup: 4,
     },
     {
-      regex: /^(export\s+)?(async\s+)?(const|let|var)\s+(\w+)\s*=\s*(async\s*)?\(/,
+      regex:
+        /^(export\s+)?(async\s+)?(const|let|var)\s+(\w+)\s*=\s*(async\s*)?\(/,
       type: "function",
       nameGroup: 4,
     },
@@ -333,7 +337,9 @@ function findPythonBoundaries(code: string): Boundary[] {
         });
       }
       currentStart = i;
-      currentType = match[0].trimStart().startsWith("class") ? "class" : "function";
+      currentType = match[0].trimStart().startsWith("class")
+        ? "class"
+        : "function";
       currentName = match[2] ?? match[3];
       baseIndent = line.search(/\S/);
     } else if (currentStart !== null) {
@@ -427,9 +433,21 @@ function findRustBoundaries(code: string): Boundary[] {
   const boundaries: Boundary[] = [];
   const lines = code.split("\n");
 
-  const patterns: Array<{ regex: RegExp; type: CodeChunk["type"]; nameGroup: number }> = [
-    { regex: /^(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/, type: "function", nameGroup: 1 },
-    { regex: /^(?:pub\s+)?impl(?:\s+\w+)?\s+(\w+)/, type: "class", nameGroup: 1 },
+  const patterns: Array<{
+    regex: RegExp;
+    type: CodeChunk["type"];
+    nameGroup: number;
+  }> = [
+    {
+      regex: /^(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/,
+      type: "function",
+      nameGroup: 1,
+    },
+    {
+      regex: /^(?:pub\s+)?impl(?:\s+\w+)?\s+(\w+)/,
+      type: "class",
+      nameGroup: 1,
+    },
     { regex: /^(?:pub\s+)?struct\s+(\w+)/, type: "class", nameGroup: 1 },
     { regex: /^(?:pub\s+)?enum\s+(\w+)/, type: "type", nameGroup: 1 },
   ];
@@ -627,9 +645,10 @@ export function chunkCode(
     rust: findRustBoundaries,
   };
 
-  const boundaries = language && boundaryDetectors[language]
-    ? boundaryDetectors[language](code)
-    : [];
+  const boundaries =
+    language && boundaryDetectors[language]
+      ? boundaryDetectors[language](code)
+      : [];
 
   let rawChunks: CodeChunk[];
 

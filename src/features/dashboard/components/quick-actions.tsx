@@ -14,7 +14,7 @@ function QuickActions() {
   return (
     <button
       onClick={() => router.push("/create-project")}
-      className="group relative inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+      className="group bg-primary text-primary-foreground shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/30 relative inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
       aria-label="Create new project"
     >
       <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />

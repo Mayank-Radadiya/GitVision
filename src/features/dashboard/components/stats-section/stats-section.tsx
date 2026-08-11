@@ -20,7 +20,7 @@ function StatsSection({ stats }: StatsSectionProps) {
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {STAT_CARDS.map((c) => (
-          <Skeleton key={c.label} className="h-[68px] rounded-xl" />
+          <Skeleton key={c.label} className="h-17 rounded-xl" />
         ))}
       </div>
     );

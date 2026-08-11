@@ -32,12 +32,18 @@ export class RequestTracer {
     try {
       const result = await fn();
       const durationMs = Math.round(performance.now() - start);
-      const metadata = metadataExtractor ? metadataExtractor(result) : undefined;
+      const metadata = metadataExtractor
+        ? metadataExtractor(result)
+        : undefined;
       this.stages.push({ name, durationMs, metadata });
       return result;
     } catch (error) {
       const durationMs = Math.round(performance.now() - start);
-      this.stages.push({ name, durationMs, metadata: { error: String(error) } });
+      this.stages.push({
+        name,
+        durationMs,
+        metadata: { error: String(error) },
+      });
       throw error;
     }
   }

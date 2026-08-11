@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectCreateSchema } from "@/src/lib/validation/schemas";
 
-import { CreateProjectInput, RepoInfo } from "./add-repo.constants";
+import { CreateProjectInput, RepoInfo, PRESETS } from "./add-repo.constants";
 import { extractRepoInfo } from "./add-repo.utils";
 import { useCreateProject } from "@/features/projects/hooks/use-create-project";
 import {
@@ -48,24 +48,6 @@ const itemVariants = {
     },
   },
 };
-
-const PRESETS = [
-  {
-    key: "1",
-    name: "React Core Framework",
-    url: "https://github.com/facebook/react",
-  },
-  {
-    key: "2",
-    name: "Next.js App Router",
-    url: "https://github.com/vercel/next.js",
-  },
-  {
-    key: "3",
-    name: "Tailwind CSS v4",
-    url: "https://github.com/tailwindlabs/tailwindcss",
-  },
-];
 
 export default function CreateNewProjectForm() {
   const createProject = useCreateProject();
@@ -236,7 +218,7 @@ export default function CreateNewProjectForm() {
                 </motion.div>
               </form>
 
-              <div className="mt-8 border-t border-gv-hairline/80 pt-6">
+              <div className="border-gv-hairline/80 mt-8 border-t pt-6">
                 <CreditsGauge />
               </div>
             </div>

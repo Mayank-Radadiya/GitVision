@@ -35,9 +35,7 @@ export function useEmbeddingManager(
    */
   const checkStatus = useCallback(async () => {
     try {
-      const response = await fetch(
-        `/api/embeddings?projectId=${projectId}`,
-      );
+      const response = await fetch(`/api/embeddings?projectId=${projectId}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch embedding status");

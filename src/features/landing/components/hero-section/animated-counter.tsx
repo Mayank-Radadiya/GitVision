@@ -38,11 +38,11 @@ export function AnimatedCounter({ value, label }: AnimatedCounterProps) {
 
   return (
     <div ref={ref} className="text-center">
-      <div className="text-2xl font-bold text-foreground tabular-nums">
+      <div className="text-foreground text-2xl font-bold tabular-nums">
         {isInView ? displayValue : "0"}
         {suffix}
       </div>
-      <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+      <div className="text-muted-foreground mt-0.5 text-xs">{label}</div>
     </div>
   );
 }

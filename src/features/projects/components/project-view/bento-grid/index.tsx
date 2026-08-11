@@ -25,9 +25,9 @@ export function BentoCard({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-border/40 bg-card/70 backdrop-blur-xl p-5 transition-all duration-300 hover:border-border/70 hover:shadow-lg hover:shadow-black/8 ${className}`}
+      className={`border-border/40 bg-card/70 hover:border-border/70 relative overflow-hidden rounded-2xl border p-5 backdrop-blur-xl transition-all duration-300 hover:shadow-lg hover:shadow-black/8 ${className}`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.02] via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-white/2 via-transparent to-transparent" />
       <div className="relative h-full">{children}</div>
     </div>
   );

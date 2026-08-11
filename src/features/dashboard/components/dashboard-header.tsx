@@ -34,7 +34,7 @@ function DashboardHeader({ stats }: DashboardHeaderProps) {
           <motion.h1
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-xl font-semibold tracking-tight text-foreground"
+            className="text-foreground text-xl font-semibold tracking-tight"
           >
             Welcome back, {firstName}
           </motion.h1>
@@ -42,7 +42,7 @@ function DashboardHeader({ stats }: DashboardHeaderProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="mt-0.5 text-sm text-muted-foreground"
+            className="text-muted-foreground mt-0.5 text-sm"
           >
             {today}
           </motion.p>

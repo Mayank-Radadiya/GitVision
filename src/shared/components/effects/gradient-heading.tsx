@@ -6,6 +6,13 @@ interface GradientHeadingProps {
   className?: string;
 }
 
+const SIZE_CLASSES: Record<string, string> = {
+  h1: "text-3xl md:text-4xl lg:text-5xl",
+  h2: "text-3xl md:text-4xl",
+  h3: "text-2xl md:text-3xl",
+  h4: "text-xl md:text-2xl",
+};
+
 export function GradientHeading({
   as: Component = "h2",
   children,
@@ -14,12 +21,9 @@ export function GradientHeading({
   return (
     <Component
       className={cn(
-        "font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent",
-        Component === "h1" && "text-3xl md:text-4xl lg:text-5xl",
-        Component === "h2" && "text-3xl md:text-4xl",
-        Component === "h3" && "text-2xl md:text-3xl",
-        Component === "h4" && "text-xl md:text-2xl",
-        className
+        "bg-linear-to-r from-blue-500 to-purple-600 bg-clip-text font-bold text-transparent",
+        SIZE_CLASSES[Component] || SIZE_CLASSES.h2,
+        className,
       )}
     >
       {children}

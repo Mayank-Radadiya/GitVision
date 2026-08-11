@@ -69,7 +69,7 @@ const STAT_ITEMS = [
 function ProjectStats({ project, isLoading }: ProjectStatsProps) {
   if (isLoading) {
     return (
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-wrap gap-3">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-10 w-36 rounded-xl" />
         ))}
@@ -82,7 +82,7 @@ function ProjectStats({ project, isLoading }: ProjectStatsProps) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.1, staggerChildren: 0.05 }}
-      className="flex gap-3 flex-wrap"
+      className="flex flex-wrap gap-3"
     >
       {STAT_ITEMS.map((stat, i) => {
         const Icon = stat.icon;
@@ -95,7 +95,7 @@ function ProjectStats({ project, isLoading }: ProjectStatsProps) {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: i * 0.06 }}
-            className="inline-flex items-center gap-2.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm px-3.5 py-2 hover:border-border/70 hover:bg-card/80 transition-all duration-200 cursor-default"
+            className="border-border/40 bg-card/60 hover:border-border/70 hover:bg-card/80 inline-flex cursor-default items-center gap-2.5 rounded-xl border px-3.5 py-2 backdrop-blur-sm transition-all duration-200"
           >
             <div
               className={`flex h-6 w-6 items-center justify-center rounded-md ${stat.bg}`}
@@ -103,10 +103,10 @@ function ProjectStats({ project, isLoading }: ProjectStatsProps) {
               <Icon className={`h-3.5 w-3.5 ${stat.color}`} />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-bold text-foreground tabular-nums leading-none">
+              <span className="text-foreground text-sm leading-none font-bold tabular-nums">
                 {displayValue}
               </span>
-              <span className="text-[11px] text-muted-foreground leading-none">
+              <span className="text-muted-foreground text-[11px] leading-none">
                 {stat.label}
               </span>
             </div>

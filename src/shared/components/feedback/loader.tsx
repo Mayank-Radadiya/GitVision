@@ -8,7 +8,7 @@ interface LoaderProps {
 
 export const Loader: React.FC<LoaderProps> = ({ message = "Loading..." }) => {
   return (
-    <div className="flex flex-col items-center justify-center w-full h-screen gap-4">
+    <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
       <div className="relative animate-pulse">
         <Image
           src="/Github.svg"
@@ -23,7 +23,7 @@ export const Loader: React.FC<LoaderProps> = ({ message = "Loading..." }) => {
         />
       </div>
       {message && (
-        <p className="text-center text-muted-foreground mt-4 animate-pulse">
+        <p className="text-muted-foreground mt-4 animate-pulse text-center">
           {message}
         </p>
       )}

@@ -36,9 +36,9 @@ function InlineStat({
   colorClass?: string;
 }) {
   return (
-    <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover:text-foreground">
+    <span className="text-muted-foreground group-hover:text-foreground flex items-center gap-1.5 transition-colors">
       <Icon className={cn("h-3.5 w-3.5", colorClass)} />
-      <span className="text-[13px] tabular-nums font-medium">
+      <span className="text-[13px] font-medium tabular-nums">
         {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}
       </span>
     </span>
@@ -90,10 +90,10 @@ function ProjectCard({
         e.key === "Enter" && router.push(`/dashboard/user-project/${id}`)
       }
       className={cn(
-        "group relative cursor-pointer rounded-2xl border border-border/50 p-4",
+        "group border-border/50 relative cursor-pointer rounded-2xl border p-4",
         "bg-card/40 backdrop-blur-xl",
         "shadow-sm transition-all duration-300",
-        "hover:-translate-y-0.5 hover:bg-card/80 hover:border-primary/40 hover:shadow-md hover:shadow-primary/5",
+        "hover:bg-card/80 hover:border-primary/40 hover:shadow-primary/5 hover:-translate-y-0.5 hover:shadow-md",
       )}
       aria-label={`Open project ${projectName}`}
     >
@@ -110,7 +110,7 @@ function ProjectCard({
 
         {/* Name + URL */}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
+          <h3 className="text-foreground group-hover:text-primary truncate text-base font-semibold tracking-tight transition-colors">
             {projectName}
           </h3>
           <a
@@ -118,7 +118,7 @@ function ProjectCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground/60 transition-colors hover:text-primary"
+            className="text-muted-foreground/60 hover:text-primary mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             aria-label={`View ${repoPath} on GitHub`}
           >
             <ExternalLink className="h-3 w-3" />
@@ -143,8 +143,8 @@ function ProjectCard({
         </div>
 
         {/* Arrow */}
-        <div className="h-7 w-7 rounded-full bg-border/50 flex items-center justify-center opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300">
-          <ChevronRight className="h-4 w-4 text-foreground/80" />
+        <div className="bg-border/50 -ml-2 flex h-7 w-7 items-center justify-center rounded-full opacity-0 transition-all duration-300 group-hover:ml-0 group-hover:opacity-100">
+          <ChevronRight className="text-foreground/80 h-4 w-4" />
         </div>
       </div>
     </div>

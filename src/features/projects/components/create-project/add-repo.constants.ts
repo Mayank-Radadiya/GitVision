@@ -31,3 +31,27 @@ export const FORM_STEPS: Step[] = [
   { id: 2, label: "02 VALIDATION" },
   { id: 3, label: "03 ANALYSIS" },
 ];
+
+export const PRESETS = [
+  {
+    key: "1",
+    owner: "facebook",
+    repo: "react",
+    name: "React",
+    url: "https://github.com/facebook/react",
+  },
+  {
+    key: "2",
+    owner: "microsoft",
+    repo: "TypeScript",
+    name: "TypeScript",
+    url: "https://github.com/microsoft/TypeScript",
+  },
+  {
+    key: "3",
+    owner: "tailwindlabs",
+    repo: "tailwindcss",
+    name: "Tailwind CSS",
+    url: "https://github.com/tailwindlabs/tailwindcss",
+  },
+];

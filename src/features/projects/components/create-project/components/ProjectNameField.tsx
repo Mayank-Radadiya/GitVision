@@ -7,7 +7,11 @@
 "use client";
 
 import { Field } from "./Field";
-import type { UseFormRegister, FieldErrors, UseFormSetValue } from "react-hook-form";
+import type {
+  UseFormRegister,
+  FieldErrors,
+  UseFormSetValue,
+} from "react-hook-form";
 import type { CreateProjectInput } from "../add-repo.constants";
 import { extractRepoInfo } from "../add-repo.utils";
 import { Wand2 } from "lucide-react";
@@ -36,7 +40,10 @@ export function ProjectNameField({
     if (extracted && setValue) {
       // Format as "Owner / Repo" or "Repo Name"
       const name = `${extracted.repo.charAt(0).toUpperCase()}${extracted.repo.slice(1)}`;
-      setValue("projectName", name, { shouldValidate: true, shouldTouch: true });
+      setValue("projectName", name, {
+        shouldValidate: true,
+        shouldTouch: true,
+      });
     }
   };
 
@@ -54,7 +61,7 @@ export function ProjectNameField({
           <button
             type="button"
             onClick={handleAutoFill}
-            className="inline-flex cursor-pointer items-center gap-1 font-gv-mono text-[10px] text-gv-amber transition-colors hover:text-gv-bone"
+            className="font-gv-mono text-gv-amber hover:text-gv-bone inline-flex cursor-pointer items-center gap-1 text-[10px] transition-colors"
             title="Auto-fill name from repository URL"
           >
             <Wand2 className="h-3 w-3" />
@@ -64,11 +71,11 @@ export function ProjectNameField({
       }
       helper={
         hasError ? (
-          <span className="font-gv-mono text-xs text-gv-ember">
+          <span className="font-gv-mono text-gv-ember text-xs">
             {errors.projectName?.message || "Project name is required"}
           </span>
         ) : (
-          <span className="font-gv-mono text-xs text-gv-fog/80">
+          <span className="font-gv-mono text-gv-fog/80 text-xs">
             Internal label inside GitVision workspace.
           </span>
         )

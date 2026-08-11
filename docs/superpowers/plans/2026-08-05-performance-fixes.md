@@ -86,7 +86,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           off-screen). The width is injected via CSS var so it stays in sync
           with SIDEBAR_WIDTH_* constants. */}
       <main
-        className="min-h-screen transition-all duration-300 md:pl-[var(--sidebar-w)]"
+        className="min-h-screen transition-all duration-300 md:pl-(--sidebar-w)"
         style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
       >
         <div className="h-full">{children}</div>

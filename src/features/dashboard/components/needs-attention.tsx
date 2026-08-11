@@ -21,13 +21,13 @@ function NeedsAttention() {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm",
+        "border-border/50 bg-card/80 rounded-xl border p-5 backdrop-blur-sm",
       )}
     >
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <AlertCircle className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-medium text-foreground">Needs Attention</h3>
+        <AlertCircle className="text-primary h-4 w-4" />
+        <h3 className="text-foreground text-sm font-medium">Needs Attention</h3>
 
         {/* Count badges */}
         {!isLoading && data && totalItems > 0 && (
@@ -57,7 +57,7 @@ function NeedsAttention() {
 
       {/* Empty state */}
       {!isLoading && totalItems === 0 && (
-        <p className="text-xs text-muted-foreground/60">
+        <p className="text-muted-foreground/60 text-xs">
           All clear — no open items
         </p>
       )}
@@ -75,7 +75,7 @@ function NeedsAttention() {
               <div
                 key={item.id}
                 className={cn(
-                  "flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/20",
+                  "hover:bg-muted/20 flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors",
                   item.isPullRequest
                     ? "border-l-2 border-l-emerald-500/40"
                     : "border-l-2 border-l-amber-500/40",
@@ -90,11 +90,11 @@ function NeedsAttention() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-1 text-xs font-medium text-foreground leading-snug">
+                  <p className="text-foreground line-clamp-1 text-xs leading-snug font-medium">
                     {item.title}
                   </p>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                    <span className="font-medium text-muted-foreground">
+                  <div className="text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 text-[10px]">
+                    <span className="text-muted-foreground font-medium">
                       {item.projectName}
                     </span>
                     <span>·</span>
@@ -113,7 +113,7 @@ function NeedsAttention() {
           {data.items.length > 3 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="mt-2 w-full cursor-pointer rounded-lg py-1.5 text-center text-[11px] font-medium text-primary/70 transition-colors hover:bg-muted/20 hover:text-primary"
+              className="text-primary/70 hover:bg-muted/20 hover:text-primary mt-2 w-full cursor-pointer rounded-lg py-1.5 text-center text-[11px] font-medium transition-colors"
             >
               {isExpanded ? "Show less" : `View all ${data.items.length} items`}
             </button>

@@ -7,9 +7,9 @@ export function HeroBackground() {
   return (
     <>
       {/* Grid layers */}
-      <div className="absolute inset-0 bg-grid-small-black/[0.15] dark:bg-grid-small-white/[0.05]" />
-      <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-      <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+      <div className="bg-grid-small-black/15 dark:bg-grid-small-white/5 absolute inset-0" />
+      <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+      <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]" />
 
       {/* Sparkles */}
       <div className="absolute inset-0 h-full w-full">

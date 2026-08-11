@@ -10,16 +10,16 @@ function PricingSection() {
   const isInView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section id="pricing" ref={ref} className="py-28 relative overflow-hidden">
+    <section id="pricing" ref={ref} className="relative overflow-hidden py-28">
       {/* Background */}
-      <div className="absolute inset-0 bg-grid-small-black/[0.15] dark:bg-grid-small-white/[0.03]" />
-      <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+      <div className="bg-grid-small-black/15 dark:bg-grid-small-white/3 absolute inset-0" />
+      <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]" />
 
       {/* Ambient orbs */}
-      <div className="absolute -left-1/4 top-1/4 h-[400px] w-[400px] rounded-full bg-primary/5 blur-[120px]" />
-      <div className="absolute -right-1/4 bottom-1/4 h-[400px] w-[400px] rounded-full bg-blue-500/5 blur-[100px]" />
+      <div className="bg-primary/5 absolute top-1/4 -left-1/4 h-100 w-100 rounded-full blur-[120px]" />
+      <div className="absolute -right-1/4 bottom-1/4 h-100 w-100 rounded-full bg-blue-500/5 blur-[100px]" />
 
-      <div className="container max-w-7xl mx-auto px-4 relative">
+      <div className="relative container mx-auto max-w-7xl px-4">
         <PricingHeader isInView={isInView} />
         <PricingGrid isInView={isInView} />
       </div>

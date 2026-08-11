@@ -65,7 +65,7 @@ export function SidebarNavItem({
         className={cn(
           "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
           isActive
-            ? "bg-gradient-to-r from-primary/15 via-primary/10 to-transparent text-foreground"
+            ? "from-primary/15 via-primary/10 text-foreground bg-linear-to-r to-transparent"
             : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
         )}
       >
@@ -73,7 +73,7 @@ export function SidebarNavItem({
         {isActive && (
           <motion.div
             layoutId="activeIndicator"
-            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-gradient-to-b from-primary to-primary/60"
+            className="from-primary to-primary/60 absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-full bg-linear-to-b"
             transition={ACTIVE_INDICATOR_SPRING}
           />
         )}
@@ -87,7 +87,7 @@ export function SidebarNavItem({
               : "text-muted-foreground group-hover:bg-accent group-hover:text-foreground",
           )}
         >
-          <Icon className="h-[18px] w-[18px]" />
+          <Icon className="h-4.5 w-4.5" />
         </div>
 
         {/* Text Label - Animated visibility */}

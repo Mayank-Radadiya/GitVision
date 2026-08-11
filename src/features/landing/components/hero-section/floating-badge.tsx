@@ -25,10 +25,10 @@ export function FloatingBadge({
         initial="initial"
         animate="animate"
         variants={floatingAnimation}
-        className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/80 backdrop-blur-md px-3 py-2 shadow-lg"
+        className="border-border/40 bg-background/80 flex items-center gap-2 rounded-lg border px-3 py-2 shadow-lg backdrop-blur-md"
       >
-        <Icon className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-medium text-foreground/80">{text}</span>
+        <Icon className="text-primary h-3.5 w-3.5" />
+        <span className="text-foreground/80 text-xs font-medium">{text}</span>
       </motion.div>
     </motion.div>
   );

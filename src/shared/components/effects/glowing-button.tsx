@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Button } from "@/shared/components/ui/button"
-import { cn } from "@/shared/lib/utils"
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 interface GlowingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode
-  className?: string
-  glowColor?: string
+  children: React.ReactNode;
+  className?: string;
+  glowColor?: string;
 }
 
 export function GlowingButton({
@@ -17,23 +17,26 @@ export function GlowingButton({
   glowColor = "rgba(99, 102, 241, 0.6)",
   ...props
 }: GlowingButtonProps) {
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [isHovering, setIsHovering] = useState(false)
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isHovering, setIsHovering] = useState(false);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!isHovering) return
+    if (!isHovering) return;
 
-    const rect = e.currentTarget.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect();
     setPosition({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-    })
-  }
+    });
+  };
 
   return (
     <Button
       size="lg"
-      className={cn("relative overflow-hidden bg-primary hover:bg-primary/90 transition-colors", className)}
+      className={cn(
+        "bg-primary hover:bg-primary/90 relative overflow-hidden transition-colors",
+        className,
+      )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setIsHovering(false)}
@@ -41,7 +44,7 @@ export function GlowingButton({
     >
       {isHovering && (
         <div
-          className="absolute pointer-events-none rounded-full mix-blend-screen"
+          className="pointer-events-none absolute rounded-full mix-blend-screen"
           style={{
             left: position.x,
             top: position.y,
@@ -55,5 +58,5 @@ export function GlowingButton({
       )}
       {children}
     </Button>
-  )
+  );
 }

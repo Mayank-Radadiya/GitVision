@@ -38,7 +38,7 @@ export function MobileMenuButton({ onClick }: MobileMenuButtonProps) {
       size="icon"
       onClick={onClick}
       aria-label="Open navigation menu"
-      className="fixed left-4 top-4 z-50 h-10 w-10 rounded-xl bg-background/80 shadow-lg backdrop-blur-sm md:hidden"
+      className="bg-background/80 fixed top-4 left-4 z-50 h-10 w-10 rounded-xl shadow-lg backdrop-blur-sm md:hidden"
     >
       <Menu className="h-5 w-5" />
     </Button>
@@ -70,7 +70,7 @@ export function MobileOverlay({ isOpen, onClose }: MobileOverlayProps) {
           exit={{ opacity: 0 }}
           onClick={onClose}
           aria-hidden="true"
-          className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-sm md:hidden"
+          className="bg-background/80 fixed inset-0 z-90 backdrop-blur-sm md:hidden"
         />
       )}
     </AnimatePresence>
@@ -103,16 +103,16 @@ export function MobileDrawer({ isOpen, onClose, children }: MobileDrawerProps) {
           animate={{ x: 0 }}
           exit={{ x: "-100%" }}
           transition={SIDEBAR_SPRING_CONFIG}
-          className="fixed inset-y-0 left-0 z-[100] w-72 md:hidden"
+          className="fixed inset-y-0 left-0 z-100 w-72 md:hidden"
         >
-          <div className="relative h-full bg-background/95 shadow-2xl backdrop-blur-xl">
+          <div className="bg-background/95 relative h-full shadow-2xl backdrop-blur-xl">
             {/* Close Button */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
               aria-label="Close navigation menu"
-              className="absolute right-3 top-3 h-8 w-8 rounded-lg"
+              className="absolute top-3 right-3 h-8 w-8 rounded-lg"
             >
               <X className="h-4 w-4" />
             </Button>
