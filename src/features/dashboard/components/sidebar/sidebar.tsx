@@ -166,9 +166,9 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         className="hidden h-screen md:fixed md:inset-y-0 md:left-0 md:z-50 md:block"
       >
         {/* Glass Effect Container */}
-        <div className="glass-sidebar relative h-full border-r border-border/40 bg-background/80 backdrop-blur-xl">
+        <div className="glass-sidebar border-border/40 bg-background/80 relative h-full border-r backdrop-blur-xl">
           {/* Subtle Gradient Overlay */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-primary/[0.02]" />
+          <div className="from-primary/2 to-primary/2 pointer-events-none absolute inset-0 bg-linear-to-b via-transparent" />
 
           {/* Sidebar Content */}
           <div className="relative h-full">

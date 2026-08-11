@@ -17,8 +17,8 @@ export default function TermsOfService() {
             href="/"
             className="group flex items-center gap-3 transition-all duration-300"
           >
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-background via-background to-background ring-1 ring-primary/20 backdrop-blur-sm overflow-hidden shadow-lg transition-all duration-300 group-hover:shadow-primary/10">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-80"></div>
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-br from-background via-background to-background ring-1 ring-primary/20 backdrop-blur-sm overflow-hidden shadow-lg transition-all duration-300 group-hover:shadow-primary/10">
+              <div className="absolute inset-0 bg-linear-to-br from-primary/10 to-transparent opacity-80"></div>
               <Image
                 src="/Github.svg"
                 alt="GitVision Logo"
@@ -27,7 +27,7 @@ export default function TermsOfService() {
                 className="relative z-10 transition-transform duration-300 group-hover:scale-110"
               />
             </div>
-            <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-xl font-bold tracking-tight text-transparent">
+            <span className="bg-linear-to-r from-foreground to-foreground/80 bg-clip-text text-xl font-bold tracking-tight text-transparent">
               Git<span className="text-primary">Vision</span>
             </span>
           </Link>
@@ -44,7 +44,7 @@ export default function TermsOfService() {
         </Link>
 
         <div className="bg-card/95 backdrop-blur-sm p-8 md:p-10 rounded-xl shadow-lg border border-border/30">
-          <h1 className="text-3xl md:text-4xl font-bold mb-8 text-center bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+          <h1 className="text-3xl md:text-4xl font-bold mb-8 text-center bg-linear-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
             Terms of Service
           </h1>
 

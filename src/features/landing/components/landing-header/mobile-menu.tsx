@@ -30,15 +30,15 @@ export function MobileMenu({
           initial="closed"
           animate="open"
           exit="closed"
-          className="overflow-hidden border-t border-border/20 md:hidden"
+          className="border-border/20 overflow-hidden border-t md:hidden"
         >
-          <div className="px-3 py-3 space-y-0.5">
+          <div className="space-y-0.5 px-3 py-3">
             {navigation.map((item) => (
               <motion.div key={item.name} variants={mobileItemVariants}>
                 <Link
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer",
+                    "flex cursor-pointer items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                     activeSection === item.sectionId
                       ? "bg-muted/60 text-foreground"
                       : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
@@ -47,7 +47,7 @@ export function MobileMenu({
                 >
                   {item.name}
                   {activeSection === item.sectionId && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    <div className="bg-primary ml-auto h-1.5 w-1.5 rounded-full" />
                   )}
                 </Link>
               </motion.div>
@@ -55,11 +55,11 @@ export function MobileMenu({
 
             <motion.div
               variants={mobileItemVariants}
-              className="pt-3 border-t border-border/20 mt-2 space-y-2"
+              className="border-border/20 mt-2 space-y-2 border-t pt-3"
             >
               {isAuthenticated ? (
                 <Link href="/dashboard" onClick={onClose}>
-                  <Button className="w-full justify-center rounded-xl h-11 font-medium cursor-pointer">
+                  <Button className="h-11 w-full cursor-pointer justify-center rounded-xl font-medium">
                     <ZapIcon className="mr-2 h-4 w-4" />
                     Dashboard
                   </Button>
@@ -69,13 +69,13 @@ export function MobileMenu({
                   <Link href="/sign-in" onClick={onClose}>
                     <Button
                       variant="ghost"
-                      className="w-full justify-center rounded-xl h-11 text-muted-foreground cursor-pointer"
+                      className="text-muted-foreground h-11 w-full cursor-pointer justify-center rounded-xl"
                     >
                       Log in
                     </Button>
                   </Link>
                   <Link href="/sign-up" onClick={onClose}>
-                    <Button className="w-full justify-center rounded-xl h-11 font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
+                    <Button className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-full cursor-pointer justify-center rounded-xl font-medium">
                       Get Started Free
                       <ArrowRightIcon className="ml-2 h-4 w-4" />
                     </Button>

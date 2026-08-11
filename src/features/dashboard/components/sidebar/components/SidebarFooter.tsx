@@ -62,7 +62,7 @@ export function SidebarFooter({
   onExpand,
 }: SidebarFooterProps) {
   return (
-    <div className="border-t border-border/50 p-3 flex flex-col gap-2">
+    <div className="border-border/50 flex flex-col gap-2 border-t p-3">
       {/* AI Credits */}
       <SidebarCredits isCollapsed={isCollapsed} />
 
@@ -78,7 +78,7 @@ export function SidebarFooter({
       >
         {/* App Version - Hidden when collapsed */}
         {!isCollapsed && (
-          <span className="text-[10px] font-medium text-muted-foreground/60">
+          <span className="text-muted-foreground/60 text-[10px] font-medium">
             {APP_VERSION}
           </span>
         )}
@@ -92,7 +92,7 @@ export function SidebarFooter({
           size="icon"
           onClick={onExpand}
           aria-label="Expand sidebar"
-          className="mt-2 h-8 w-full rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="text-muted-foreground hover:bg-accent hover:text-foreground mt-2 h-8 w-full rounded-lg"
         >
           <ChevronLeft className="h-4 w-4 rotate-180" />
         </Button>

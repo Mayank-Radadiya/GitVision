@@ -35,7 +35,7 @@ export default async function ChatDetailPage({ params }: ChatPageProps) {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-background via-background/95 to-background/90">
+    <div className="h-screen bg-linear-to-br from-background via-background/95 to-background/90">
       <ChatRoom
         chatId={chatData.id}
         projectId={chatData.projectId}

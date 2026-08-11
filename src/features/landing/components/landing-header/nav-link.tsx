@@ -15,7 +15,7 @@ export function NavLink({ item, isActive }: NavLinkProps) {
       <Link
         href={item.href}
         className={cn(
-          "relative px-3 py-1.5 text-sm font-medium transition-colors duration-200 cursor-pointer",
+          "relative cursor-pointer px-3 py-1.5 text-sm font-medium transition-colors duration-200",
           isActive
             ? "text-foreground"
             : "text-muted-foreground/70 hover:text-foreground",
@@ -25,7 +25,7 @@ export function NavLink({ item, isActive }: NavLinkProps) {
         {isActive && (
           <motion.span
             layoutId="active-nav"
-            className="absolute inset-0 rounded-full bg-muted/60 -z-10"
+            className="bg-muted/60 absolute inset-0 -z-10 rounded-full"
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
           />
         )}

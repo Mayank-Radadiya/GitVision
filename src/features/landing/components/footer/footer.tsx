@@ -7,14 +7,14 @@ function Footer() {
   return (
     <footer
       id="footer"
-      className="border-t border-border/40 bg-gradient-to-b from-background to-background/95"
+      className="border-border/40 from-background to-background/95 border-t bg-linear-to-b"
     >
-      <div className="container max-w-7xl mx-auto px-6 py-14">
+      <div className="container mx-auto max-w-7xl px-6 py-14">
         {/* Gradient divider */}
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/30 to-transparent mb-12" />
+        <div className="via-primary/30 mb-12 h-px w-full bg-linear-to-r from-transparent to-transparent" />
 
         {/* Main grid: brand + link columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
+        <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <FooterBrand />
           </div>

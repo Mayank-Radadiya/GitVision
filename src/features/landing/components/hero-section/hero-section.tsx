@@ -27,10 +27,10 @@ function HeroSection() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <section className="relative overflow-hidden bg-grid-small-black/[0.2] dark:bg-grid-small-white/[0.05] pt-32 pb-24 min-h-screen flex flex-col justify-center">
+      <section className="bg-grid-small-black/20 dark:bg-grid-small-white/5 relative flex min-h-screen flex-col justify-center overflow-hidden pt-32 pb-24">
         <HeroBackground />
 
-        <div className="container relative z-10 mx-auto px-4">
+        <div className="relative z-10 container mx-auto px-4">
           <div className="mx-auto max-w-3xl text-center">
             <HeroContent />
             <HeroSearchForm />

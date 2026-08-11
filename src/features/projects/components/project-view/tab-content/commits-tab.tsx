@@ -166,34 +166,34 @@ function CommitRow({
   return (
     <motion.div
       layout
-      className={`group border-b border-border/40 last:border-b-0 transition-all ${
+      className={`group border-border/40 border-b transition-all last:border-b-0 ${
         expanded ? "bg-muted/10" : "hover:bg-muted/30"
       }`}
     >
       <div
-        className="flex items-start gap-4 px-5 py-4 cursor-pointer"
+        className="flex cursor-pointer items-start gap-4 px-5 py-4"
         onClick={() => setExpanded((v) => !v)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
       >
         {/* Dynamic Icon / Avatar Block */}
-        <div className="flex-shrink-0 pt-0.5">
+        <div className="shrink-0 pt-0.5">
           <div className="relative">
             <div
-              className={`h-10 w-10 rounded-full overflow-hidden border-2 ${style ? style.border : dynamicStyles.match(/border-[^\s]+/)![0]} shadow-sm`}
+              className={`h-10 w-10 overflow-hidden rounded-full border-2 ${style ? style.border : dynamicStyles.match(/border-[^\s]+/)![0]} shadow-sm`}
             >
               <Image
                 src={commit.authorAvatar || placeholder}
                 alt={commit.authorName}
                 width={40}
                 height={40}
-                className="object-cover h-full w-full"
+                className="h-full w-full object-cover"
               />
             </div>
             {/* Small commit icon overlay */}
             <div
-              className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background ring-2 ring-background border ${style ? style.border : dynamicStyles.match(/border-[^\s]+/)![0]} shadow-sm`}
+              className={`bg-background ring-background absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border ring-2 ${style ? style.border : dynamicStyles.match(/border-[^\s]+/)![0]} shadow-sm`}
             >
               <GitCommit
                 className={`h-3 w-3 ${style ? style.color : dynamicStyles.split(" ")[0]}`}
@@ -203,58 +203,58 @@ function CommitRow({
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex items-center gap-2">
               {style && prefix ? (
                 <Badge
                   variant="outline"
-                  className={`text-[10px] h-5 px-1.5 flex-shrink-0 font-bold border ${style.bg} ${style.border} ${style.color} uppercase tracking-wider`}
+                  className={`h-5 shrink-0 border px-1.5 text-[10px] font-bold ${style.bg} ${style.border} ${style.color} tracking-wider uppercase`}
                 >
                   {scope ? `${style.label} (${scope})` : style.label}
                 </Badge>
               ) : (
                 <Badge
                   variant="outline"
-                  className={`text-[10px] h-5 px-1.5 flex-shrink-0 font-bold border uppercase tracking-wider ${dynamicStyles}`}
+                  className={`h-5 shrink-0 border px-1.5 text-[10px] font-bold tracking-wider uppercase ${dynamicStyles}`}
                 >
                   Commit
                 </Badge>
               )}
             </div>
-            <p className="text-[15px] font-semibold text-foreground leading-snug truncate pt-0.5">
+            <p className="text-foreground truncate pt-0.5 text-[15px] leading-snug font-semibold">
               {rest || firstLine}
             </p>
           </div>
 
           {/* Meta row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-semibold text-foreground/70">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-foreground/70 text-xs font-semibold">
               {commit.authorName}
             </span>
-            <div className="h-1 w-1 rounded-full bg-border/80" />
-            <span className="text-[11px] font-medium text-muted-foreground/60 flex items-center gap-1.5">
+            <div className="bg-border/80 h-1 w-1 rounded-full" />
+            <span className="text-muted-foreground/60 flex items-center gap-1.5 text-[11px] font-medium">
               <Calendar className="h-3 w-3" />
               {formatDistanceToNow(new Date(commit.authorDate), {
                 addSuffix: true,
               })}
             </span>
-            <div className="h-1 w-1 rounded-full bg-border/80 hidden sm:block" />
+            <div className="bg-border/80 hidden h-1 w-1 rounded-full sm:block" />
             {commitUrl ? (
               <a
                 href={commitUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className={`hidden sm:flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${dynamicStyles} opacity-80 hover:opacity-100 shadow-sm`}
+                className={`hidden cursor-pointer items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors sm:flex ${dynamicStyles} opacity-80 shadow-sm hover:opacity-100`}
               >
                 <Hash className="h-3 w-3" />
                 {commit.commitHash.slice(0, 7)}
-                <ExternalLink className="h-3 w-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="ml-0.5 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
               </a>
             ) : (
               <span
-                className={`hidden sm:flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded border ${dynamicStyles} opacity-80 shadow-sm`}
+                className={`hidden items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium sm:flex ${dynamicStyles} opacity-80 shadow-sm`}
               >
                 <Hash className="h-3 w-3" />
                 {commit.commitHash.slice(0, 7)}
@@ -263,8 +263,8 @@ function CommitRow({
 
             {commit.AiSummary && (
               <>
-                <div className="h-1 w-1 rounded-full bg-border/80" />
-                <span className="flex items-center gap-1.5 text-[11px] font-bold text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-500/10 px-2 py-0.5 rounded border border-violet-200 dark:border-violet-500/20">
+                <div className="bg-border/80 h-1 w-1 rounded-full" />
+                <span className="flex items-center gap-1.5 rounded border border-violet-200 bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-600 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-400">
                   <Sparkles className="h-3 w-3" />
                   AI Summary
                 </span>
@@ -274,9 +274,9 @@ function CommitRow({
         </div>
 
         {/* Expand chevron */}
-        <div className="flex-shrink-0 mt-3 sm:mt-1.5">
+        <div className="mt-3 shrink-0 sm:mt-1.5">
           <ChevronDown
-            className={`h-5 w-5 text-muted-foreground/40 transition-transform duration-200 ${
+            className={`text-muted-foreground/40 h-5 w-5 transition-transform duration-200 ${
               expanded ? "rotate-180" : ""
             }`}
           />
@@ -293,11 +293,11 @@ function CommitRow({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5 ml-14 space-y-4">
+            <div className="ml-14 space-y-4 px-5 pb-5">
               {/* Commit body text */}
               {hasBody && (
-                <div className="rounded-xl bg-card border border-border/50 px-4 py-3 shadow-inner">
-                  <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed">
+                <div className="bg-card border-border/50 rounded-xl border px-4 py-3 shadow-inner">
+                  <pre className="text-foreground/80 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                     {bodyLines}
                   </pre>
                 </div>
@@ -305,20 +305,20 @@ function CommitRow({
 
               {/* AI Summary area */}
               {isGenerating ? (
-                <div className="flex items-center gap-3 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 px-4 py-3 text-blue-700 dark:text-blue-400 shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                   <span className="text-xs font-bold tracking-wide uppercase">
                     Analyzing commit payload…
                   </span>
                 </div>
               ) : commit.AiSummary ? (
-                <div className="rounded-xl bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 px-4 py-3 flex gap-3 shadow-sm">
-                  <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
+                <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm dark:border-violet-500/20 dark:bg-violet-500/10">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
                   <div>
-                    <p className="text-[10px] font-bold text-violet-700 dark:text-violet-400 uppercase tracking-widest mb-1.5">
+                    <p className="mb-1.5 text-[10px] font-bold tracking-widest text-violet-700 uppercase dark:text-violet-400">
                       GitVision Analysis
                     </p>
-                    <p className="text-sm font-medium text-foreground/90 leading-relaxed">
+                    <p className="text-foreground/90 text-sm leading-relaxed font-medium">
                       {commit.AiSummary}
                     </p>
                   </div>
@@ -331,7 +331,7 @@ function CommitRow({
                     e.stopPropagation();
                     onGenerateSummary(commit.id);
                   }}
-                  className="h-8 px-4 gap-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white dark:bg-violet-600 dark:hover:bg-violet-500 shadow-sm cursor-pointer w-fit"
+                  className="h-8 w-fit cursor-pointer gap-2 bg-violet-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   Generate AI Analysis
@@ -349,12 +349,12 @@ function CommitRow({
 
 function CommitsSkeleton() {
   return (
-    <div className="rounded-2xl border border-border/50 overflow-hidden divide-y divide-border/30 bg-card">
+    <div className="border-border/50 divide-border/30 bg-card divide-y overflow-hidden rounded-2xl border">
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-start gap-4 px-5 py-4">
-          <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+          <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
           <div className="flex-1 space-y-3 pt-1">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Skeleton className="h-5 w-16 rounded-full" />
               <Skeleton className="h-5 w-2/3 rounded" />
             </div>
@@ -374,12 +374,12 @@ function CommitsSkeleton() {
 
 function EmptyCommits() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border/50 rounded-2xl bg-muted/10">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-background border border-border mb-4 shadow-sm">
-        <GitCommit className="h-6 w-6 text-muted-foreground/60" />
+    <div className="border-border/50 bg-muted/10 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-20 text-center">
+      <div className="bg-background border-border mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border shadow-sm">
+        <GitCommit className="text-muted-foreground/60 h-6 w-6" />
       </div>
-      <h3 className="text-lg font-bold text-foreground">No commits tracked</h3>
-      <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
+      <h3 className="text-foreground text-lg font-bold">No commits tracked</h3>
+      <p className="text-muted-foreground mt-1 max-w-sm text-sm font-medium">
         Connect your repository and push code to see a vibrant timeline of your
         project&apos;s history here.
       </p>
@@ -416,19 +416,19 @@ function CommitsTab() {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">
+          <h2 className="text-foreground text-xl font-bold tracking-tight">
             Commit History
           </h2>
           {!isLoading && totalLoaded > 0 && (
-            <p className="text-sm font-medium text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm font-medium">
               Showing {totalLoaded} commit{totalLoaded !== 1 ? "s" : ""}
             </p>
           )}
         </div>
         {/* AI indicator */}
-        <div className="flex items-center gap-2 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 px-3 py-1.5 rounded-full border border-violet-200 dark:border-violet-500/20 shadow-sm">
+        <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-600 shadow-sm dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-400">
           <Sparkles className="h-3.5 w-3.5" />
           <span>Click rows for AI Analysis</span>
         </div>
@@ -441,7 +441,7 @@ function CommitsTab() {
         <EmptyCommits />
       ) : (
         <>
-          <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-sm">
+          <div className="border-border/50 bg-card overflow-hidden rounded-2xl border shadow-sm">
             {allCommits.map((commit, index) => (
               <CommitRow
                 key={`${commit.id}-${index}`}
@@ -461,7 +461,7 @@ function CommitsTab() {
                 size="lg"
                 onClick={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
-                className="gap-2.5 font-bold border-border/50 bg-background hover:bg-muted/50 transition-all text-sm w-full max-w-sm"
+                className="border-border/50 bg-background hover:bg-muted/50 w-full max-w-sm gap-2.5 text-sm font-bold transition-all"
               >
                 {isFetchingNextPage ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -475,7 +475,7 @@ function CommitsTab() {
 
           {!hasNextPage && totalLoaded > 0 && (
             <div className="flex justify-center pt-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/40">
+              <span className="text-muted-foreground/40 text-xs font-bold tracking-wider uppercase">
                 End of History
               </span>
             </div>

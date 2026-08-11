@@ -23,7 +23,7 @@ export default function CustomToggleButton() {
     <div>
       <Toggle
         variant="outline"
-        className="group data-[state=on]:hover:bg-muted size-9 data-[state=on]:bg-transparent relative rounded-full bg-muted/30 p-1 backdrop-blur-sm ring-1 ring-border/50"
+        className="group data-[state=on]:hover:bg-muted bg-muted/30 ring-border/50 relative size-9 rounded-full p-1 ring-1 backdrop-blur-sm data-[state=on]:bg-transparent"
         pressed={theme === "dark"}
         onPressedChange={() => setTheme(theme === "dark" ? "light" : "dark")}
         aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}

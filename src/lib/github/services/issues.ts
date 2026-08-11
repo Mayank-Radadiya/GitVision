@@ -115,9 +115,8 @@ export const syncIssuesAndComments = async (
     ) {
       pages++;
 
-      const gqlResponse: GraphQLIssuesData = await octokit.graphql<GraphQLIssuesData>(
-        ISSUES_AND_PRS_QUERY,
-        {
+      const gqlResponse: GraphQLIssuesData =
+        await octokit.graphql<GraphQLIssuesData>(ISSUES_AND_PRS_QUERY, {
           owner,
           repo,
           issueCount: pageSize,
@@ -125,8 +124,7 @@ export const syncIssuesAndComments = async (
           commentCount: GITHUB_CONFIG.COMMENTS_PER_ISSUE,
           issueCursor,
           prCursor,
-        },
-      );
+        });
 
       const { issues, pullRequests } = gqlResponse.repository;
 

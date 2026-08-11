@@ -45,7 +45,7 @@ export function Field({
         <label
           htmlFor={id}
           className={cn(
-            "font-gv-mono text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150",
+            "font-gv-mono text-[11px] font-semibold tracking-wider uppercase transition-colors duration-150",
             focused ? "text-gv-amber" : "text-gv-fog",
           )}
         >
@@ -71,16 +71,17 @@ export function Field({
             registration.onBlur(e);
           }}
           className={cn(
-            "w-full rounded-xl border border-white/[0.08] bg-gv-graphite-2/90 px-4 py-3 font-gv-body text-sm text-gv-bone shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)] transition-all duration-200",
+            "bg-gv-graphite-2/90 font-gv-body text-gv-bone w-full rounded-xl border border-white/8 px-4 py-3 text-sm shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)] transition-all duration-200",
             "placeholder:text-gv-fog/40 focus:outline-none",
-            "focus:border-gv-amber/70 focus:bg-gv-graphite-2 focus:ring-[3px] focus:ring-gv-amber/15",
-            ariaInvalid && "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/20 gv-input-error",
+            "focus:border-gv-amber/70 focus:bg-gv-graphite-2 focus:ring-gv-amber/15 focus:ring-[3px]",
+            ariaInvalid &&
+              "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/20 gv-input-error",
             disabled && "cursor-not-allowed opacity-50",
           )}
         />
       </div>
 
-      {helper ? <div className="min-h-[20px]">{helper}</div> : null}
+      {helper ? <div className="min-h-5">{helper}</div> : null}
     </div>
   );
 }

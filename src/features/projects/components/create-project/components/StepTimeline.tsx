@@ -48,7 +48,7 @@ export function StepTimeline({ currentStep }: StepTimelineProps) {
                 </div>
                 <span
                   className={cn(
-                    "mt-2 font-gv-mono text-[10px] font-semibold tracking-wider",
+                    "font-gv-mono mt-2 text-[10px] font-semibold tracking-wider",
                     isActive
                       ? "text-gv-amber"
                       : isComplete

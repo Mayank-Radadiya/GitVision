@@ -51,34 +51,34 @@ function StatCard({
         "group relative overflow-hidden rounded-2xl border p-3",
         "bg-card/80 backdrop-blur-xl",
         tokens.border,
-        "shadow-sm hover:shadow-md transition-all duration-200",
+        "shadow-sm transition-all duration-200 hover:shadow-md",
         "cursor-default",
       )}
     >
       {/* Ambient glow */}
       <div
         className={cn(
-          "absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-15 blur-2xl",
+          "absolute -top-6 -right-6 h-24 w-24 rounded-full opacity-15 blur-2xl",
           "transition-opacity duration-300 group-hover:opacity-30",
-          `bg-gradient-to-br ${tokens.gradient}`,
+          `bg-linear-to-br ${tokens.gradient}`,
         )}
       />
 
       <div className="relative z-10 flex items-start justify-between gap-3">
         {/* Text content */}
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-3xl font-bold tracking-tight text-foreground">
+          <p className="text-muted-foreground text-sm font-medium">{label}</p>
+          <p className="text-foreground text-3xl font-bold tracking-tight">
             <AnimatedValue target={value} />
           </p>
-          <p className="text-xs text-muted-foreground/70">{description}</p>
+          <p className="text-muted-foreground/70 text-xs">{description}</p>
         </div>
 
         {/* Icon */}
         <div
           className={cn(
             "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-            "bg-gradient-to-br text-white shadow-lg",
+            "bg-linear-to-br text-white shadow-lg",
             tokens.gradient,
             tokens.glow,
             "transition-transform duration-200 group-hover:scale-105",

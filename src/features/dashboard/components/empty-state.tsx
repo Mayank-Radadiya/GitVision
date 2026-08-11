@@ -19,16 +19,16 @@ function EmptyState() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/50 bg-card/40 px-8 py-16 backdrop-blur-sm"
+      className="border-border/50 bg-card/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-8 py-16 backdrop-blur-sm"
     >
       {/* Icon */}
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <FolderGit2 className="h-8 w-8 text-primary" />
+      <div className="bg-primary/10 mb-6 flex h-16 w-16 items-center justify-center rounded-2xl">
+        <FolderGit2 className="text-primary h-8 w-8" />
       </div>
 
       {/* Heading */}
-      <h3 className="text-xl font-semibold text-foreground">No projects yet</h3>
-      <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground leading-relaxed">
+      <h3 className="text-foreground text-xl font-semibold">No projects yet</h3>
+      <p className="text-muted-foreground mt-2 max-w-sm text-center text-sm leading-relaxed">
         Connect a GitHub repository to unlock commit history, collaboration
         patterns, and AI-powered code insights.
       </p>
@@ -36,7 +36,7 @@ function EmptyState() {
       {/* CTA */}
       <Button
         onClick={() => router.push("/dashboard/create-project")}
-        className="mt-8 gap-2 rounded-xl px-6 py-2.5 font-semibold shadow-lg shadow-primary/20"
+        className="shadow-primary/20 mt-8 gap-2 rounded-xl px-6 py-2.5 font-semibold shadow-lg"
         aria-label="Connect a new repository"
       >
         <Plus className="h-4 w-4" />

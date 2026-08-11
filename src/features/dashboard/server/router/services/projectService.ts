@@ -87,8 +87,9 @@ export function createProjectService() {
           const clerkUser = await client.users.getUser(userId);
           const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
           const name =
-            [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-            "unknown";
+            [clerkUser.firstName, clerkUser.lastName]
+              .filter(Boolean)
+              .join(" ") || "unknown";
 
           currentCredits = 100;
 
@@ -109,7 +110,8 @@ export function createProjectService() {
         if (currentCredits < 10) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Insufficient AI credits. You need 10 credits to create a project.",
+            message:
+              "Insufficient AI credits. You need 10 credits to create a project.",
           });
         }
 

@@ -104,9 +104,9 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
   // Expanded View
   return (
     <Link href="/billing" className="mb-3 block px-3">
-      <div className="group relative overflow-hidden rounded-xl bg-accent/30 p-4 transition-all duration-300 hover:bg-accent/50 hover:shadow-md">
+      <div className="group bg-accent/30 hover:bg-accent/50 relative overflow-hidden rounded-xl p-4 transition-all duration-300 hover:shadow-md">
         {/* Subtle Background Glow on Hover */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="from-primary/0 via-primary/5 to-primary/0 absolute inset-0 bg-linear-to-r opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
         {/* Content Container */}
         <div className="relative z-10">
@@ -120,28 +120,28 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
               <div className="mb-2 flex items-center gap-2">
                 <Zap
                   className={cn(
-                    "h-4 w-4 text-primary",
+                    "text-primary h-4 w-4",
                     isCritical && "text-red-500",
                     isWarning && "text-amber-500",
                   )}
                 />
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
                   AI Credits
                 </h4>
               </div>
 
               {/* Text readout */}
               <div className="mb-3 flex items-baseline gap-1">
-                <span className="text-2xl font-bold tracking-tight text-foreground">
+                <span className="text-foreground text-2xl font-bold tracking-tight">
                   {credits}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   / {MAX_FREE_CREDITS}
                 </span>
               </div>
 
               {/* Progress Bar Background */}
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-background/80 shadow-inner">
+              <div className="bg-background/80 h-1.5 w-full overflow-hidden rounded-full shadow-inner">
                 {/* Progress Bar Foreground (Animated Fill) */}
                 <motion.div
                   className={cn("h-full rounded-full", barColorClass)}
@@ -152,7 +152,7 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
               </div>
 
               {/* Upgrade Trigger Text */}
-              <p className="mt-2 text-[10px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+              <p className="text-muted-foreground group-hover:text-foreground mt-2 text-[10px] font-medium transition-colors">
                 Get more credits →
               </p>
             </motion.div>

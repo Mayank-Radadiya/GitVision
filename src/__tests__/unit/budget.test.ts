@@ -15,7 +15,9 @@ describe("Budget Manager Primitive", () => {
 
   it("should compute dynamic budget allocation for gemini-flash-latest", () => {
     const budget = computeBudget("gemini-flash-latest");
-    expect(budget.contextWindow).toBe(MODEL_CONTEXT_WINDOWS["gemini-flash-latest"]);
+    expect(budget.contextWindow).toBe(
+      MODEL_CONTEXT_WINDOWS["gemini-flash-latest"],
+    );
     expect(budget.output).toBe(2048);
     expect(budget.instructions).toBe(1500);
     const expectedRemaining = budget.contextWindow - 2048 - 1500;

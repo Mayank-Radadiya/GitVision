@@ -12,7 +12,7 @@ export const signUpZodSchema = z
       .regex(/[0-9]/, "Password must contain at least one number")
       .regex(
         /[@$!%*?&]/,
-        "Password must contain at least one special character"
+        "Password must contain at least one special character",
       ),
     confirmPassword: z
       .string()

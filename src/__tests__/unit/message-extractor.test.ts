@@ -6,11 +6,15 @@ import {
 
 describe("extractMessageText Helper", () => {
   it("should extract text from string content field", () => {
-    expect(extractMessageText({ role: "user", content: "Hello world" })).toBe("Hello world");
+    expect(extractMessageText({ role: "user", content: "Hello world" })).toBe(
+      "Hello world",
+    );
   });
 
   it("should extract text from text field", () => {
-    expect(extractMessageText({ role: "user", text: "Hello from text prop" })).toBe("Hello from text prop");
+    expect(
+      extractMessageText({ role: "user", text: "Hello from text prop" }),
+    ).toBe("Hello from text prop");
   });
 
   it("should extract text from AI SDK UIMessage parts array", () => {
@@ -30,7 +34,9 @@ describe("extractMessageText Helper", () => {
     expect(extractMessageText({})).toBe("");
     expect(extractMessageText({ content: "" })).toBe("");
     expect(extractMessageText({ parts: [] })).toBe("");
-    expect(extractMessageText({ parts: [{ type: "image", url: "foo" }] })).toBe("");
+    expect(extractMessageText({ parts: [{ type: "image", url: "foo" }] })).toBe(
+      "",
+    );
   });
 });
 

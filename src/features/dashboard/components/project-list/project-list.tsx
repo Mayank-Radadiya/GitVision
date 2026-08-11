@@ -85,10 +85,10 @@ function ProjectList() {
     <div>
       {/* Section Header */}
       <div className="mb-4 flex items-center gap-2">
-        <FolderGit2 className="h-4 w-4 text-primary" />
-        <h2 className="text-sm font-medium text-foreground">Your Projects</h2>
+        <FolderGit2 className="text-primary h-4 w-4" />
+        <h2 className="text-foreground text-sm font-medium">Your Projects</h2>
         {projects.length > 0 && (
-          <span className="text-xs text-muted-foreground/60">
+          <span className="text-muted-foreground/60 text-xs">
             {projects.length}
           </span>
         )}
@@ -113,7 +113,7 @@ function ProjectList() {
       {!isLoading && projects.length === 0 && <EmptyState />}
 
       {!isLoading && sorted.length === 0 && projects.length > 0 && (
-        <p className="py-12 text-center text-sm text-muted-foreground">
+        <p className="text-muted-foreground py-12 text-center text-sm">
           No projects match &ldquo;{query}&rdquo;
         </p>
       )}
@@ -146,7 +146,7 @@ function ProjectList() {
           {hasMore && (
             <button
               onClick={() => setShowAll(!showAll)}
-              className="mt-3 w-full text-center text-xs font-medium text-primary/70 hover:text-primary transition-colors py-2"
+              className="text-primary/70 hover:text-primary mt-3 w-full py-2 text-center text-xs font-medium transition-colors"
             >
               {showAll ? "Show less" : `View all ${sorted.length} projects`}
             </button>

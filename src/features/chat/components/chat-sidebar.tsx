@@ -44,10 +44,10 @@ export function ChatSidebar({
   const projectChats = chats.filter((c) => c.type === "project");
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-border/40 bg-background/60 backdrop-blur-sm">
+    <div className="border-border/40 bg-background/60 flex h-full w-64 flex-col border-r backdrop-blur-sm">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/40 p-4">
-        <h2 className="text-sm font-semibold text-foreground/80">Chats</h2>
+      <div className="border-border/40 flex items-center justify-between border-b p-4">
+        <h2 className="text-foreground/80 text-sm font-semibold">Chats</h2>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -70,9 +70,9 @@ export function ChatSidebar({
       <ScrollArea className="flex-1 px-2 py-2">
         {chats.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <MessageSquare className="mb-3 h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground/60">No chats yet</p>
-            <p className="mt-1 text-xs text-muted-foreground/40">
+            <MessageSquare className="text-muted-foreground/40 mb-3 h-8 w-8" />
+            <p className="text-muted-foreground/60 text-sm">No chats yet</p>
+            <p className="text-muted-foreground/40 mt-1 text-xs">
               Start a conversation
             </p>
           </div>
@@ -82,8 +82,8 @@ export function ChatSidebar({
             {generalChats.length > 0 && (
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 px-2">
-                  <Sparkles className="h-3 w-3 text-muted-foreground/50" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                  <Sparkles className="text-muted-foreground/50 h-3 w-3" />
+                  <span className="text-muted-foreground/50 text-[10px] font-medium tracking-wider uppercase">
                     General
                   </span>
                 </div>
@@ -105,8 +105,8 @@ export function ChatSidebar({
             {projectChats.length > 0 && (
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 px-2">
-                  <FolderGit2 className="h-3 w-3 text-muted-foreground/50" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                  <FolderGit2 className="text-muted-foreground/50 h-3 w-3" />
+                  <span className="text-muted-foreground/50 text-[10px] font-medium tracking-wider uppercase">
                     Projects
                   </span>
                 </div>
@@ -163,7 +163,7 @@ function ChatListItem({
           onDelete();
         }}
         aria-label="Delete chat conversation"
-        className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+        className="hover:bg-destructive/10 hover:text-destructive shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
       >
         <Trash2 className="h-3 w-3" />
       </button>

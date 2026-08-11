@@ -49,7 +49,7 @@ export function ChatInput({
   return (
     <div
       className={cn(
-        "relative flex items-end gap-2 rounded-xl border border-border/50 bg-card/50 p-2 transition-colors focus-within:border-border",
+        "border-border/50 bg-card/50 focus-within:border-border relative flex items-end gap-2 rounded-xl border p-2 transition-colors",
         className,
       )}
     >
@@ -60,7 +60,7 @@ export function ChatInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={1}
-        className="max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="placeholder:text-muted-foreground/50 max-h-50 min-h-10 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isLoading && !value.trim() && onStop ? (
         <Button
@@ -68,7 +68,7 @@ export function ChatInput({
           size="icon"
           variant="ghost"
           aria-label="Stop generating response"
-          className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-8 w-8 shrink-0 cursor-pointer rounded-lg transition-colors"
         >
           <Square className="h-3.5 w-3.5 fill-current" />
         </Button>
@@ -79,7 +79,7 @@ export function ChatInput({
           size="icon"
           aria-label="Send message"
           className={cn(
-            "h-8 w-8 shrink-0 rounded-lg transition-colors cursor-pointer",
+            "h-8 w-8 shrink-0 cursor-pointer rounded-lg transition-colors",
             value.trim()
               ? "bg-foreground text-background hover:bg-foreground/90"
               : "bg-muted text-muted-foreground",

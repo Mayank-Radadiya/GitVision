@@ -25,53 +25,53 @@ export function PricingCard({ plan }: PricingCardProps) {
         spotlightColor={plan.accent.spotlight}
         hoverScale={plan.popular ? 1.03 : 1.01}
         className={cn(
-          "h-full flex flex-col overflow-hidden",
+          "flex h-full flex-col overflow-hidden",
           "border",
           plan.accent.border,
-          plan.popular && "border-2 relative ring-1 ring-primary/20",
+          plan.popular && "ring-primary/20 relative border-2 ring-1",
         )}
       >
         {/* Popular badge */}
         {plan.popular && (
-          <div className="absolute top-4 right-4 z-30 bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-1 rounded-full">
+          <div className="bg-primary text-primary-foreground absolute top-4 right-4 z-30 rounded-full px-2.5 py-1 text-xs font-semibold">
             Most Popular
           </div>
         )}
 
-        <CardHeader className="pb-6 flex flex-col items-center text-center space-y-2">
+        <CardHeader className="flex flex-col items-center space-y-2 pb-6 text-center">
           {/* Icon */}
-          <div className={cn("p-3 rounded-xl mb-2", plan.accent.bg)}>
+          <div className={cn("mb-2 rounded-xl p-3", plan.accent.bg)}>
             <plan.icon className={cn("h-5 w-5", plan.accent.text)} />
           </div>
 
           <CardTitle className="text-xl">{plan.name}</CardTitle>
-          <p className="text-sm text-muted-foreground">{plan.description}</p>
+          <p className="text-muted-foreground text-sm">{plan.description}</p>
 
           {/* Price */}
           <div className="mt-3 flex items-baseline">
             <span className="text-4xl font-bold">{plan.price}</span>
             {!isFree && (
-              <span className="ml-1.5 text-muted-foreground text-sm">
+              <span className="text-muted-foreground ml-1.5 text-sm">
                 {plan.priceLabel}
               </span>
             )}
           </div>
           {isFree && (
-            <p className="text-xs text-muted-foreground">{plan.priceLabel}</p>
+            <p className="text-muted-foreground text-xs">{plan.priceLabel}</p>
           )}
         </CardHeader>
 
-        <CardContent className="flex-grow pb-0">
+        <CardContent className="grow pb-0">
           <ul className="space-y-3">
             {plan.features.map((feature) => (
               <li key={feature} className="flex items-start">
                 <CheckIcon
                   className={cn(
-                    "h-4 w-4 mr-3 shrink-0 mt-0.5",
+                    "mt-0.5 mr-3 h-4 w-4 shrink-0",
                     plan.accent.check,
                   )}
                 />
-                <span className="text-sm text-muted-foreground">{feature}</span>
+                <span className="text-muted-foreground text-sm">{feature}</span>
               </li>
             ))}
           </ul>
@@ -81,8 +81,8 @@ export function PricingCard({ plan }: PricingCardProps) {
           <Button
             variant={plan.popular ? "default" : "outline"}
             className={cn(
-              "w-full h-11 rounded-lg transition-all cursor-pointer group",
-              plan.popular && "shadow-md shadow-primary/20",
+              "group h-11 w-full cursor-pointer rounded-lg transition-all",
+              plan.popular && "shadow-primary/20 shadow-md",
             )}
           >
             <span>{plan.cta}</span>

@@ -30,8 +30,8 @@ export function CreditsGauge() {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div className="flex items-center gap-2">
-        <Coins className="h-4 w-4 text-gv-amber" />
-        <span className="font-gv-mono text-xs font-semibold uppercase tracking-wider text-gv-bone">
+        <Coins className="text-gv-amber h-4 w-4" />
+        <span className="font-gv-mono text-gv-bone text-xs font-semibold tracking-wider uppercase">
           AI Credits
         </span>
       </div>
@@ -48,26 +48,28 @@ export function CreditsGauge() {
                 <span
                   key={i}
                   className={cn(
-                    "h-2.5 w-2.5 rounded-[2px] transition-colors duration-150",
-                    i < filled ? "bg-gv-amber shadow-[0_0_5px_rgba(232,163,61,0.25)]" : "bg-gv-hairline/80",
+                    "h-2.5 w-2.5 rounded-xs transition-colors duration-150",
+                    i < filled
+                      ? "bg-gv-amber shadow-[0_0_5px_rgba(232,163,61,0.25)]"
+                      : "bg-gv-hairline/80",
                   )}
                 />
               ))}
             </div>
           </TooltipTrigger>
-          <TooltipContent className="font-gv-mono text-xs border border-gv-hairline bg-gv-graphite text-gv-bone">
+          <TooltipContent className="font-gv-mono border-gv-hairline bg-gv-graphite text-gv-bone border text-xs">
             {credits} / {MAX_CREDITS} Credits Available
           </TooltipContent>
         </Tooltip>
 
-        <span className="font-gv-mono text-xs font-bold text-gv-amber">
+        <span className="font-gv-mono text-gv-amber text-xs font-bold">
           {credits}
         </span>
       </div>
 
       <Link
         href="/billing"
-        className="font-gv-mono text-xs font-medium text-gv-amber transition-colors hover:text-gv-bone hover:underline"
+        className="font-gv-mono text-gv-amber hover:text-gv-bone text-xs font-medium transition-colors hover:underline"
       >
         Top up →
       </Link>

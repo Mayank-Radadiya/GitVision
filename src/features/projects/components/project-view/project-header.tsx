@@ -77,21 +77,21 @@ function ProjectOptionsDropdown({
           variant="outline"
           size="sm"
           aria-label="Project actions menu"
-          className="h-8 w-8 p-0 border-border/50 hover:bg-muted/50 transition-colors"
+          className="border-border/50 hover:bg-muted/50 h-8 w-8 p-0 transition-colors"
         >
-          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          <MoreVertical className="text-muted-foreground h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem
           onClick={handleDelete}
           disabled={isDeleting}
-          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 focus:text-red-600 focus:bg-red-500/10 cursor-pointer"
+          className="cursor-pointer text-red-500 hover:bg-red-500/10 hover:text-red-600 focus:bg-red-500/10 focus:text-red-600"
         >
           {isDeleting ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash2 className="mr-2 h-4 w-4" />
           )}
           {isDeleting ? "Deleting..." : "Delete Project"}
         </DropdownMenuItem>
@@ -122,7 +122,7 @@ function HealthRing({ score, size = 68 }: HealthRingProps) {
   const label = score >= 80 ? "Excellent" : score >= 55 ? "Good" : "Needs Work";
 
   return (
-    <div className="relative flex-shrink-0 flex items-center justify-center">
+    <div className="relative flex shrink-0 items-center justify-center">
       <svg width={size} height={size} className="-rotate-90">
         {/* Track */}
         <circle
@@ -151,10 +151,10 @@ function HealthRing({ score, size = 68 }: HealthRingProps) {
       </svg>
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-base font-bold text-foreground leading-none tabular-nums">
+        <span className="text-foreground text-base leading-none font-bold tabular-nums">
           {score}
         </span>
-        <span className="text-[9px] text-muted-foreground leading-none mt-0.5 font-medium">
+        <span className="text-muted-foreground mt-0.5 text-[9px] leading-none font-medium">
           {label}
         </span>
       </div>
@@ -240,9 +240,9 @@ function ProjectHeader({
         variant="ghost"
         size="sm"
         onClick={() => router.push("/dashboard")}
-        className="gap-2 text-muted-foreground hover:text-foreground group cursor-pointer h-8 px-2"
+        className="text-muted-foreground hover:text-foreground group h-8 cursor-pointer gap-2 px-2"
       >
-        <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform duration-150" />
+        <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" />
         <span className="text-xs font-medium">Dashboard</span>
       </Button>
 
@@ -251,17 +251,17 @@ function ProjectHeader({
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/70 backdrop-blur-xl"
+        className="border-border/50 bg-card/70 relative overflow-hidden rounded-2xl border backdrop-blur-xl"
       >
         {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
-        <div className="absolute -top-20 -right-20 h-48 w-48 rounded-full bg-primary/6 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent pointer-events-none" />
+        <div className="from-primary/5 pointer-events-none absolute inset-0 bg-linear-to-br via-transparent to-purple-500/5" />
+        <div className="bg-primary/6 pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full blur-3xl" />
+        <div className="via-border/60 pointer-events-none absolute right-0 bottom-0 left-0 h-px bg-linear-to-r from-transparent to-transparent" />
 
         <div className="relative px-6 py-5 md:px-7 md:py-6">
           <div className="flex items-start justify-between gap-4">
             {/* Left block — project info */}
-            <div className="flex-1 min-w-0 space-y-3">
+            <div className="min-w-0 flex-1 space-y-3">
               {isLoading ? (
                 <>
                   <Skeleton className="h-8 w-56" />
@@ -276,11 +276,11 @@ function ProjectHeader({
                   {/* Status badge */}
                   <Badge
                     variant="outline"
-                    className="gap-1.5 border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[11px] h-6 px-2 w-fit"
+                    className="h-6 w-fit gap-1.5 border-emerald-500/30 bg-emerald-500/10 px-2 text-[11px] text-emerald-400"
                   >
                     <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     </span>
                     <Wifi className="h-3 w-3" />
                     AI Synced
@@ -288,7 +288,7 @@ function ProjectHeader({
 
                   {/* Project Name */}
                   <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl leading-tight">
+                    <h1 className="text-foreground text-2xl leading-tight font-bold tracking-tight md:text-3xl">
                       {projectName || "Project Details"}
                     </h1>
                     {githubUrl && (
@@ -296,11 +296,11 @@ function ProjectHeader({
                         href={cleanUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-primary transition-colors group/link cursor-pointer"
+                        className="text-muted-foreground/60 hover:text-primary group/link mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-xs transition-colors"
                       >
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                        <ExternalLink className="h-3 w-3 shrink-0" />
                         <span className="opacity-70">{owner}/</span>
-                        <span className="font-medium text-muted-foreground group-hover/link:underline underline-offset-4">
+                        <span className="text-muted-foreground font-medium underline-offset-4 group-hover/link:underline">
                           {repo}
                         </span>
                       </Link>
@@ -308,7 +308,7 @@ function ProjectHeader({
                   </div>
 
                   {/* Quick stats pills */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2">
                     <StatPill
                       icon={<Star className="h-3 w-3 text-amber-400" />}
                       value={stars ?? 0}
@@ -325,18 +325,18 @@ function ProjectHeader({
             </div>
 
             {/* Right block — health ring + actions */}
-            <div className="flex flex-col items-end gap-4 flex-shrink-0">
+            <div className="flex shrink-0 flex-col items-end gap-4">
               {/* Health Ring */}
               {!isLoading ? (
                 <div className="flex flex-col items-center gap-1">
                   <HealthRing score={healthScore} />
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center gap-1 text-[10px]">
                     <ShieldCheck className="h-3 w-3" />
                     Repo Health
                   </div>
                 </div>
               ) : (
-                <Skeleton className="h-[68px] w-[68px] rounded-full" />
+                <Skeleton className="h-17 w-17 rounded-full" />
               )}
 
               {/* Action buttons */}
@@ -346,7 +346,7 @@ function ProjectHeader({
                     size="sm"
                     variant="outline"
                     onClick={() => router.push(`/chat/${projectId}`)}
-                    className="gap-2 h-8 text-xs border-border/50 hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer transition-all"
+                    className="border-border/50 hover:border-primary/40 hover:bg-primary/5 hover:text-primary h-8 cursor-pointer gap-2 text-xs transition-all"
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
                     Ask AI
@@ -354,7 +354,7 @@ function ProjectHeader({
                   <Button
                     size="sm"
                     onClick={onOpenCodeViewer}
-                    className="gap-2 h-8 text-xs bg-gradient-to-br from-[#F97316] to-[#EA580C] hover:from-[#EA580C] hover:to-[#F97316] border-0 text-white font-semibold shadow-md hover:shadow-orange-500/20 hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer"
+                    className="h-8 cursor-pointer gap-2 border-0 bg-linear-to-br from-[#F97316] to-[#EA580C] text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-[#EA580C] hover:to-[#F97316] hover:shadow-lg hover:shadow-orange-500/20"
                   >
                     <Code className="h-3.5 w-3.5" />
                     Code Viewer
@@ -384,7 +384,7 @@ function StatPill({
   label: string;
 }) {
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/25 px-2.5 py-1 text-xs text-foreground/80">
+    <div className="border-border/50 bg-muted/25 text-foreground/80 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs">
       {icon}
       <span className="font-semibold tabular-nums">
         {value.toLocaleString()}

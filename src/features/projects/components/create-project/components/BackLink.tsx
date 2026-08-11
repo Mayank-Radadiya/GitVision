@@ -15,9 +15,9 @@ export function BackLink() {
     <button
       type="button"
       onClick={() => router.push("/dashboard")}
-      className="group inline-flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 font-gv-mono text-xs text-gv-fog transition-colors duration-200 hover:text-gv-bone"
+      className="group font-gv-mono text-gv-fog hover:text-gv-bone inline-flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-xs transition-colors duration-200"
     >
-      <ArrowLeft className="h-3.5 w-3.5 text-gv-fog transition-all duration-200 group-hover:-translate-x-0.5 group-hover:text-gv-amber" />
+      <ArrowLeft className="text-gv-fog group-hover:text-gv-amber h-3.5 w-3.5 transition-all duration-200 group-hover:-translate-x-0.5" />
       <span>Back to Projects</span>
     </button>
   );

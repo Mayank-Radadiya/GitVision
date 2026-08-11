@@ -28,6 +28,7 @@ import {
   useSyncIssues,
 } from "@/features/projects/hooks/use-project";
 import { AnimatePresence, motion } from "framer-motion";
+import { cn } from "@/shared/lib/utils";
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
 const FILTERS = ["All", "Open", "Closed"] as const;
@@ -42,10 +43,10 @@ function IssueComments({ issueId }: { issueId: string }) {
     return (
       <div className="flex items-center justify-center gap-2.5 py-8">
         <div className="relative">
-          <div className="h-5 w-5 rounded-full border-2 border-primary/20" />
-          <Loader2 className="absolute inset-0 h-5 w-5 animate-spin text-primary/60" />
+          <div className="border-primary/20 h-5 w-5 rounded-full border-2" />
+          <Loader2 className="text-primary/60 absolute inset-0 h-5 w-5 animate-spin" />
         </div>
-        <span className="text-xs text-muted-foreground/50 font-medium">
+        <span className="text-muted-foreground/50 text-xs font-medium">
           Loading discussion…
         </span>
       </div>
@@ -55,10 +56,10 @@ function IssueComments({ issueId }: { issueId: string }) {
   if (comments.length === 0) {
     return (
       <div className="flex flex-col items-center py-6 text-center">
-        <div className="h-8 w-8 rounded-full bg-muted/30 flex items-center justify-center mb-2">
-          <MessageSquare className="h-3.5 w-3.5 text-muted-foreground/25" />
+        <div className="bg-muted/30 mb-2 flex h-8 w-8 items-center justify-center rounded-full">
+          <MessageSquare className="text-muted-foreground/25 h-3.5 w-3.5" />
         </div>
-        <p className="text-[11px] text-muted-foreground/35 font-medium">
+        <p className="text-muted-foreground/35 text-[11px] font-medium">
           No comments yet
         </p>
       </div>
@@ -68,7 +69,7 @@ function IssueComments({ issueId }: { issueId: string }) {
   return (
     <div className="relative">
       {/* Vertical timeline line */}
-      <div className="absolute left-[15px] top-4 bottom-4 w-px bg-gradient-to-b from-primary/20 via-border/30 to-transparent" />
+      <div className="from-primary/20 via-border/30 absolute top-4 bottom-4 left-3.75 w-px bg-linear-to-b to-transparent" />
 
       <div className="space-y-1">
         {comments.map((comment, idx) => (
@@ -77,29 +78,29 @@ function IssueComments({ issueId }: { issueId: string }) {
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05, duration: 0.25 }}
-            className="relative flex gap-3 rounded-lg p-2.5 hover:bg-white/[0.04] transition-colors"
+            className="relative flex gap-3 rounded-lg p-2.5 transition-colors hover:bg-white/4"
           >
             {/* Avatar with ring to cover timeline */}
-            <Avatar className="h-[30px] w-[30px] flex-shrink-0 ring-[3px] ring-card z-10 shadow-sm">
+            <Avatar className="ring-card z-10 h-7.5 w-7.5 shrink-0 shadow-sm ring-[3px]">
               <AvatarImage src={comment.authorAvatar || ""} />
-              <AvatarFallback className="text-[9px] bg-gradient-to-br from-primary/20 to-primary/5 text-primary/70 font-bold">
+              <AvatarFallback className="from-primary/20 to-primary/5 text-primary/70 bg-linear-to-br text-[9px] font-bold">
                 {comment.authorLogin.slice(0, 1).toUpperCase()}
               </AvatarFallback>
             </Avatar>
 
             {/* Comment bubble */}
-            <div className="flex-1 min-w-0 rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm px-3.5 py-2.5 shadow-sm">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[11.5px] font-semibold text-foreground">
+            <div className="border-border/40 bg-card/80 min-w-0 flex-1 rounded-xl border px-3.5 py-2.5 shadow-sm backdrop-blur-sm">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="text-foreground text-[11.5px] font-semibold">
                   {comment.authorLogin}
                 </span>
-                <span className="text-[10px] text-muted-foreground/60 font-medium">
+                <span className="text-muted-foreground/60 text-[10px] font-medium">
                   {formatDistanceToNow(new Date(comment.githubCreatedAt), {
                     addSuffix: true,
                   })}
                 </span>
               </div>
-              <p className="text-[12.5px] text-foreground/80 leading-[1.65] whitespace-pre-wrap break-words">
+              <p className="text-foreground/80 text-[12.5px] leading-[1.65] wrap-break-word whitespace-pre-wrap">
                 {comment.body}
               </p>
             </div>
@@ -142,11 +143,12 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
       {isExpanded && (
         <motion.div
           layoutId="issue-accent"
-          className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full ${
+          className={cn(
+            "absolute top-0 bottom-0 left-0 w-0.75 rounded-r-full bg-linear-to-b",
             issue.state === "open"
-              ? "bg-gradient-to-b from-emerald-400 to-emerald-400/20"
-              : "bg-gradient-to-b from-violet-400 to-violet-400/20"
-          }`}
+              ? "from-emerald-400 to-emerald-400/20"
+              : "from-violet-400 to-violet-400/20",
+          )}
           transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
         />
       )}
@@ -154,61 +156,64 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
       {/* Clickable issue row */}
       <div
         onClick={onToggle}
-        className={`px-5 py-4 transition-all duration-200 cursor-pointer select-none group ${
+        className={cn(
+          "group cursor-pointer px-5 py-4 transition-all duration-200 select-none",
           isExpanded
-            ? "bg-gradient-to-r from-muted/40 via-muted/20 to-transparent"
-            : "hover:bg-muted/15"
-        }`}
+            ? "from-muted/40 via-muted/20 bg-linear-to-r to-transparent"
+            : "hover:bg-muted/15",
+        )}
       >
         <div className="flex items-start gap-3">
           {/* Status Icon with subtle glow */}
-          <div className="flex-shrink-0 mt-0.5 relative">
+          <div className="relative mt-0.5 shrink-0">
             {issue.state === "open" ? (
               <>
-                <div className="absolute inset-0 blur-[6px] bg-emerald-400/20 rounded-full" />
-                <CircleDot className="h-4 w-4 text-emerald-400 relative" />
+                <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-[6px]" />
+                <CircleDot className="relative h-4 w-4 text-emerald-400" />
               </>
             ) : (
               <>
-                <div className="absolute inset-0 blur-[6px] bg-violet-400/20 rounded-full" />
-                <CheckCircle2 className="h-4 w-4 text-violet-400 relative" />
+                <div className="absolute inset-0 rounded-full bg-violet-400/20 blur-[6px]" />
+                <CheckCircle2 className="relative h-4 w-4 text-violet-400" />
               </>
             )}
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-2">
+          <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <p
-                className={`text-sm font-medium leading-snug line-clamp-1 transition-colors duration-200 ${
+                className={cn(
+                  "line-clamp-1 text-sm leading-snug font-medium transition-colors duration-200",
                   isExpanded
                     ? "text-foreground"
-                    : "text-foreground/90 group-hover:text-foreground"
-                }`}
+                    : "text-foreground/90 group-hover:text-foreground",
+                )}
               >
                 {issue.title}
               </p>
               {/* Actions */}
-              <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+              <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
                 {githubUrl && (
                   <a
                     href={githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1.5 rounded-lg hover:bg-muted/30 transition-all cursor-pointer group/link"
+                    className="hover:bg-muted/30 group/link cursor-pointer rounded-lg p-1.5 transition-all"
                     title="View on GitHub"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 group-hover/link:text-foreground group-hover/link:scale-105 transition-all" />
+                    <ExternalLink className="text-muted-foreground/50 group-hover/link:text-foreground h-3.5 w-3.5 transition-all group-hover/link:scale-105" />
                   </a>
                 )}
                 <Badge
                   variant="outline"
-                  className={`text-[10px] h-5 px-2 border font-medium ${
+                  className={cn(
+                    "h-5 border px-2 text-[10px] font-medium",
                     issue.state === "open"
-                      ? "bg-emerald-500/8 text-emerald-400 border-emerald-500/20"
-                      : "bg-violet-500/8 text-violet-400 border-violet-500/20"
-                  }`}
+                      ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-400"
+                      : "border-violet-500/20 bg-violet-500/8 text-violet-400",
+                  )}
                 >
                   {issue.state === "open" ? "Open" : "Closed"}
                 </Badge>
@@ -216,8 +221,8 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
             </div>
 
             {/* Meta row */}
-            <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground/60">
-              <span className="font-mono text-muted-foreground/40">
+            <div className="text-muted-foreground/60 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="text-muted-foreground/40 font-mono">
                 #{issue.issueNumber}
               </span>
               <span className="text-muted-foreground/35">•</span>
@@ -233,8 +238,8 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
                 )}
               </span>
               <span className="text-muted-foreground/35">•</span>
-              <div className="flex items-center gap-1.5 font-medium text-muted-foreground/70">
-                <Avatar className="h-4 w-4 ring-1 ring-border/30">
+              <div className="text-muted-foreground/70 flex items-center gap-1.5 font-medium">
+                <Avatar className="ring-border/30 h-4 w-4 ring-1">
                   <AvatarImage src={issue.authorAvatar || ""} />
                   <AvatarFallback className="text-[7px] font-bold">
                     {issue.authorLogin.slice(0, 1).toUpperCase()}
@@ -257,13 +262,13 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
             transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
             className="overflow-hidden"
           >
-            <div className="mx-4 mb-4 rounded-2xl border border-border/35 bg-gradient-to-br from-card to-card/70 backdrop-blur-xl p-4 shadow-lg shadow-black/[0.06]">
+            <div className="border-border/35 from-card to-card/70 mx-4 mb-4 rounded-2xl border bg-linear-to-br p-4 shadow-lg shadow-black/6 backdrop-blur-xl">
               {/* Discussion header */}
-              <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-border/15">
-                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
-                  <MessageSquare className="h-2.5 w-2.5 text-primary/60" />
+              <div className="border-border/15 mb-3 flex items-center gap-2 border-b pb-2.5">
+                <div className="bg-primary/10 flex h-5 w-5 items-center justify-center rounded-md">
+                  <MessageSquare className="text-primary/60 h-2.5 w-2.5" />
                 </div>
-                <span className="text-[11px] font-semibold text-muted-foreground/65 uppercase tracking-wider">
+                <span className="text-muted-foreground/65 text-[11px] font-semibold tracking-wider uppercase">
                   Discussion
                 </span>
               </div>
@@ -308,32 +313,33 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
   return (
     <div className="space-y-4">
       {/* Search + Filter Row */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 group/search">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within/search:text-primary/50 transition-colors" />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="group/search relative flex-1">
+          <Search className="text-muted-foreground/40 group-focus-within/search:text-primary/50 absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 transition-colors" />
           <input
             type="text"
             placeholder="Search issues…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/30 transition-all duration-200"
+            className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground/45 focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-0.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm p-1 flex-shrink-0">
+        <div className="border-border/40 bg-card/60 flex shrink-0 items-center gap-0.5 rounded-xl border p-1 backdrop-blur-sm">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className={`relative px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+              className={cn(
+                "relative cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                 activeFilter === f
                   ? "text-primary"
-                  : "text-muted-foreground/60 hover:text-foreground"
-              }`}
+                  : "text-muted-foreground/60 hover:text-foreground",
+              )}
             >
               {activeFilter === f && (
                 <motion.div
                   layoutId="issue-filter-pill"
-                  className="absolute inset-0 rounded-lg bg-primary/10 border border-primary/15"
+                  className="bg-primary/10 border-primary/15 absolute inset-0 rounded-lg border"
                   transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
                 />
               )}
@@ -344,30 +350,30 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
       </div>
 
       {/* Issue List */}
-      <div className="rounded-2xl border border-border/40 overflow-hidden divide-y divide-border/25 bg-card/50 backdrop-blur-sm shadow-sm">
+      <div className="border-border/40 divide-border/25 bg-card/50 divide-y overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="relative">
-              <div className="h-8 w-8 rounded-full border-2 border-primary/10" />
-              <Loader2 className="absolute inset-0 h-8 w-8 animate-spin text-primary/40" />
+              <div className="border-primary/10 h-8 w-8 rounded-full border-2" />
+              <Loader2 className="text-primary/40 absolute inset-0 h-8 w-8 animate-spin" />
             </div>
-            <span className="text-xs text-muted-foreground/40 font-medium">
+            <span className="text-muted-foreground/40 text-xs font-medium">
               Loading issues…
             </span>
           </div>
         ) : filteredIssues.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div className="h-10 w-10 rounded-full bg-muted/20 flex items-center justify-center">
-              <CircleDot className="h-4 w-4 text-muted-foreground/25" />
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <div className="bg-muted/20 flex h-10 w-10 items-center justify-center rounded-full">
+              <CircleDot className="text-muted-foreground/25 h-4 w-4" />
             </div>
-            <p className="text-sm text-muted-foreground/40 font-medium">
+            <p className="text-muted-foreground/40 text-sm font-medium">
               No issues found
             </p>
             {issues.length === 0 && !searchQuery ? (
               <button
                 onClick={() => syncIssues({ projectId })}
                 disabled={isSyncing}
-                className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/60 px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="border-border/40 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw
                   className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
@@ -375,7 +381,7 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
                 {isSyncing ? "Syncing from GitHub…" : "Sync Issues from GitHub"}
               </button>
             ) : (
-              <p className="text-xs text-muted-foreground/25">
+              <p className="text-muted-foreground/25 text-xs">
                 Try adjusting your search or filters
               </p>
             )}
@@ -394,7 +400,7 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
       </div>
 
       {/* Footer */}
-      <p className="text-center text-[11px] text-muted-foreground/25 flex items-center justify-center gap-1.5 mt-4 pt-2">
+      <p className="text-muted-foreground/25 mt-4 flex items-center justify-center gap-1.5 pt-2 text-center text-[11px]">
         <Sparkles className="h-3 w-3" />
         AI Triage powered by GitVision
       </p>

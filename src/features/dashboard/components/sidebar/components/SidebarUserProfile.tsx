@@ -59,13 +59,13 @@ export function SidebarUserProfile({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl bg-accent/30 p-2.5 transition-all duration-200 hover:bg-accent/50",
+        "bg-accent/30 hover:bg-accent/50 flex items-center gap-3 rounded-xl p-2.5 transition-all duration-200",
         isCollapsed && "justify-center bg-transparent p-0",
       )}
     >
       {/* Avatar Container */}
       <div className="relative shrink-0">
-        <div className="h-9 w-9 overflow-hidden rounded-full ring-2 ring-primary/20">
+        <div className="ring-primary/20 h-9 w-9 overflow-hidden rounded-full ring-2">
           <Image
             src={user.imageUrl}
             alt={user.fullName || "User avatar"}
@@ -76,7 +76,7 @@ export function SidebarUserProfile({
         </div>
         {/* Online Status Indicator */}
         <div
-          className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500"
+          className="border-background absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 bg-emerald-500"
           aria-label="Online"
         />
       </div>
@@ -91,10 +91,10 @@ export function SidebarUserProfile({
             transition={FADE_TRANSITION}
             className="min-w-0 flex-1"
           >
-            <p className="truncate text-sm font-medium text-foreground">
+            <p className="text-foreground truncate text-sm font-medium">
               {user.fullName}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-muted-foreground truncate text-xs">
               {user.primaryEmailAddress?.emailAddress}
             </p>
           </motion.div>

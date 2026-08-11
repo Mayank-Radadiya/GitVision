@@ -64,28 +64,28 @@ function LandingHeader() {
           className={cn(
             "transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
             isScrolled
-              ? "bg-background/70 backdrop-blur-2xl border-b border-border/15 shadow-[0_0_15px_rgba(0,0,0,0.04)]"
+              ? "bg-background/70 border-border/15 border-b shadow-[0_0_15px_rgba(0,0,0,0.04)] backdrop-blur-2xl"
               : "bg-transparent",
           )}
         >
           {/* Gradient accent — visible on scroll */}
           <div
             className={cn(
-              "absolute bottom-0 inset-x-0 h-px transition-opacity duration-700",
+              "absolute inset-x-0 bottom-0 h-px transition-opacity duration-700",
               isScrolled ? "opacity-100" : "opacity-0",
             )}
           >
-            <div className="h-full bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
+            <div className="via-primary/25 h-full bg-linear-to-r from-transparent to-transparent" />
           </div>
 
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
             {/* Logo */}
-            <motion.div variants={childVariants} className="flex-shrink-0">
+            <motion.div variants={childVariants} className="shrink-0">
               <Link
                 href="/"
-                className="group flex items-center gap-2.5 cursor-pointer"
+                className="group flex cursor-pointer items-center gap-2.5"
               >
-                <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20 transition-all duration-300 group-hover:bg-primary/15 group-hover:ring-primary/30 group-hover:shadow-[0_0_20px_-5px] group-hover:shadow-primary/25">
+                <div className="bg-primary/10 ring-primary/20 group-hover:bg-primary/15 group-hover:ring-primary/30 group-hover:shadow-primary/25 relative flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-all duration-300 group-hover:shadow-[0_0_20px_-5px]">
                   <Image
                     src="/Github.svg"
                     alt="GitVision"
@@ -94,7 +94,7 @@ function LandingHeader() {
                     className="relative z-10 transition-transform duration-300 group-hover:scale-105"
                   />
                 </div>
-                <span className="text-lg font-semibold tracking-tight text-foreground">
+                <span className="text-foreground text-lg font-semibold tracking-tight">
                   Git
                   <span className="text-primary">Vision</span>
                 </span>
@@ -104,7 +104,7 @@ function LandingHeader() {
             {/* Center nav — desktop pill */}
             <motion.div
               variants={childVariants}
-              className="hidden md:flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 px-1.5 py-1"
+              className="border-border/30 bg-muted/30 hidden items-center gap-1 rounded-full border px-1.5 py-1 md:flex"
             >
               {NAVIGATION.map((item) => (
                 <NavLink
@@ -116,7 +116,7 @@ function LandingHeader() {
             </motion.div>
 
             {/* Right section — desktop */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden items-center gap-2 md:flex">
               <motion.div variants={childVariants}>
                 <GitHubStarBadge />
               </motion.div>
@@ -127,13 +127,13 @@ function LandingHeader() {
 
               <motion.div
                 variants={childVariants}
-                className="flex items-center gap-2 ml-0.5"
+                className="ml-0.5 flex items-center gap-2"
               >
                 {user ? (
                   <Link href="/dashboard">
                     <Button
                       size="sm"
-                      className="h-8 rounded-full px-4 text-sm font-medium cursor-pointer shadow-sm shadow-primary/15 hover:shadow-md hover:shadow-primary/20 transition-all duration-200"
+                      className="shadow-primary/15 hover:shadow-primary/20 h-8 cursor-pointer rounded-full px-4 text-sm font-medium shadow-sm transition-all duration-200 hover:shadow-md"
                     >
                       <ZapIcon className="mr-1.5 h-3.5 w-3.5" />
                       Dashboard
@@ -145,7 +145,7 @@ function LandingHeader() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="text-muted-foreground hover:text-foreground h-8 cursor-pointer rounded-full px-3.5 text-sm font-medium transition-colors"
                       >
                         Log in
                       </Button>
@@ -153,10 +153,10 @@ function LandingHeader() {
                     <Link href="/sign-up">
                       <Button
                         size="sm"
-                        className="group relative h-8 rounded-full px-4 text-sm font-medium cursor-pointer overflow-hidden bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20 hover:shadow-lg hover:shadow-primary/25 transition-all duration-300"
+                        className="group bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20 hover:shadow-primary/25 relative h-8 cursor-pointer overflow-hidden rounded-full px-4 text-sm font-medium shadow-sm transition-all duration-300 hover:shadow-lg"
                       >
                         {/* Shimmer effect */}
-                        <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+                        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                         <span className="relative flex items-center gap-1">
                           Get Started
                           <ArrowRightIcon className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -177,7 +177,7 @@ function LandingHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-xl cursor-pointer"
+                className="h-9 w-9 cursor-pointer rounded-xl"
                 onClick={toggleMobileMenu}
                 aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={isMobileMenuOpen}

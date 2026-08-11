@@ -30,17 +30,17 @@ function ActivityItem({
     <div className="group flex gap-3 py-3 first:pt-0 last:pb-0">
       {/* Timeline dot */}
       <div className="flex flex-col items-center pt-1">
-        <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-        <div className="mt-1 w-px flex-1 bg-border/40" />
+        <div className="bg-primary/60 group-hover:bg-primary h-2 w-2 rounded-full transition-colors" />
+        <div className="bg-border/40 mt-1 w-px flex-1" />
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1 pb-3">
-        <p className="truncate text-sm text-foreground leading-snug">
+        <p className="text-foreground truncate text-sm leading-snug">
           {message}
         </p>
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground/70">
-          <span className="font-medium text-muted-foreground">{project}</span>
+        <div className="text-muted-foreground/70 mt-1 flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground font-medium">{project}</span>
           <span>·</span>
           <span>{author}</span>
           <span>·</span>
@@ -60,14 +60,14 @@ function ActivityFeed() {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/60 bg-card/80 p-5 backdrop-blur-xl",
+        "border-border/60 bg-card/80 rounded-2xl border p-5 backdrop-blur-xl",
         "shadow-sm",
       )}
     >
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <GitCommit className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">
+        <GitCommit className="text-primary h-4 w-4" />
+        <h3 className="text-foreground text-sm font-semibold">
           Recent Activity
         </h3>
       </div>
@@ -77,7 +77,7 @@ function ActivityFeed() {
         <div className="space-y-4">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="flex gap-3">
-              <Skeleton className="h-2 w-2 shrink-0 rounded-full mt-1.5" />
+              <Skeleton className="mt-1.5 h-2 w-2 shrink-0 rounded-full" />
               <div className="flex-1 space-y-1.5">
                 <Skeleton className="h-4 w-full rounded" />
                 <Skeleton className="h-3 w-32 rounded" />
@@ -89,7 +89,7 @@ function ActivityFeed() {
 
       {/* Empty */}
       {!isLoading && (!activities || activities.length === 0) && (
-        <p className="py-8 text-center text-sm text-muted-foreground/60">
+        <p className="text-muted-foreground/60 py-8 text-center text-sm">
           No recent activity
         </p>
       )}

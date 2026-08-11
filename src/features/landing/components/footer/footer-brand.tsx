@@ -9,8 +9,8 @@ export function FooterBrand() {
         href="/"
         className="group flex items-center gap-3 transition-all duration-300"
       >
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-background via-background to-background ring-1 ring-primary/20 overflow-hidden shadow-lg transition-all duration-300 group-hover:shadow-primary/10">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-80" />
+        <div className="from-background via-background to-background ring-primary/20 group-hover:shadow-primary/10 relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-linear-to-br shadow-lg ring-1 transition-all duration-300">
+          <div className="from-primary/10 absolute inset-0 bg-linear-to-br to-transparent opacity-80" />
           <Image
             src="/Github.svg"
             alt="GitVision Logo"
@@ -24,7 +24,7 @@ export function FooterBrand() {
         </span>
       </Link>
 
-      <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+      <p className="text-muted-foreground max-w-xs text-sm leading-relaxed">
         AI-powered GitHub repository analysis that visualizes code patterns and
         provides meaningful insights into your development process.
       </p>

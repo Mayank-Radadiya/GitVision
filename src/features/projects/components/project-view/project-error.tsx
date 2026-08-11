@@ -26,23 +26,23 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
         variant="ghost"
         size="sm"
         onClick={() => router.push("/dashboard")}
-        className="gap-2 text-muted-foreground hover:text-foreground group cursor-pointer mb-8"
+        className="text-muted-foreground hover:text-foreground group mb-8 cursor-pointer gap-2"
       >
-        <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform duration-200" />
+        <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" />
         Back to Dashboard
       </Button>
 
       {/* Error Card */}
-      <div className="mx-auto max-w-lg rounded-2xl border border-red-500/20 bg-card/80 backdrop-blur-xl p-12 text-center shadow-xl">
+      <div className="bg-card/80 mx-auto max-w-lg rounded-2xl border border-red-500/20 p-12 text-center shadow-xl backdrop-blur-xl">
         <div className="mb-6 inline-flex rounded-2xl bg-red-500/10 p-4">
           <AlertCircle className="h-12 w-12 text-red-400" />
         </div>
 
-        <h2 className="text-2xl font-bold text-foreground mb-3">
+        <h2 className="text-foreground mb-3 text-2xl font-bold">
           Error Loading Project
         </h2>
 
-        <p className="text-sm text-muted-foreground leading-relaxed mb-8">
+        <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
           {message ||
             "An unexpected error occurred. Please try again or return to the dashboard."}
         </p>
@@ -51,14 +51,14 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
           <Button
             variant="outline"
             onClick={onRetry}
-            className="gap-2 cursor-pointer"
+            className="cursor-pointer gap-2"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
           </Button>
           <Button
             onClick={() => router.push("/dashboard")}
-            className="gap-2 bg-gradient-to-br from-[#F97316] to-[#EA580C] border-0 text-white cursor-pointer"
+            className="cursor-pointer gap-2 border-0 bg-linear-to-br from-[#F97316] to-[#EA580C] text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             Dashboard

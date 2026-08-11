@@ -1,5 +1,10 @@
 import { db } from "@/db";
-import { projectTables, projectFiles, codeEmbeddings, rateLimitsTable } from "@/db/schema";
+import {
+  projectTables,
+  projectFiles,
+  codeEmbeddings,
+  rateLimitsTable,
+} from "@/db/schema";
 import { eq, and, ne, sql, sum, lt } from "drizzle-orm";
 import { getRepositoryFiles, syncIssuesAndComments } from "../github";
 import { inngest } from "./client";
@@ -279,16 +284,21 @@ export const cleanupStaleData = inngest.createFunction(
   },
   async ({ step }) => {
     // 1. Purge expired rate limit windows (> 24h old)
-    const rateLimitResult = await step.run("Clean Expired Rate Limits", async () => {
-      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const deleted = await db
-        .delete(rateLimitsTable)
-        .where(lt(rateLimitsTable.createdAt, dayAgo))
-        .returning({ id: rateLimitsTable.id });
+    const rateLimitResult = await step.run(
+      "Clean Expired Rate Limits",
+      async () => {
+        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const deleted = await db
+          .delete(rateLimitsTable)
+          .where(lt(rateLimitsTable.createdAt, dayAgo))
+          .returning({ id: rateLimitsTable.id });
 
-      logger.info(`[Retention] Cleaned ${deleted.length} expired rate limit entries`);
-      return { count: deleted.length };
-    });
+        logger.info(
+          `[Retention] Cleaned ${deleted.length} expired rate limit entries`,
+        );
+        return { count: deleted.length };
+      },
+    );
 
     return {
       success: true,
@@ -296,4 +306,3 @@ export const cleanupStaleData = inngest.createFunction(
     };
   },
 );
-

@@ -15,7 +15,7 @@ export function HeroCtas() {
       className="flex flex-col items-center justify-center gap-4 sm:flex-row"
     >
       <Link href="/sign-up" aria-label="Sign up for free access">
-        <GlowingButton className="rounded-full gap-2 group z-12 text-white cursor-pointer">
+        <GlowingButton className="group z-12 cursor-pointer gap-2 rounded-full text-white">
           Get started for free
           <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </GlowingButton>
@@ -24,7 +24,7 @@ export function HeroCtas() {
         <Button
           variant="outline"
           size="lg"
-          className="rounded-full border-border/60 bg-background/60 backdrop-blur-sm hover:bg-background/80 transition-all duration-300 cursor-pointer"
+          className="border-border/60 bg-background/60 hover:bg-background/80 cursor-pointer rounded-full backdrop-blur-sm transition-all duration-300"
         >
           See how it works
         </Button>

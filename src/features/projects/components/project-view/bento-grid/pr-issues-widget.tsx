@@ -107,31 +107,31 @@ function PRItem({
   comments,
 }: PRItemProps) {
   return (
-    <div className="group flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-white/4 cursor-pointer">
-      <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5 ring-1 ring-border/40">
+    <div className="group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors hover:bg-white/4">
+      <Avatar className="ring-border/40 mt-0.5 h-7 w-7 shrink-0 ring-1">
         <AvatarImage src={avatar} alt={author} />
         <AvatarFallback className="text-xs">
           {author[0].toUpperCase()}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+        <p className="text-foreground group-hover:text-primary line-clamp-2 text-sm leading-snug font-medium transition-colors">
           {title}
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge
             variant="outline"
-            className={`text-[10px] font-medium px-1.5 py-0 h-4 border ${labelColor}`}
+            className={`h-4 border px-1.5 py-0 text-[10px] font-medium ${labelColor}`}
           >
-            <Tag className="h-2.5 w-2.5 mr-1" />
+            <Tag className="mr-1 h-2.5 w-2.5" />
             {label}
           </Badge>
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
             <Clock className="h-2.5 w-2.5" />
             {age}
           </div>
           {comments > 0 && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-muted-foreground text-[11px]">
               {comments} comments
             </span>
           )}
@@ -148,13 +148,13 @@ function EmptySlate({ type }: { type: "pr" | "issue" }) {
   const label = type === "pr" ? "pull requests" : "issues";
   return (
     <div className="flex flex-col items-center justify-center py-10 text-center">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/40 border border-border/30">
-        <Icon className="h-5 w-5 text-muted-foreground/50" />
+      <div className="bg-muted/40 border-border/30 mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border">
+        <Icon className="text-muted-foreground/50 h-5 w-5" />
       </div>
-      <p className="text-sm font-medium text-muted-foreground">
+      <p className="text-muted-foreground text-sm font-medium">
         No open {label}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground/60">
+      <p className="text-muted-foreground/60 mt-1 text-xs">
         All caught up — great work! 🎉
       </p>
     </div>
@@ -165,20 +165,20 @@ function EmptySlate({ type }: { type: "pr" | "issue" }) {
 
 function PrIssuesWidget() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
             <GitPullRequest className="h-3.5 w-3.5" />
           </div>
-          <h3 className="text-sm font-semibold text-foreground">
+          <h3 className="text-foreground text-sm font-semibold">
             Pull Requests & Issues
           </h3>
         </div>
         <Badge
           variant="outline"
-          className="text-[10px] border-amber-500/30 text-amber-400 bg-amber-500/10 gap-1 px-1.5"
+          className="gap-1 border-amber-500/30 bg-amber-500/10 px-1.5 text-[10px] text-amber-400"
         >
           <Zap className="h-2.5 w-2.5" />
           Mock
@@ -186,31 +186,31 @@ function PrIssuesWidget() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="prs" className="flex-1 flex flex-col">
-        <TabsList className="h-8 w-full bg-muted/40 border border-border/40 p-0.5 mb-3">
+      <Tabs defaultValue="prs" className="flex flex-1 flex-col">
+        <TabsList className="bg-muted/40 border-border/40 mb-3 h-8 w-full border p-0.5">
           <TabsTrigger
             value="prs"
-            className="flex-1 h-7 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="data-[state=active]:bg-background h-7 flex-1 text-xs data-[state=active]:shadow-sm"
           >
-            <GitPullRequest className="h-3 w-3 mr-1.5" />
+            <GitPullRequest className="mr-1.5 h-3 w-3" />
             Open PRs
-            <span className="ml-1.5 rounded-full bg-violet-500/20 text-violet-400 text-[10px] px-1.5 py-0 font-medium leading-4">
+            <span className="ml-1.5 rounded-full bg-violet-500/20 px-1.5 py-0 text-[10px] leading-4 font-medium text-violet-400">
               {MOCK_PRS.length}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="issues"
-            className="flex-1 h-7 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="data-[state=active]:bg-background h-7 flex-1 text-xs data-[state=active]:shadow-sm"
           >
-            <AlertCircle className="h-3 w-3 mr-1.5" />
+            <AlertCircle className="mr-1.5 h-3 w-3" />
             Issues
-            <span className="ml-1.5 rounded-full bg-red-500/20 text-red-400 text-[10px] px-1.5 py-0 font-medium leading-4">
+            <span className="ml-1.5 rounded-full bg-red-500/20 px-1.5 py-0 text-[10px] leading-4 font-medium text-red-400">
               {MOCK_ISSUES.length}
             </span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="prs" className="flex-1 mt-0">
+        <TabsContent value="prs" className="mt-0 flex-1">
           <ScrollArea className="h-52">
             {MOCK_PRS.length === 0 ? (
               <EmptySlate type="pr" />
@@ -224,7 +224,7 @@ function PrIssuesWidget() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="issues" className="flex-1 mt-0">
+        <TabsContent value="issues" className="mt-0 flex-1">
           <ScrollArea className="h-52">
             {MOCK_ISSUES.length === 0 ? (
               <EmptySlate type="issue" />
@@ -249,11 +249,11 @@ function PrIssuesWidget() {
       </Tabs>
 
       {/* Footer CTA */}
-      <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between">
-        <p className="text-[11px] text-muted-foreground/60">
+      <div className="border-border/30 mt-3 flex items-center justify-between border-t pt-3">
+        <p className="text-muted-foreground/60 text-[11px]">
           Live data coming soon
         </p>
-        <button className="text-[11px] text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer">
+        <button className="text-primary hover:text-primary/80 cursor-pointer text-[11px] font-medium transition-colors">
           Connect GitHub →
         </button>
       </div>

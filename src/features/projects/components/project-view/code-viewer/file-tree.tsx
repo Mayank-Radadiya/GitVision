@@ -35,7 +35,7 @@ function getFileIcon(node: TreeNode) {
   if (node.type === "directory") return null; // handled separately
 
   const lang = node.language || "";
-  const iconClass = "h-4 w-4 flex-shrink-0";
+  const iconClass = "h-4 w-4 shrink-0";
 
   switch (lang) {
     case "typescript":
@@ -88,23 +88,19 @@ function DirectoryNode({
     <div>
       <button
         onClick={toggle}
-        className={cn(
-          "flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm",
-          "hover:bg-accent/50 transition-colors cursor-pointer",
-          "text-muted-foreground hover:text-foreground",
-        )}
+        className="hover:bg-accent/50 text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors"
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         <ChevronRight
           className={cn(
-            "h-3.5 w-3.5 flex-shrink-0 transition-transform duration-150",
+            "h-3.5 w-3.5 shrink-0 transition-transform duration-150",
             isOpen && "rotate-90",
           )}
         />
         {isOpen ? (
-          <FolderOpen className="h-4 w-4 flex-shrink-0 text-primary/70" />
+          <FolderOpen className="text-primary/70 h-4 w-4 shrink-0" />
         ) : (
-          <Folder className="h-4 w-4 flex-shrink-0 text-primary/70" />
+          <Folder className="text-primary/70 h-4 w-4 shrink-0" />
         )}
         <span className="truncate font-medium">{node.name}</span>
       </button>
@@ -141,8 +137,7 @@ function FileNode({ node, depth, isSelected, onSelect }: FileNodeProps) {
     <button
       onClick={() => onSelect(node.path)}
       className={cn(
-        "flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm",
-        "transition-colors cursor-pointer",
+        "flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
         isSelected
           ? "bg-primary/10 text-primary font-medium"
           : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",

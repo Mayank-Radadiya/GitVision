@@ -9,6 +9,7 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { LayoutGrid, GitCommit, GitPullRequest, CircleDot } from "lucide-react";
+import { cn } from "@/shared/lib/utils";
 import type { ProjectTab } from "@/features/projects/types/project.types";
 
 interface ProjectTabsProps {
@@ -25,7 +26,7 @@ const TABS: { id: ProjectTab; label: string; icon: React.ElementType }[] = [
 
 function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
   return (
-    <div className="relative flex items-center gap-0 border-b border-border/40 overflow-x-auto scrollbar-none">
+    <div className="border-border/40 relative flex scrollbar-none items-center gap-0 overflow-x-auto border-b">
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -34,11 +35,12 @@ function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 cursor-pointer whitespace-nowrap flex-shrink-0 ${
+            className={cn(
+              "relative flex shrink-0 cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200",
               isActive
                 ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground/80"
-            }`}
+                : "text-muted-foreground hover:text-foreground/80",
+            )}
             aria-selected={isActive}
             role="tab"
           >
@@ -49,7 +51,7 @@ function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
             {isActive && (
               <motion.div
                 layoutId="project-tab-underline"
-                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-primary"
+                className="bg-primary absolute right-0 bottom-0 left-0 h-0.5 rounded-t-full"
                 transition={{ type: "spring", bounce: 0.15, duration: 0.35 }}
               />
             )}

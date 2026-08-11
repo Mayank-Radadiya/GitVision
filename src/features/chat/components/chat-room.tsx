@@ -9,7 +9,10 @@ import { Button } from "@/src/shared/components/ui/button";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { ChatErrorCard } from "./chat-error";
-import { parseChatError, type ChatErrorInfo } from "@/src/shared/lib/chat-errors";
+import {
+  parseChatError,
+  type ChatErrorInfo,
+} from "@/src/shared/lib/chat-errors";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatRoomProps {
@@ -83,32 +86,32 @@ function RetrievalSkeleton({
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
         <Sparkles className="h-4 w-4 animate-pulse" />
       </div>
-      <div className="flex max-w-[85%] flex-col gap-2 items-start">
-        <div className="rounded-2xl rounded-tl-md bg-muted/40 border border-border/30 px-4 py-3">
+      <div className="flex max-w-[85%] flex-col items-start gap-2">
+        <div className="bg-muted/40 border-border/30 rounded-2xl rounded-tl-md border px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
               <span
-                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400/60"
                 style={{ animationDelay: "0ms", animationDuration: "1.2s" }}
               />
               <span
-                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400/60"
                 style={{ animationDelay: "150ms", animationDuration: "1.2s" }}
               />
               <span
-                className="h-1.5 w-1.5 rounded-full bg-emerald-400/60 animate-bounce"
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400/60"
                 style={{ animationDelay: "300ms", animationDuration: "1.2s" }}
               />
             </div>
-            <span className="text-xs text-muted-foreground/60 animate-pulse">
+            <span className="text-muted-foreground/60 animate-pulse text-xs">
               {RETRIEVAL_PHASE_LABELS[phase]}
             </span>
           </div>
           {/* Shimmer lines */}
           <div className="mt-3 space-y-2">
-            <div className="h-2.5 w-48 rounded-full bg-muted-foreground/10 animate-pulse" />
+            <div className="bg-muted-foreground/10 h-2.5 w-48 animate-pulse rounded-full" />
             <div
-              className="h-2.5 w-36 rounded-full bg-muted-foreground/8 animate-pulse"
+              className="bg-muted-foreground/8 h-2.5 w-36 animate-pulse rounded-full"
               style={{ animationDelay: "100ms" }}
             />
           </div>
@@ -165,13 +168,7 @@ export function ChatRoom({
     [chatId, projectId, type],
   );
 
-  const {
-    messages,
-    sendMessage,
-    regenerate,
-    stop,
-    status,
-  } = useChat({
+  const { messages, sendMessage, regenerate, stop, status } = useChat({
     transport,
     // v7 messages are UIMessage-shaped (parts, not `content`)
     messages: initialMessages.map((m) => ({
@@ -291,7 +288,7 @@ export function ChatRoom({
   return (
     <div className="flex h-[calc(100vh-2rem)] flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
+      <div className="border-border/40 flex items-center gap-3 border-b px-4 py-3">
         <Button
           variant="ghost"
           size="icon"
@@ -309,7 +306,7 @@ export function ChatRoom({
           )}
           <h1 className="truncate text-sm font-medium">{title}</h1>
           {projectName && (
-            <span className="shrink-0 text-xs text-muted-foreground font-mono">
+            <span className="text-muted-foreground shrink-0 font-mono text-xs">
               · {projectName}
             </span>
           )}
@@ -326,7 +323,7 @@ export function ChatRoom({
                   ? `Ask about ${projectName ?? "your project"}`
                   : "Start a conversation"}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm">
                 {type === "project"
                   ? "I've indexed your codebase. Ask me to explain logic, find bugs, or suggest refactors."
                   : "Ask any programming question — algorithms, system design, or debugging help."}
@@ -347,7 +344,7 @@ export function ChatRoom({
                   <button
                     key={suggestion}
                     onClick={() => setInput(suggestion)}
-                    className="cursor-pointer rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                    className="border-border/40 text-muted-foreground hover:bg-muted/50 hover:text-foreground cursor-pointer rounded-lg border px-3 py-1.5 text-xs transition-colors"
                   >
                     {suggestion}
                   </button>
@@ -421,7 +418,7 @@ export function ChatRoom({
       {chatError && <ChatErrorCard error={chatError} onRetry={reload} />}
 
       {/* Input */}
-      <div className="border-t border-border/40 px-4 py-4">
+      <div className="border-border/40 border-t px-4 py-4">
         <div className="mx-auto max-w-3xl">
           <ChatInput
             value={input}
@@ -435,7 +432,7 @@ export function ChatRoom({
                 : "Ask anything..."
             }
           />
-          <p className="mt-2 text-center text-[10px] text-muted-foreground/40">
+          <p className="text-muted-foreground/40 mt-2 text-center text-[10px]">
             AI can make mistakes. Verify important information.
           </p>
         </div>

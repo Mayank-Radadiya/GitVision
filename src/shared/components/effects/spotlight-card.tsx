@@ -108,11 +108,11 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
           : "transform 0.5s ease-out",
         ...getBorderGlowStyles(),
       }}
-      className={`relative ${borderRadius} overflow-hidden dark:bg-gradient-to-br from-neutral-950/70 to-neutral-900/70 bg-card backdrop-blur-md transition-all duration-300 p-8 ${className}`}
+      className={`relative ${borderRadius} bg-card overflow-hidden from-neutral-950/70 to-neutral-900/70 p-8 backdrop-blur-md transition-all duration-300 dark:bg-linear-to-br ${className}`}
     >
       {/* Spotlight effect */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out z-10"
+        className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-500 ease-in-out"
         style={{
           opacity,
           background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`,
@@ -120,10 +120,10 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
       />
 
       {/* Background ambient gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
+      <div className="absolute inset-0 z-0 bg-linear-to-br from-purple-500/5 via-transparent to-blue-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
       {/* Animated subtle grain texture */}
-      <div className="absolute inset-0 opacity-20 bg-noise animate-noise-slow mix-blend-overlay z-0" />
+      <div className="bg-noise animate-noise-slow absolute inset-0 z-0 opacity-20 mix-blend-overlay" />
 
       {/* Spotlight border trail effect */}
       {isHovered && (

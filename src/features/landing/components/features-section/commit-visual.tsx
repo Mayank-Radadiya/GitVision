@@ -1,7 +1,7 @@
 export function CommitVisual() {
   return (
-    <div className="mt-6 rounded-lg border border-border/30 bg-muted/30 p-3 font-mono text-xs text-muted-foreground overflow-hidden">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="border-border/30 bg-muted/30 text-muted-foreground mt-6 overflow-hidden rounded-lg border p-3 font-mono text-xs">
+      <div className="mb-2 flex items-center gap-2">
         <div className="h-2 w-2 rounded-full bg-green-500" />
         <span className="text-foreground/70">main</span>
         <span className="text-muted-foreground/50">←</span>
@@ -18,7 +18,7 @@ export function CommitVisual() {
           <span className="text-red-400">- 2</span>{" "}
           <span className="text-muted-foreground/60">middleware.ts</span>
         </div>
-        <div className="pt-1 text-primary/70">
+        <div className="text-primary/70 pt-1">
           AI: &quot;Adds JWT auth with refresh tokens&quot;
         </div>
       </div>

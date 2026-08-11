@@ -32,16 +32,16 @@ function PickUpItem({ card }: { card: PickUpCard }) {
   return (
     <Link
       href={card.href}
-      className="group flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:bg-muted/30"
+      className="group hover:bg-muted/30 flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors"
     >
       <Icon className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
-      <span className="truncate text-xs font-medium text-foreground">
+      <span className="text-foreground truncate text-xs font-medium">
         {card.title}
       </span>
-      <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+      <span className="text-muted-foreground hidden truncate text-xs sm:inline">
         — {card.description}
       </span>
-      <ArrowRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
+      <ArrowRight className="text-muted-foreground/40 ml-auto h-3 w-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
@@ -52,8 +52,8 @@ function PickUpSection() {
   if (!isLoading && (!data || data.cards.length === 0)) return null;
 
   return (
-    <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card/40 px-2 py-1.5 backdrop-blur-sm">
-      <span className="shrink-0 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+    <div className="border-border/40 bg-card/40 flex items-center gap-1 rounded-xl border px-2 py-1.5 backdrop-blur-sm">
+      <span className="text-muted-foreground/60 shrink-0 px-2 text-[11px] font-semibold tracking-wider uppercase">
         Resume
       </span>
 

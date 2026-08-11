@@ -10,7 +10,7 @@ export function HeroStats() {
       initial="hidden"
       animate="visible"
       custom={0.55}
-      className="mt-14 grid grid-cols-3 gap-8 max-w-sm mx-auto"
+      className="mx-auto mt-14 grid max-w-sm grid-cols-3 gap-8"
     >
       {STATS_DATA.map((stat) => (
         <AnimatedCounter

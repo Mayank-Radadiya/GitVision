@@ -26,14 +26,14 @@ function MiniBarChart({ data }: { data: { date: string; commits: number }[] }) {
 
   if (!hasAnyCommits) {
     return (
-      <div className="flex flex-col items-center justify-center py-6 h-20 gap-2">
-        <GitCommitHorizontal className="h-8 w-8 text-muted-foreground/20" />
-        <p className="text-xs text-muted-foreground/40">No commits this week</p>
-        <div className="flex items-end gap-2 h-8 mt-2 w-full max-w-[200px]">
+      <div className="flex h-20 flex-col items-center justify-center gap-2 py-6">
+        <GitCommitHorizontal className="text-muted-foreground/20 h-8 w-8" />
+        <p className="text-muted-foreground/40 text-xs">No commits this week</p>
+        <div className="mt-2 flex h-8 w-full max-w-50 items-end gap-2">
           {data.map((point) => (
             <div
               key={point.date}
-              className="flex-1 rounded-sm bg-muted/15 h-2"
+              className="bg-muted/15 h-2 flex-1 rounded-sm"
             />
           ))}
         </div>
@@ -42,16 +42,16 @@ function MiniBarChart({ data }: { data: { date: string; commits: number }[] }) {
   }
 
   return (
-    <div className="flex items-end gap-2 h-28">
+    <div className="flex h-28 items-end gap-2">
       {data.map((point) => {
         const height = Math.max((point.commits / max) * 100, 6);
         return (
           <div
             key={point.date}
-            className="flex flex-1 flex-col items-center gap-1.5 group"
+            className="group flex flex-1 flex-col items-center gap-1.5"
           >
             {/* Commit count tooltip */}
-            <span className="text-[8px] font-medium text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+            <span className="text-muted-foreground text-[8px] font-medium tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
               {point.commits}
             </span>
             {/* Bar */}
@@ -65,7 +65,7 @@ function MiniBarChart({ data }: { data: { date: string; commits: number }[] }) {
               style={{ height: `${height}%` }}
             />
             {/* Day label */}
-            <span className="text-[10px] text-muted-foreground/60">
+            <span className="text-muted-foreground/60 text-[10px]">
               {formatDay(point.date)}
             </span>
           </div>
@@ -109,19 +109,19 @@ function CommitChart() {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/50 bg-card/80 p-5 backdrop-blur-sm",
+        "border-border/50 bg-card/80 rounded-xl border p-5 backdrop-blur-sm",
       )}
     >
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-medium text-foreground">
+          <BarChart3 className="text-primary h-4 w-4" />
+          <h3 className="text-foreground text-sm font-medium">
             Commit Activity
           </h3>
         </div>
         {!isLoading && totalCommits > 0 && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground flex items-center gap-1 text-xs tabular-nums">
             {totalCommits} this week
           </span>
         )}

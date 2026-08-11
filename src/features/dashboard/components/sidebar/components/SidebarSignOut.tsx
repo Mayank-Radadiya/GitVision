@@ -51,9 +51,9 @@ export function SidebarSignOut({ isCollapsed }: SidebarSignOutProps) {
             <Button
               aria-label="Sign out"
               // variant="ghost"
-              className="bg-transparent justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:cursor-pointer hover:text-red-500 hover:bg-red-500/30"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer justify-center rounded-xl bg-transparent"
             >
-              <LogOut className="h-[18px] w-[18px]" />
+              <LogOut className="h-4.5 w-4.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right" className="font-medium">

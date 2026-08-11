@@ -10,16 +10,16 @@ function FeaturesSection() {
   const isInView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section id="features" ref={ref} className="py-28 relative overflow-hidden">
+    <section id="features" ref={ref} className="relative overflow-hidden py-28">
       {/* Background */}
-      <div className="absolute inset-0 bg-grid-small-black/[0.15] dark:bg-grid-small-white/[0.03]" />
-      <div className="absolute inset-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+      <div className="bg-grid-small-black/15 dark:bg-grid-small-white/3 absolute inset-0" />
+      <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]" />
 
       {/* Ambient orbs */}
-      <div className="absolute -left-1/4 top-1/3 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
-      <div className="absolute -right-1/4 bottom-1/3 h-[400px] w-[400px] rounded-full bg-purple-500/5 blur-[100px]" />
+      <div className="bg-primary/5 absolute top-1/3 -left-1/4 h-125 w-125 rounded-full blur-[120px]" />
+      <div className="absolute -right-1/4 bottom-1/3 h-100 w-100 rounded-full bg-purple-500/5 blur-[100px]" />
 
-      <div className="container relative px-4 mx-auto">
+      <div className="relative container mx-auto px-4">
         <FeaturesHeader isInView={isInView} />
         <FeaturesGrid isInView={isInView} />
       </div>

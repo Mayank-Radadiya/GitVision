@@ -2,7 +2,6 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 
-
 interface SparklesProps {
   id?: string;
   className?: string;
@@ -115,7 +114,7 @@ export const SparklesCore = ({
     const particleCount = Math.min(
       Math.floor((canvasSize.current.w * canvasSize.current.h) / 8000) *
         particleDensity,
-      1000
+      1000,
     );
 
     for (let i = 0; i < particleCount; i++) {

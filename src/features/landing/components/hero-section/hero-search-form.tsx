@@ -35,24 +35,24 @@ export function HeroSearchForm() {
       className="mx-auto mb-10 max-w-md"
     >
       <form className="relative" onSubmit={handleSubmit}>
-        <SearchIcon className="absolute z-10 left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 z-10 h-4 w-4 -translate-y-1/2" />
         <Input
           type="text"
           placeholder="Paste GitHub repository URL"
-          className="pl-9 pr-24 h-12 rounded-full border-border/60 bg-transparent shadow-sm focus:ring-2 focus:ring-primary/40 transition-all"
+          className="border-border/60 focus:ring-primary/40 h-12 rounded-full bg-transparent pr-24 pl-9 shadow-sm transition-all focus:ring-2"
           value={repoUrl}
           onChange={handleChange}
           aria-label="GitHub repository URL"
         />
         <Button
           type="submit"
-          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-10 bg-primary hover:bg-primary/90 transition-all duration-300 cursor-pointer"
+          className="bg-primary hover:bg-primary/90 absolute top-1/2 right-1 h-10 -translate-y-1/2 cursor-pointer rounded-full transition-all duration-300"
           disabled={!repoUrl.trim() || isSubmitting}
           aria-label="Analyze repository"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-white/80 animate-ping" />
+              <span className="h-3 w-3 animate-ping rounded-full bg-white/80" />
               Analyzing...
             </span>
           ) : (
@@ -60,7 +60,7 @@ export function HeroSearchForm() {
           )}
         </Button>
       </form>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-2 text-xs">
         Example: https://github.com/vercel/next.js
       </p>
     </motion.div>

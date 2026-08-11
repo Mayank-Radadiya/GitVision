@@ -153,24 +153,24 @@ function AvatarFacepile({
   const extra = humanTotal > 5 ? humanTotal - 5 : 0;
 
   return (
-    <div className="flex items-center mb-4">
+    <div className="mb-4 flex items-center">
       <div className="flex -space-x-2.5">
         {contributors.map((c) => {
           const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&size=32`;
           return (
             <Avatar
               key={c.email}
-              className="h-8 w-8 ring-2 ring-background transition-transform hover:scale-110 hover:z-10 hover:-translate-y-0.5"
+              className="ring-background h-8 w-8 ring-2 transition-transform hover:z-10 hover:-translate-y-0.5 hover:scale-110"
             >
               <AvatarImage src={c.avatar || placeholder} alt={c.name} />
-              <AvatarFallback className="text-[11px] bg-muted">
+              <AvatarFallback className="bg-muted text-[11px]">
                 {c.name[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
           );
         })}
         {extra > 0 && (
-          <div className="h-8 w-8 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground z-10">
+          <div className="ring-background bg-muted text-muted-foreground z-10 flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold ring-2">
             +{extra}
           </div>
         )}
@@ -195,11 +195,11 @@ function ContributorRow({
   const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(contributor.name)}&background=random&size=32`;
 
   return (
-    <div className="flex items-center gap-2.5 group">
-      <span className="w-3.5 text-[10px] font-bold text-muted-foreground/40 flex-shrink-0 text-right">
+    <div className="group flex items-center gap-2.5">
+      <span className="text-muted-foreground/40 w-3.5 shrink-0 text-right text-[10px] font-bold">
         {rank}
       </span>
-      <Avatar className="h-6 w-6 flex-shrink-0 ring-1 ring-border/40 group-hover:ring-primary/40 transition-all">
+      <Avatar className="ring-border/40 group-hover:ring-primary/40 h-6 w-6 shrink-0 ring-1 transition-all">
         <AvatarImage
           src={contributor.avatar || placeholder}
           alt={contributor.name}
@@ -208,21 +208,21 @@ function ContributorRow({
           {contributor.name[0]?.toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-medium text-foreground truncate max-w-[90px]">
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-foreground max-w-22.5 truncate text-xs font-medium">
             {contributor.name}
           </p>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-1">
+          <div className="ml-1 flex shrink-0 items-center gap-2">
             <Sparkline data={contributor.velocity} />
-            <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+            <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
               {contributor.commitCount}
             </span>
           </div>
         </div>
-        <div className="h-1 rounded-full bg-muted/40 overflow-hidden">
+        <div className="bg-muted/40 h-1 overflow-hidden rounded-full">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all duration-700 ease-out"
+            className="from-primary/70 to-primary h-full rounded-full bg-linear-to-r transition-all duration-700 ease-out"
             style={{ width: `${percentage}%` }}
           />
         </div>
@@ -236,13 +236,13 @@ function ContributorRow({
 function EmptyContributors() {
   return (
     <div className="flex flex-col items-center justify-center py-6 text-center">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-muted/40 border border-border/30">
-        <Users className="h-4 w-4 text-muted-foreground/40" />
+      <div className="bg-muted/40 border-border/30 mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border">
+        <Users className="text-muted-foreground/40 h-4 w-4" />
       </div>
-      <p className="text-xs font-medium text-muted-foreground">
+      <p className="text-muted-foreground text-xs font-medium">
         No commits yet
       </p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground/60">
+      <p className="text-muted-foreground/60 mt-0.5 text-[11px]">
         Contributors appear as commits are loaded.
       </p>
     </div>
@@ -259,7 +259,7 @@ function ContributorWidget({
   const maxCount = contributors[0]?.commitCount ?? 1;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -267,16 +267,16 @@ function ContributorWidget({
             <Users className="h-3.5 w-3.5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground leading-none">
+            <h3 className="text-foreground text-sm leading-none font-semibold">
               Contributors
             </h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
               7-day velocity
             </p>
           </div>
         </div>
         {contributors.length > 0 && (
-          <span className="text-[11px] text-muted-foreground bg-muted/40 border border-border/40 rounded-full px-2 py-0.5">
+          <span className="text-muted-foreground bg-muted/40 border-border/40 rounded-full border px-2 py-0.5 text-[11px]">
             {totalContributors} total
           </span>
         )}

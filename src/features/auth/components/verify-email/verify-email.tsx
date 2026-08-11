@@ -36,18 +36,18 @@ function VerifyEmail({
   error,
 }: VerifyEmailProps) {
   return (
-    <div className="flex w-full flex-col items-center justify-center relative z-10 px-4 sm:px-0 mt-8 mb-8 md:mt-24">
-      <div className="relative group perspective-1000 max-w-md w-full">
+    <div className="relative z-10 mt-8 mb-8 flex w-full flex-col items-center justify-center px-4 sm:px-0 md:mt-24">
+      <div className="group perspective-1000 relative w-full max-w-md">
         {/* Deep layered background offsets */}
-        <div className="absolute -inset-1.5 bg-gradient-to-br from-primary/30 to-background rounded-none blur-sm opacity-50 group-hover:opacity-100 transition duration-700" />
-        <div className="absolute inset-0 bg-primary/10 translate-x-2 translate-y-2 border border-primary/20" />
+        <div className="from-primary/30 to-background absolute -inset-1.5 rounded-none bg-linear-to-br opacity-50 blur-sm transition duration-700 group-hover:opacity-100" />
+        <div className="bg-primary/10 border-primary/20 absolute inset-0 translate-x-2 translate-y-2 border" />
 
-        <Card className="relative border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl sm:p-6 transition-all duration-500 rounded-none transform-style-3d group-hover:-translate-y-1 group-hover:-translate-x-1">
+        <Card className="border-border/50 bg-background/95 transform-style-3d relative rounded-none shadow-2xl backdrop-blur-xl transition-all duration-500 group-hover:-translate-x-1 group-hover:-translate-y-1 sm:p-6">
           {/* Accent line */}
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary/80 via-primary/40 to-transparent" />
+          <div className="from-primary/80 via-primary/40 absolute inset-x-0 top-0 h-0.5 bg-linear-to-r to-transparent" />
 
-          <CardHeader className="space-y-3 pb-8 text-left pt-4">
-            <CardTitle className="text-3xl font-bold tracking-tighter text-foreground selection:bg-primary/30">
+          <CardHeader className="space-y-3 pt-4 pb-8 text-left">
+            <CardTitle className="text-foreground selection:bg-primary/30 text-3xl font-bold tracking-tighter">
               Verify your email
             </CardTitle>
             <CardDescription className="text-muted-foreground/80 text-sm font-medium tracking-widest uppercase">
@@ -66,34 +66,34 @@ function VerifyEmail({
                   <InputOTPGroup>
                     <InputOTPSlot
                       index={0}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner "
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                     <InputOTPSlot
                       index={1}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner"
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                     <InputOTPSlot
                       index={2}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner"
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                     <InputOTPSlot
                       index={3}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner"
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                     <InputOTPSlot
                       index={4}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner"
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                     <InputOTPSlot
                       index={5}
-                      className="w-12 h-12 text-lg rounded-none border-border bg-background shadow-inner"
+                      className="border-border bg-background h-12 w-12 rounded-none text-lg shadow-inner"
                     />
                   </InputOTPGroup>
                 </InputOTP>
               </div>
               <Button
                 type="submit"
-                className="h-12 mt-4 rounded-none w-full font-bold uppercase tracking-widest text-[11px] transition-all duration-300 bg-primary hover:bg-primary/90 text-primary-foreground shadow-[4px_4px_0_hsl(var(--primary)/0.2)] hover:shadow-none hover:translate-y-1 hover:translate-x-1 cursor-pointer text-white"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground mt-4 h-12 w-full cursor-pointer rounded-none text-[11px] font-bold tracking-widest uppercase shadow-[4px_4px_0_hsl(var(--primary)/0.2)] transition-all duration-300 hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
                 disabled={isLoading || emailCode.length !== 6}
               >
                 {isLoading ? (
@@ -107,21 +107,21 @@ function VerifyEmail({
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center pb-2 pt-4 border-t border-border/10 mt-2 flex-col gap-4">
-            <div className="text-xs font-medium text-muted-foreground/80 tracking-wide flex items-center justify-center gap-2">
+          <CardFooter className="border-border/10 mt-2 flex flex-col justify-center gap-4 border-t pt-4 pb-2">
+            <div className="text-muted-foreground/80 flex items-center justify-center gap-2 text-xs font-medium tracking-wide">
               <span>Didn&apos;t receive a code?</span>
               <Button
                 variant="link"
-                className="h-auto p-0 text-foreground font-semibold hover:text-primary transition-colors underline decoration-border hover:decoration-primary cursor-pointer underline-offset-4"
+                className="text-foreground hover:text-primary decoration-border hover:decoration-primary h-auto cursor-pointer p-0 font-semibold underline underline-offset-4 transition-colors"
                 disabled={isLoading}
               >
                 Resend code
               </Button>
             </div>
-            <div className="text-xs font-medium text-muted-foreground/80 tracking-wide">
+            <div className="text-muted-foreground/80 text-xs font-medium tracking-wide">
               <Link
                 href="/sign-in"
-                className="text-foreground font-semibold hover:text-primary transition-colors underline decoration-border hover:decoration-primary cursor-pointer underline-offset-4"
+                className="text-foreground hover:text-primary decoration-border hover:decoration-primary cursor-pointer font-semibold underline underline-offset-4 transition-colors"
               >
                 Back to sign in
               </Link>
@@ -134,17 +134,17 @@ function VerifyEmail({
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="mt-8 p-4 border border-destructive/30 bg-destructive/5 shadow-[4px_4px_0_rgba(239,68,68,0.1)] rounded-none relative overflow-hidden"
+            className="border-destructive/30 bg-destructive/5 relative mt-8 overflow-hidden rounded-none border p-4 shadow-[4px_4px_0_rgba(239,68,68,0.1)]"
           >
-            <div className="absolute left-0 top-0 w-1 h-full bg-destructive" />
-            <h3 className="text-[11px] uppercase tracking-wider font-bold text-destructive pl-2">
+            <div className="bg-destructive absolute top-0 left-0 h-full w-1" />
+            <h3 className="text-destructive pl-2 text-[11px] font-bold tracking-wider uppercase">
               Verification Error
             </h3>
             <div className="mt-2 space-y-1 pl-2">
               {error.map((el, index) => (
                 <div
                   key={index}
-                  className="text-xs font-medium text-destructive/90 flex items-start gap-2"
+                  className="text-destructive/90 flex items-start gap-2 text-xs font-medium"
                 >
                   <span className="mt-1 text-[8px] opacity-70">◆</span>{" "}
                   {el.longMessage}

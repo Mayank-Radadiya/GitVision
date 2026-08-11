@@ -218,7 +218,7 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
             <h1 className="text-3xl font-semibold tracking-tight">
               How can I help you?
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-sm">
               Ask general questions or select a project for codebase-aware chat.
             </p>
           </div>
@@ -226,7 +226,7 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
           {/* Mode selection */}
           <div className="space-y-4">
             {/* Project selector */}
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="border-border/50 bg-card/50 rounded-xl border p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
                   <FolderGit2 className="h-4 w-4 text-blue-500" />
@@ -253,17 +253,17 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
 
               {/* Embedding states — only shown when project selected */}
               {selectedProject && (
-                <div className="mt-3 border-t border-border/30 pt-3">
+                <div className="border-border/30 mt-3 border-t pt-3">
                   {/* Not indexed */}
                   {!isEmbeddingReady &&
                     !isProcessing &&
                     currentStatus !== "failed" && (
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
                           <Database className="h-3.5 w-3.5" />
                           <span>
                             Embeddings required for{" "}
-                            <span className="font-medium text-foreground">
+                            <span className="text-foreground font-medium">
                               {selectedProjectData?.name}
                             </span>
                           </span>
@@ -290,11 +290,11 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
                           <span className="text-muted-foreground">
                             Indexing{" "}
-                            <span className="font-medium text-foreground">
+                            <span className="text-foreground font-medium">
                               {selectedProjectData?.name}
                             </span>
                           </span>
-                          <span className="font-mono text-xs text-muted-foreground">
+                          <span className="text-muted-foreground font-mono text-xs">
                             {getProjectProgress(selectedProject)}%
                           </span>
                         </div>
@@ -304,13 +304,13 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
                           }
                           size="sm"
                           variant="ghost"
-                          className="h-7 gap-1 text-xs text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive h-7 gap-1 text-xs"
                         >
                           <X className="h-3 w-3" />
                           Cancel
                         </Button>
                       </div>
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="bg-muted h-1 w-full overflow-hidden rounded-full">
                         <div
                           className="h-full rounded-full bg-blue-500 transition-all duration-500"
                           style={{
@@ -393,9 +393,9 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
 
       {/* Recent conversations — bottom */}
       {chats.length > 0 && (
-        <div className="border-t border-border/40 px-6 py-5">
+        <div className="border-border/40 border-t px-6 py-5">
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <h2 className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
               Recent conversations
             </h2>
             <div className="flex flex-col gap-1">
@@ -405,27 +405,27 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
                   <button
                     key={chat.id}
                     onClick={() => router.push(`/chat/${chat.id}`)}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/50 cursor-pointer"
+                    className="group hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
                   >
-                    <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                    <MessageSquare className="text-muted-foreground/50 h-4 w-4 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">{chat.title}</p>
                     </div>
                     {project && (
                       <Badge
                         variant="outline"
-                        className="shrink-0 gap-1 border-border/30 text-[10px] font-mono text-muted-foreground"
+                        className="border-border/30 text-muted-foreground shrink-0 gap-1 font-mono text-[10px]"
                       >
                         <FolderGit2 className="h-2.5 w-2.5" />
                         {project.name}
                       </Badge>
                     )}
-                    <span className="shrink-0 text-[10px] text-muted-foreground/50">
+                    <span className="text-muted-foreground/50 shrink-0 text-[10px]">
                       {formatDistanceToNow(new Date(chat.updatedAt), {
                         addSuffix: true,
                       })}
                     </span>
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/50" />
+                    <ArrowRight className="text-muted-foreground/0 group-hover:text-muted-foreground/50 h-3.5 w-3.5 shrink-0 transition-all" />
                   </button>
                 );
               })}

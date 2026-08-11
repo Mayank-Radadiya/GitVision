@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
   return (
     <motion.div
-      className="mx-auto min-h-screen max-w-[1400px] p-5 lg:p-8"
+      className="mx-auto min-h-screen max-w-350 p-5 lg:p-8"
       variants={staggerContainer}
       initial="hidden"
       animate="visible"

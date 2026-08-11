@@ -69,12 +69,12 @@ export function RepositoryUrlField({
             <button
               type="button"
               onClick={handlePaste}
-              className="inline-flex cursor-pointer items-center gap-1.5 font-gv-mono text-[10px] text-gv-fog transition-colors hover:text-gv-amber"
+              className="font-gv-mono text-gv-fog hover:text-gv-amber inline-flex cursor-pointer items-center gap-1.5 text-[10px] transition-colors"
               title="Paste URL from clipboard (⌘V)"
             >
-              <Clipboard className="h-3 w-3 text-gv-amber" />
+              <Clipboard className="text-gv-amber h-3 w-3" />
               <span>Paste</span>
-              <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.2 font-mono text-[9px] text-gv-fog/80">
+              <kbd className="py-0.2 text-gv-fog/80 rounded border border-white/10 bg-white/5 px-1 font-mono text-[9px]">
                 ⌘V
               </kbd>
             </button>
@@ -82,7 +82,7 @@ export function RepositoryUrlField({
         }
         helper={
           hasError ? (
-            <div className="flex items-center gap-2 font-gv-mono text-xs text-gv-ember">
+            <div className="font-gv-mono text-gv-ember flex items-center gap-2 text-xs">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               <span>
                 Can&apos;t resolve repository. Please verify URL (e.g.
@@ -90,7 +90,7 @@ export function RepositoryUrlField({
               </span>
             </div>
           ) : (
-            <span className="font-gv-mono text-xs text-gv-fog/80">
+            <span className="font-gv-mono text-gv-fog/80 text-xs">
               HTTPS GitHub URL to map tree architecture and dependencies.
             </span>
           )
@@ -99,16 +99,16 @@ export function RepositoryUrlField({
 
       {/* ─── IDE Command Prompt Box ────────────────────────────────────────── */}
       {value.trim().length > 0 && !hasError && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-gv-graphite-2/60 px-4 py-2.5 font-gv-mono text-xs shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)]">
+        <div className="bg-gv-graphite-2/60 font-gv-mono flex items-center justify-between gap-3 rounded-xl border border-white/8 px-4 py-2.5 text-xs shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)]">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gv-wire animate-pulse" />
-            <Terminal className="h-3.5 w-3.5 shrink-0 text-gv-wire/80" />
-            <span className="truncate text-gv-fog">
+            <span className="bg-gv-wire h-2 w-2 animate-pulse rounded-full" />
+            <Terminal className="text-gv-wire/80 h-3.5 w-3.5 shrink-0" />
+            <span className="text-gv-fog truncate">
               $ git remote get-url origin
               {rawInfo && (
                 <>
                   <span className="text-gv-fog/60"> → </span>
-                  <span className="font-semibold text-gv-bone">
+                  <span className="text-gv-bone font-semibold">
                     {rawInfo.owner}/{rawInfo.repo}
                   </span>
                 </>
@@ -121,7 +121,7 @@ export function RepositoryUrlField({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-gv-moss/30 bg-gv-moss/10 px-2.5 py-0.5 text-[11px] font-semibold text-gv-moss"
+              className="border-gv-moss/30 bg-gv-moss/10 text-gv-moss inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] font-semibold"
             >
               <CheckCircle2 className="h-3 w-3" />
               Verified

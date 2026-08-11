@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { User, Bot, Copy, Check, FileText } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/shared/lib/utils";
 import { CodeBlock } from "./code-block";
 import { Badge } from "@/src/shared/components/ui/badge";
 import {
@@ -25,19 +26,19 @@ function ThinkingIndicator() {
     <div className="flex items-center gap-3 px-1 py-2">
       <div className="flex items-center gap-1.5">
         <span
-          className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce"
+          className="h-2 w-2 animate-bounce rounded-full bg-emerald-400"
           style={{ animationDelay: "0ms", animationDuration: "1.2s" }}
         />
         <span
-          className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce"
+          className="h-2 w-2 animate-bounce rounded-full bg-emerald-400"
           style={{ animationDelay: "150ms", animationDuration: "1.2s" }}
         />
         <span
-          className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce"
+          className="h-2 w-2 animate-bounce rounded-full bg-emerald-400"
           style={{ animationDelay: "300ms", animationDuration: "1.2s" }}
         />
       </div>
-      <span className="text-xs text-muted-foreground/60 animate-pulse">
+      <span className="text-muted-foreground/60 animate-pulse text-xs">
         Thinking...
       </span>
     </div>
@@ -65,8 +66,8 @@ export function ChatMessage({
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
           <Bot className="h-4 w-4" />
         </div>
-        <div className="flex max-w-[85%] flex-col gap-2 items-start">
-          <div className="rounded-2xl rounded-tl-md bg-muted/40 border border-border/30 px-4 py-3">
+        <div className="flex max-w-[85%] flex-col items-start gap-2">
+          <div className="bg-muted/40 border-border/30 rounded-2xl rounded-tl-md border px-4 py-3">
             <ThinkingIndicator />
           </div>
         </div>
@@ -76,29 +77,34 @@ export function ChatMessage({
 
   return (
     <div
-      className={`group flex gap-3 px-4 py-5 ${isUser ? "flex-row-reverse" : ""}`}
+      className={cn("group flex gap-3 px-4 py-5", isUser && "flex-row-reverse")}
     >
       {/* Avatar */}
       <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
           isUser
             ? "bg-primary/10 text-primary"
-            : "bg-emerald-500/10 text-emerald-500"
-        }`}
+            : "bg-emerald-500/10 text-emerald-500",
+        )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
 
       {/* Message content */}
       <div
-        className={`flex max-w-[85%] flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}
+        className={cn(
+          "flex max-w-[85%] flex-col gap-2",
+          isUser ? "items-end" : "items-start",
+        )}
       >
         <div
-          className={`relative rounded-2xl px-4 py-3 ${
+          className={cn(
+            "relative rounded-2xl px-4 py-3",
             isUser
               ? "bg-primary text-primary-foreground rounded-tr-md"
-              : "bg-muted/40 border border-border/30 rounded-tl-md"
-          }`}
+              : "bg-muted/40 border-border/30 rounded-tl-md border",
+          )}
         >
           {isUser ? (
             <p className="text-sm whitespace-pre-wrap">{content}</p>
@@ -114,7 +120,7 @@ export function ChatMessage({
                     if (isInline) {
                       return (
                         <code
-                          className="rounded-md bg-white/[0.06] border border-white/[0.06] px-1.5 py-0.5 font-mono text-[13px] text-emerald-300/90"
+                          className="rounded-md border border-white/6 bg-white/6 px-1.5 py-0.5 font-mono text-[13px] text-emerald-300/90"
                           {...props}
                         >
                           {children}
@@ -133,21 +139,21 @@ export function ChatMessage({
                   },
                   p({ children }) {
                     return (
-                      <p className="mb-3 last:mb-0 leading-[1.75] text-foreground/90">
+                      <p className="text-foreground/90 mb-3 leading-[1.75] last:mb-0">
                         {children}
                       </p>
                     );
                   },
                   ul({ children }) {
                     return (
-                      <ul className="mb-3 list-disc pl-5 space-y-1.5 text-foreground/85 marker:text-emerald-500/50">
+                      <ul className="text-foreground/85 mb-3 list-disc space-y-1.5 pl-5 marker:text-emerald-500/50">
                         {children}
                       </ul>
                     );
                   },
                   ol({ children }) {
                     return (
-                      <ol className="mb-3 list-decimal pl-5 space-y-1.5 text-foreground/85 marker:text-emerald-500/50">
+                      <ol className="text-foreground/85 mb-3 list-decimal space-y-1.5 pl-5 marker:text-emerald-500/50">
                         {children}
                       </ol>
                     );
@@ -157,35 +163,35 @@ export function ChatMessage({
                   },
                   h1({ children }) {
                     return (
-                      <h1 className="mb-3 mt-5 first:mt-0 text-lg font-bold text-foreground border-b border-border/30 pb-2">
+                      <h1 className="text-foreground border-border/30 mt-5 mb-3 border-b pb-2 text-lg font-bold first:mt-0">
                         {children}
                       </h1>
                     );
                   },
                   h2({ children }) {
                     return (
-                      <h2 className="mb-2 mt-4 first:mt-0 text-base font-semibold text-foreground">
+                      <h2 className="text-foreground mt-4 mb-2 text-base font-semibold first:mt-0">
                         {children}
                       </h2>
                     );
                   },
                   h3({ children }) {
                     return (
-                      <h3 className="mb-1.5 mt-3 first:mt-0 text-sm font-semibold text-foreground">
+                      <h3 className="text-foreground mt-3 mb-1.5 text-sm font-semibold first:mt-0">
                         {children}
                       </h3>
                     );
                   },
                   blockquote({ children }) {
                     return (
-                      <blockquote className="my-3 border-l-2 border-emerald-500/30 pl-4 italic text-muted-foreground">
+                      <blockquote className="text-muted-foreground my-3 border-l-2 border-emerald-500/30 pl-4 italic">
                         {children}
                       </blockquote>
                     );
                   },
                   strong({ children }) {
                     return (
-                      <strong className="font-semibold text-foreground">
+                      <strong className="text-foreground font-semibold">
                         {children}
                       </strong>
                     );
@@ -203,25 +209,25 @@ export function ChatMessage({
                     );
                   },
                   hr() {
-                    return <hr className="my-4 border-border/30" />;
+                    return <hr className="border-border/30 my-4" />;
                   },
                   table({ children }) {
                     return (
-                      <div className="my-3 overflow-x-auto rounded-lg border border-border/30">
+                      <div className="border-border/30 my-3 overflow-x-auto rounded-lg border">
                         <table className="w-full text-sm">{children}</table>
                       </div>
                     );
                   },
                   th({ children }) {
                     return (
-                      <th className="border-b border-border/30 bg-muted/30 px-3 py-2 text-left text-xs font-semibold text-foreground">
+                      <th className="border-border/30 bg-muted/30 text-foreground border-b px-3 py-2 text-left text-xs font-semibold">
                         {children}
                       </th>
                     );
                   },
                   td({ children }) {
                     return (
-                      <td className="border-b border-border/10 px-3 py-2 text-foreground/80">
+                      <td className="border-border/10 text-foreground/80 border-b px-3 py-2">
                         {children}
                       </td>
                     );
@@ -231,7 +237,7 @@ export function ChatMessage({
                 {content}
               </ReactMarkdown>
               {isStreaming && (
-                <span className="inline-block h-4 w-[3px] animate-pulse rounded-full bg-emerald-400/80 ml-0.5 align-middle" />
+                <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse rounded-full bg-emerald-400/80 align-middle" />
               )}
             </div>
           )}
@@ -239,13 +245,18 @@ export function ChatMessage({
 
         {/* Actions + Related Files */}
         <div
-          className={`flex flex-wrap items-center gap-2 px-1 ${isUser ? "flex-row-reverse" : ""}`}
+          className={cn(
+            "flex flex-wrap items-center gap-2 px-1",
+            isUser && "flex-row-reverse",
+          )}
         >
           {/* Copy button */}
           <button
             onClick={handleCopy}
-            aria-label={copied ? "Message copied to clipboard" : "Copy message content"}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-pointer"
+            aria-label={
+              copied ? "Message copied to clipboard" : "Copy message content"
+            }
+            className="text-muted-foreground hover:text-foreground cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
           >
             {copied ? (
               <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -263,7 +274,7 @@ export function ChatMessage({
                     <TooltipTrigger asChild>
                       <Badge
                         variant="outline"
-                        className="cursor-default gap-1 text-[10px] font-mono border-border/50 bg-muted/30 text-muted-foreground"
+                        className="border-border/50 bg-muted/30 text-muted-foreground cursor-default gap-1 font-mono text-[10px]"
                       >
                         <FileText className="h-2.5 w-2.5" />
                         {file.split("/").pop()}

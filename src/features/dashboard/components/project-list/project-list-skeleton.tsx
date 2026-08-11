@@ -13,7 +13,7 @@ function ProjectListSkeleton() {
       {Array.from({ length: SKELETON_COUNT }, (_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 rounded-2xl border border-border/40 bg-card/50 p-5"
+          className="border-border/40 bg-card/50 flex items-center gap-4 rounded-2xl border p-5"
         >
           <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
           <div className="flex-1 space-y-2">

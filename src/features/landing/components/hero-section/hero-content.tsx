@@ -10,9 +10,9 @@ export function HeroContent() {
         initial="hidden"
         animate="visible"
         custom={0}
-        className="mb-6 inline-flex items-center rounded-full border border-border/60 bg-background/80 px-4 py-1.5 text-sm backdrop-blur-sm shadow-sm"
+        className="border-border/60 bg-background/80 mb-6 inline-flex items-center rounded-full border px-4 py-1.5 text-sm shadow-sm backdrop-blur-sm"
       >
-        <span className="mr-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground dark:text-white/80">
+        <span className="bg-primary text-primary-foreground mr-2 rounded-full px-2 py-0.5 text-xs font-semibold dark:text-white/80">
           New
         </span>
         <span className="text-muted-foreground">
@@ -26,12 +26,12 @@ export function HeroContent() {
         initial="hidden"
         animate="visible"
         custom={0.1}
-        className="mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl !leading-[1.1]"
+        className="mb-6 text-4xl leading-[1.1]! font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
       >
         <span className="text-foreground">Understand GitHub</span>
         <br />
         <span className="text-foreground">Repositories </span>
-        <span className="bg-gradient-to-r from-primary via-blue-400 to-primary bg-clip-text text-transparent animate-shimmer-text">
+        <span className="from-primary to-primary animate-shimmer-text bg-linear-to-r via-blue-400 bg-clip-text text-transparent">
           with AI
         </span>
       </motion.h1>
@@ -42,7 +42,7 @@ export function HeroContent() {
         initial="hidden"
         animate="visible"
         custom={0.2}
-        className="mb-10 text-xl text-muted-foreground"
+        className="text-muted-foreground mb-10 text-xl"
       >
         Get instant AI-powered insights into any public GitHub repository.
         <br className="hidden md:inline" /> Understand code changes, contributor

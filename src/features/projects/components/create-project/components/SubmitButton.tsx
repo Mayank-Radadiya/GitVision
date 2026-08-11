@@ -25,10 +25,10 @@ export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
       disabled={isLoading || !isValid}
       aria-busy={isLoading}
       className={cn(
-        "group relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border font-gv-mono text-sm font-bold tracking-wider transition-all duration-200",
+        "group font-gv-mono relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl text-sm font-bold tracking-wider transition-all duration-200",
         idle
-          ? "gv-cta cursor-pointer border-gv-amber/80 bg-gv-graphite text-gv-bone shadow-[0_0_20px_rgba(232,163,61,0.15)] hover:-translate-y-0.5 hover:shadow-[0_0_28px_rgba(232,163,61,0.3)] active:translate-y-0"
-          : "cursor-not-allowed border-white/[0.06] bg-gv-graphite-2/40 text-gv-fog/50",
+          ? "gv-cta border-gv-amber/80 bg-gv-graphite text-gv-bone cursor-pointer border shadow-[0_0_20px_rgba(232,163,61,0.15)] hover:-translate-y-0.5 hover:shadow-[0_0_28px_rgba(232,163,61,0.3)] active:translate-y-0"
+          : "bg-gv-graphite-2/40 text-gv-fog/50 cursor-not-allowed border border-white/6",
       )}
     >
       {/* Scan-line sweep during loading */}
@@ -37,12 +37,12 @@ export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
           {!reduced && (
             <div
               aria-hidden
-              className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-gv-amber/40 to-transparent gv-scanline-sweep"
+              className="via-gv-amber/40 gv-scanline-sweep absolute inset-0 z-0 bg-linear-to-r from-transparent to-transparent"
             />
           )}
           <div
             aria-hidden
-            className="absolute inset-x-0 bottom-0 h-0.5 bg-gv-amber opacity-90"
+            className="bg-gv-amber absolute inset-x-0 bottom-0 h-0.5 opacity-90"
           />
         </>
       )}
@@ -53,21 +53,25 @@ export function SubmitButton({ isLoading, isValid }: SubmitButtonProps) {
           <>
             <motion.span
               animate={reduced ? {} : { rotate: 360 }}
-              transition={reduced ? {} : { duration: 1.5, repeat: Infinity, ease: "linear" }}
+              transition={
+                reduced
+                  ? {}
+                  : { duration: 1.5, repeat: Infinity, ease: "linear" }
+              }
             >
-              <GitCommit className="h-4 w-4 text-gv-amber" />
+              <GitCommit className="text-gv-amber h-4 w-4" />
             </motion.span>
-            <span className="font-gv-mono text-sm font-semibold tracking-wider text-gv-bone">
+            <span className="font-gv-mono text-gv-bone text-sm font-semibold tracking-wider">
               Analyzing repository tree…
             </span>
           </>
         ) : (
           <>
-            <GitCommit className="h-4 w-4 shrink-0 text-gv-amber transition-colors duration-200 group-hover:text-gv-void" />
+            <GitCommit className="text-gv-amber group-hover:text-gv-void h-4 w-4 shrink-0 transition-colors duration-200" />
             <span>Connect & Add Repository</span>
-            <ArrowRight className="h-4 w-4 shrink-0 transition-all duration-200 group-hover:translate-x-1 group-hover:text-gv-void" />
+            <ArrowRight className="group-hover:text-gv-void h-4 w-4 shrink-0 transition-all duration-200 group-hover:translate-x-1" />
             {idle && (
-              <kbd className="ml-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-gv-bone/90 group-hover:border-gv-void/30 group-hover:bg-gv-void/20 group-hover:text-gv-void">
+              <kbd className="text-gv-bone/90 group-hover:border-gv-void/30 group-hover:bg-gv-void/20 group-hover:text-gv-void ml-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold">
                 ⌘↵
               </kbd>
             )}

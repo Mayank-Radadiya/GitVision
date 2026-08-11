@@ -18,8 +18,8 @@ export function FeatureCard({ feature }: FeatureCardProps) {
     >
       <div
         className={cn(
-          "relative h-full rounded-2xl border border-border/40 bg-background/60 backdrop-blur-sm p-7 transition-all duration-300",
-          "hover:border-border/60 hover:bg-background/80 hover:shadow-lg cursor-default",
+          "border-border/40 bg-background/60 relative h-full rounded-2xl border p-7 backdrop-blur-sm transition-all duration-300",
+          "hover:border-border/60 hover:bg-background/80 cursor-default hover:shadow-lg",
           feature.borderHover,
         )}
       >
@@ -34,13 +34,13 @@ export function FeatureCard({ feature }: FeatureCardProps) {
         </div>
 
         {/* Title + arrow */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="mb-3 flex items-center gap-2">
           <h3 className="text-lg font-semibold">{feature.name}</h3>
-          <ArrowRightIcon className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" />
+          <ArrowRightIcon className="text-muted-foreground/40 h-3.5 w-3.5 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
         </div>
 
         {/* Description */}
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-muted-foreground text-sm leading-relaxed">
           {feature.description}
         </p>
 

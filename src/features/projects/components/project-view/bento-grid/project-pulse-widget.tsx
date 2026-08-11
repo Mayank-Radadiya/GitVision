@@ -80,11 +80,11 @@ function FrequencyChart({ commits }: { commits: Commit[] }) {
   const max = Math.max(...buckets.map((b) => b.count), 1);
 
   return (
-    <div className="flex items-end gap-1.5 h-10">
+    <div className="flex h-10 items-end gap-1.5">
       {buckets.map((b, i) => (
-        <div key={i} className="flex flex-col items-center gap-1 flex-1 group">
+        <div key={i} className="group flex flex-1 flex-col items-center gap-1">
           <div
-            className="w-full rounded-t hover:bg-primary transition-colors cursor-default"
+            className="hover:bg-primary w-full cursor-default rounded-t transition-colors"
             style={{
               height: `${Math.max((b.count / max) * 28, b.count > 0 ? 4 : 2)}px`,
               backgroundColor:
@@ -94,7 +94,7 @@ function FrequencyChart({ commits }: { commits: Commit[] }) {
             }}
             title={`${b.count} commit${b.count !== 1 ? "s" : ""}`}
           />
-          <span className="text-[9px] text-muted-foreground font-mono font-medium group-hover:text-foreground transition-colors">
+          <span className="text-muted-foreground group-hover:text-foreground font-mono text-[9px] font-medium transition-colors">
             {b.label[0]}
           </span>
         </div>
@@ -134,32 +134,32 @@ function CommitRow({
     : undefined;
 
   return (
-    <div className="group relative flex gap-4 py-3 hover:bg-muted/10 transition-colors -mx-2 px-2 rounded-lg">
+    <div className="group hover:bg-muted/10 relative -mx-2 flex gap-4 rounded-lg px-2 py-3 transition-colors">
       {/* Timeline line and dot */}
-      <div className="relative flex flex-col items-center ml-2">
+      <div className="relative ml-2 flex flex-col items-center">
         <div
-          className={`mt-1.5 flex h-4 w-4 items-center justify-center rounded-full border-[2px] bg-background ${colorClasses.split(" ")[0].replace("text-", "border-")}`}
+          className={`bg-background mt-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 ${colorClasses.split(" ")[0].replace("text-", "border-")}`}
         >
           <div
             className={`h-1.5 w-1.5 rounded-full ${colorClasses.split(" ")[0].replace("text-", "bg-")}`}
           />
         </div>
         {!isLast && (
-          <div className="absolute top-6 bottom-[-12px] w-px bg-border/60" />
+          <div className="bg-border/60 absolute top-6 -bottom-3 w-px" />
         )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 space-y-2 pb-1">
+      <div className="min-w-0 flex-1 space-y-2 pb-1">
         {/* Message */}
-        <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1 group-hover:line-clamp-none transition-all">
+        <p className="text-foreground line-clamp-1 text-sm leading-snug font-semibold transition-all group-hover:line-clamp-none">
           {rawMessage}
         </p>
 
         {/* Meta row */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Subtle author avatar and name */}
-          <div className="flex items-center gap-1.5 bg-muted/40 border border-border/50 rounded-full px-1.5 py-0.5">
+          <div className="bg-muted/40 border-border/50 flex items-center gap-1.5 rounded-full border px-1.5 py-0.5">
             <Image
               src={commit.authorAvatar || placeholder}
               alt={commit.authorName}
@@ -167,12 +167,12 @@ function CommitRow({
               height={16}
               className="rounded-full object-cover"
             />
-            <span className="text-[10px] text-muted-foreground font-medium pr-1">
+            <span className="text-muted-foreground pr-1 text-[10px] font-medium">
               {commit.authorName}
             </span>
           </div>
 
-          <span className="text-[11px] text-muted-foreground font-medium">
+          <span className="text-muted-foreground text-[11px] font-medium">
             {formatDistanceToNow(new Date(commit.authorDate), {
               addSuffix: true,
             })}
@@ -184,13 +184,13 @@ function CommitRow({
               href={commitUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className={`font-mono text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ml-auto opacity-70 hover:opacity-100 ${colorClasses}`}
+              className={`ml-auto cursor-pointer rounded border px-2 py-0.5 font-mono text-[10px] opacity-70 transition-colors hover:opacity-100 ${colorClasses}`}
             >
               {commit.commitHash.slice(0, 7)}
             </a>
           ) : (
             <span
-              className={`font-mono text-[10px] px-2 py-0.5 rounded border ml-auto opacity-70 ${colorClasses}`}
+              className={`ml-auto rounded border px-2 py-0.5 font-mono text-[10px] opacity-70 ${colorClasses}`}
             >
               {commit.commitHash.slice(0, 7)}
             </span>
@@ -200,26 +200,26 @@ function CommitRow({
         {/* AI Summary */}
         <div className="mt-1">
           {isGenerating ? (
-            <div className="flex items-center gap-2 rounded-md bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-blue-600 dark:text-blue-400">
-              <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+            <div className="flex items-center gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-blue-600 dark:text-blue-400">
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
               <span className="text-[11px] font-semibold tracking-wide uppercase">
                 Generating Analysis...
               </span>
             </div>
           ) : commit.AiSummary ? (
-            <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2.5 flex gap-2">
-              <Sparkles className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-foreground/80 leading-relaxed font-medium">
+            <div className="bg-primary/5 border-primary/20 flex gap-2 rounded-md border px-3 py-2.5">
+              <Sparkles className="text-primary mt-0.5 h-3 w-3 shrink-0" />
+              <p className="text-foreground/80 text-xs leading-relaxed font-medium">
                 {commit.AiSummary}
               </p>
             </div>
           ) : (
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex mt-0.5">
+            <div className="mt-0.5 flex opacity-0 transition-opacity duration-200 group-hover:opacity-100">
               <Button
                 size="sm"
                 disabled={isAnyGenerating}
                 onClick={() => onGenerateSummary(commit.id)}
-                className="h-6 px-2.5 gap-1.5 text-[11px] font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm cursor-pointer"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground h-6 cursor-pointer gap-1.5 px-2.5 text-[11px] font-semibold shadow-sm"
               >
                 <Sparkles className="h-2.5 w-2.5" />
                 Analyze Commit
@@ -236,14 +236,14 @@ function CommitRow({
 
 function DateGroupHeader({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 pt-4 pb-2 first:pt-0 -mx-1">
-      <div className="flex items-center justify-center w-8">
-        <CalendarDays className="h-3.5 w-3.5 text-foreground/50" />
+    <div className="-mx-1 flex items-center gap-3 pt-4 pb-2 first:pt-0">
+      <div className="flex w-8 items-center justify-center">
+        <CalendarDays className="text-foreground/50 h-3.5 w-3.5" />
       </div>
-      <span className="text-xs font-bold text-foreground/75 uppercase tracking-wider">
+      <span className="text-foreground/75 text-xs font-bold tracking-wider uppercase">
         {label}
       </span>
-      <div className="flex-1 h-px bg-border/50" />
+      <div className="bg-border/50 h-px flex-1" />
     </div>
   );
 }
@@ -255,9 +255,9 @@ function PulseSkeleton() {
     <div className="space-y-6">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="flex gap-4">
-          <div className="flex flex-col items-center ml-2">
-            <Skeleton className="h-4 w-4 rounded-full mt-1.5" />
-            <Skeleton className="w-px h-12 mt-2" />
+          <div className="ml-2 flex flex-col items-center">
+            <Skeleton className="mt-1.5 h-4 w-4 rounded-full" />
+            <Skeleton className="mt-2 h-12 w-px" />
           </div>
           <div className="flex-1 space-y-3 pt-1">
             <Skeleton className="h-5 w-3/4 rounded" />
@@ -276,12 +276,12 @@ function PulseSkeleton() {
 
 function EmptyPulse() {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/50 rounded-xl bg-muted/20">
-      <GitCommit className="h-8 w-8 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-semibold text-foreground">
+    <div className="border-border/50 bg-muted/20 flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
+      <GitCommit className="text-muted-foreground/40 mb-3 h-8 w-8" />
+      <p className="text-foreground text-sm font-semibold">
         No commits tracked
       </p>
-      <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+      <p className="text-muted-foreground mt-1 max-w-50 text-xs">
         Push commits to your repository to see the pulse timeline.
       </p>
     </div>
@@ -329,18 +329,18 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-xl">
+    <div className="bg-card flex h-full flex-col rounded-xl">
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-600/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-600/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400">
             <TrendingUp className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-foreground tracking-tight leading-tight">
+            <h3 className="text-foreground text-base leading-tight font-bold tracking-tight">
               Project Pulse
             </h3>
-            <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+            <p className="text-muted-foreground mt-0.5 text-[11px] font-medium">
               {commits.length > 0
                 ? `${commits.length} commit${commits.length !== 1 ? "s" : ""} recorded`
                 : "Activity timeline"}
@@ -351,10 +351,10 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
 
       {/* 7-day frequency chart */}
       {!isLoading && commits.length > 0 && (
-        <div className="mb-6 rounded-xl border border-border/40 bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-1.5 mb-3">
-            <div className="h-2 w-2 rounded-full bg-primary" />
-            <p className="text-[10px] font-bold text-foreground uppercase tracking-wider">
+        <div className="border-border/40 bg-card mb-6 rounded-xl border p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-1.5">
+            <div className="bg-primary h-2 w-2 rounded-full" />
+            <p className="text-foreground text-[10px] font-bold tracking-wider uppercase">
               Last 7 days
             </p>
           </div>
@@ -370,7 +370,7 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
       ) : (
         <ScrollArea
           style={{ maxHeight: "500px" }}
-          className="flex-1 -mx-2 px-2"
+          className="-mx-2 flex-1 px-2"
         >
           <div className="pb-4">
             {grouped.map((group, groupIdx) => (
@@ -396,13 +396,13 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
             ))}
 
             {hasNextPage && (
-              <div className="pt-6 pb-2 flex justify-center">
+              <div className="flex justify-center pt-6 pb-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="h-8 px-4 text-xs font-semibold gap-2 border-border/50 bg-background hover:bg-muted/50 transition-colors"
+                  className="border-border/50 bg-background hover:bg-muted/50 h-8 gap-2 px-4 text-xs font-semibold transition-colors"
                 >
                   {isFetchingNextPage ? (
                     <Loader2 className="h-3 w-3 animate-spin" />

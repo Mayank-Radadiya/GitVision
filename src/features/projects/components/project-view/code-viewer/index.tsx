@@ -66,13 +66,13 @@ function CodeViewer({ projectId }: CodeViewerProps) {
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-            <Code className="h-4 w-4 text-primary" />
+        <div className="mb-4 flex items-center gap-2.5">
+          <div className="bg-primary/10 flex h-9 w-9 items-center justify-center rounded-xl">
+            <Code className="text-primary h-4 w-4" />
           </div>
           <Skeleton className="h-6 w-32" />
         </div>
-        <Skeleton className="h-[600px] w-full rounded-xl" />
+        <Skeleton className="h-150 w-full rounded-xl" />
       </div>
     );
   }
@@ -81,7 +81,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
   if (error) {
     return (
       <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
-        <AlertTriangle className="mx-auto h-8 w-8 text-red-400 mb-3" />
+        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-400" />
         <p className="text-sm text-red-400">
           {error instanceof Error
             ? error.message
@@ -94,16 +94,16 @@ function CodeViewer({ projectId }: CodeViewerProps) {
   return (
     <div>
       {/* Section Header */}
-      <div className="mb-4 flex items-center justify-between ">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
             <Code className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-foreground text-lg font-semibold">
               Source Code
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               {data?.totalFiles || 0} files
             </p>
           </div>
@@ -115,8 +115,8 @@ function CodeViewer({ projectId }: CodeViewerProps) {
           aria-label={sidebarOpen ? "Hide files sidebar" : "Show files sidebar"}
           className={cn(
             "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs",
-            "border border-border/40 bg-background/50",
-            "hover:bg-accent/50 transition-colors cursor-pointer",
+            "border-border/40 bg-background/50 border",
+            "hover:bg-accent/50 cursor-pointer transition-colors",
             "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -137,7 +137,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
       {/* Editor Layout */}
       <div
         className={cn(
-          "overflow-hidden rounded-xl border border-border/60",
+          "border-border/60 overflow-hidden rounded-xl border",
           "bg-card",
           "shadow-lg shadow-black/5",
         )}
@@ -152,13 +152,13 @@ function CodeViewer({ projectId }: CodeViewerProps) {
                 animate={{ width: 260, opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
-                className="border-r border-border/60 overflow-hidden flex-shrink-0"
+                className="border-border/60 shrink-0 overflow-hidden border-r"
               >
-                <div className="h-full overflow-y-auto overflow-x-hidden w-[260px] bg-muted/30">
+                <div className="bg-muted/30 h-full w-65 overflow-x-hidden overflow-y-auto">
                   {/* Sidebar header */}
-                  <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/60 bg-card px-3 py-2.5">
-                    <FolderTree className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="border-border/60 bg-card sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-2.5">
+                    <FolderTree className="text-muted-foreground h-3.5 w-3.5" />
+                    <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                       Explorer
                     </span>
                   </div>
@@ -173,7 +173,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
           </AnimatePresence>
 
           {/* Code Panel */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             {selectedFile ? (
               <CodePanel
                 filePath={selectedFile.path}
@@ -182,10 +182,10 @@ function CodeViewer({ projectId }: CodeViewerProps) {
               />
             ) : (
               /* Empty state */
-              <div className="flex h-full items-center justify-center text-center p-8">
+              <div className="flex h-full items-center justify-center p-8 text-center">
                 <div>
-                  <FileSearch className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
-                  <p className="text-sm text-muted-foreground">
+                  <FileSearch className="text-muted-foreground/30 mx-auto mb-4 h-12 w-12" />
+                  <p className="text-muted-foreground text-sm">
                     Select a file from the explorer to view its content
                   </p>
                 </div>

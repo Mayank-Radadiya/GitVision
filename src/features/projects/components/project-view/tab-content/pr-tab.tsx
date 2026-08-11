@@ -26,6 +26,7 @@ import {
   useSyncIssues,
 } from "@/features/projects/hooks/use-project";
 import { motion } from "framer-motion";
+import { cn } from "@/shared/lib/utils";
 
 // ─── Status Config ────────────────────────────────────────────────────────────
 
@@ -98,32 +99,33 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
   return (
     <div className="space-y-4">
       {/* Search + Filter Row */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 group/search">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within/search:text-primary/50 transition-colors" />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="group/search relative flex-1">
+          <Search className="text-muted-foreground/40 group-focus-within/search:text-primary/50 absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 transition-colors" />
           <input
             type="text"
             placeholder="Search pull requests…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/30 transition-all duration-200"
+            className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground/45 focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-0.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm p-1 flex-shrink-0">
+        <div className="border-border/40 bg-card/60 flex shrink-0 items-center gap-0.5 rounded-xl border p-1 backdrop-blur-sm">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className={`relative px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
+              className={cn(
+                "relative cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                 activeFilter === f
                   ? "text-primary"
-                  : "text-muted-foreground/60 hover:text-foreground"
-              }`}
+                  : "text-muted-foreground/60 hover:text-foreground",
+              )}
             >
               {activeFilter === f && (
                 <motion.div
                   layoutId="pr-filter-pill"
-                  className="absolute inset-0 rounded-lg bg-primary/10 border border-primary/15"
+                  className="bg-primary/10 border-primary/15 absolute inset-0 rounded-lg border"
                   transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
                 />
               )}
@@ -134,30 +136,30 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
       </div>
 
       {/* PR List */}
-      <div className="rounded-2xl border border-border/40 overflow-hidden divide-y divide-border/25 bg-card/50 backdrop-blur-sm shadow-sm">
+      <div className="border-border/40 divide-border/25 bg-card/50 divide-y overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="relative">
-              <div className="h-8 w-8 rounded-full border-2 border-primary/10" />
-              <Loader2 className="absolute inset-0 h-8 w-8 animate-spin text-primary/40" />
+              <div className="border-primary/10 h-8 w-8 rounded-full border-2" />
+              <Loader2 className="text-primary/40 absolute inset-0 h-8 w-8 animate-spin" />
             </div>
-            <span className="text-xs text-muted-foreground/40 font-medium">
+            <span className="text-muted-foreground/40 text-xs font-medium">
               Loading pull requests…
             </span>
           </div>
         ) : filteredPRs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div className="h-10 w-10 rounded-full bg-muted/20 flex items-center justify-center">
-              <GitPullRequest className="h-4 w-4 text-muted-foreground/25" />
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <div className="bg-muted/20 flex h-10 w-10 items-center justify-center rounded-full">
+              <GitPullRequest className="text-muted-foreground/25 h-4 w-4" />
             </div>
-            <p className="text-sm text-muted-foreground/40 font-medium">
+            <p className="text-muted-foreground/40 text-sm font-medium">
               No pull requests found
             </p>
             {prs.length === 0 && !searchQuery ? (
               <button
                 onClick={() => syncIssues({ projectId })}
                 disabled={isSyncing}
-                className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/60 px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="border-border/40 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw
                   className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
@@ -165,7 +167,7 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                 {isSyncing ? "Syncing from GitHub…" : "Sync PRs from GitHub"}
               </button>
             ) : (
-              <p className="text-xs text-muted-foreground/25">
+              <p className="text-muted-foreground/25 text-xs">
                 Try adjusting your search or filters
               </p>
             )}
@@ -183,42 +185,42 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
             return (
               <div
                 key={pr.id}
-                className="relative px-5 py-4 transition-all duration-200 hover:bg-muted/15 group cursor-default"
+                className="hover:bg-muted/15 group relative cursor-default px-5 py-4 transition-all duration-200"
               >
                 <div className="flex items-start gap-3">
                   {/* Status Icon with subtle glow */}
-                  <div className="flex-shrink-0 mt-0.5 relative">
+                  <div className="relative mt-0.5 shrink-0">
                     <div
-                      className={`absolute inset-0 blur-[6px] rounded-full ${statusConfig.glow}`}
+                      className={`absolute inset-0 rounded-full blur-[6px] ${statusConfig.glow}`}
                     />
                     <StatusIcon
-                      className={`h-4 w-4 relative ${statusConfig.color}`}
+                      className={`relative h-4 w-4 ${statusConfig.color}`}
                     />
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0 space-y-2">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200 leading-snug line-clamp-1">
+                      <p className="text-foreground/90 group-hover:text-foreground line-clamp-1 text-sm leading-snug font-medium transition-colors duration-200">
                         {pr.title}
                       </p>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+                      <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
                         {githubUrl && (
                           <a
                             href={githubUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1.5 rounded-lg hover:bg-muted/30 transition-all cursor-pointer group/link"
+                            className="hover:bg-muted/30 group/link cursor-pointer rounded-lg p-1.5 transition-all"
                             title="View on GitHub"
                           >
-                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 group-hover/link:text-foreground group-hover/link:scale-105 transition-all" />
+                            <ExternalLink className="text-muted-foreground/50 group-hover/link:text-foreground h-3.5 w-3.5 transition-all group-hover/link:scale-105" />
                           </a>
                         )}
                         <Badge
                           variant="outline"
-                          className={`flex-shrink-0 text-[10px] h-5 px-2 border font-medium ${statusConfig.className}`}
+                          className={`h-5 shrink-0 border px-2 text-[10px] font-medium ${statusConfig.className}`}
                         >
                           {statusConfig.label}
                         </Badge>
@@ -226,8 +228,8 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                     </div>
 
                     {/* Meta row */}
-                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground/60">
-                      <span className="font-mono text-muted-foreground/40">
+                    <div className="text-muted-foreground/60 flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="text-muted-foreground/40 font-mono">
                         #{pr.issueNumber}
                       </span>
                       <span className="text-muted-foreground/35">•</span>
@@ -243,8 +245,8 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                         )}
                       </span>
                       <span className="text-muted-foreground/35">•</span>
-                      <div className="flex items-center gap-1.5 font-medium text-muted-foreground/70">
-                        <Avatar className="h-4 w-4 ring-1 ring-border/30">
+                      <div className="text-muted-foreground/70 flex items-center gap-1.5 font-medium">
+                        <Avatar className="ring-border/30 h-4 w-4 ring-1">
                           <AvatarImage src={pr.authorAvatar || ""} />
                           <AvatarFallback className="text-[7px] font-bold">
                             {pr.authorLogin.slice(0, 1).toUpperCase()}
@@ -262,7 +264,7 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
       </div>
 
       {/* Footer watermark */}
-      <p className="text-center text-[11px] text-muted-foreground/25 flex items-center justify-center gap-1.5 mt-4 pt-2">
+      <p className="text-muted-foreground/25 mt-4 flex items-center justify-center gap-1.5 pt-2 text-center text-[11px]">
         <Sparkles className="h-3 w-3" />
         AI Triage powered by GitVision
       </p>

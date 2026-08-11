@@ -52,7 +52,7 @@ export function SidebarNavSection({
     <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-3")}>
       {/* Section Label - Hidden when collapsed */}
       {!isCollapsed && (
-        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+        <p className="text-muted-foreground/70 mb-3 px-3 text-xs font-semibold tracking-wider uppercase">
           {label}
         </p>
       )}
