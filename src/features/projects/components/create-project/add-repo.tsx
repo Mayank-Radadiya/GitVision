@@ -10,17 +10,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectCreateSchema } from "@/src/lib/validation/schemas";
 
-import {
-  CreateProjectInput,
-  RepoInfo,
-} from "./add-repo.constants";
+import { CreateProjectInput, RepoInfo } from "./add-repo.constants";
 import { extractRepoInfo } from "./add-repo.utils";
 import { useCreateProject } from "@/features/projects/hooks/use-create-project";
 import {
   BackLink,
   CreditsGauge,
   FormHeader,
-  GitGraphBackground,
   ProjectNameField,
   RepositoryUrlField,
   StepTimeline,
@@ -52,6 +48,24 @@ const itemVariants = {
     },
   },
 };
+
+const PRESETS = [
+  {
+    key: "1",
+    name: "React Core Framework",
+    url: "https://github.com/facebook/react",
+  },
+  {
+    key: "2",
+    name: "Next.js App Router",
+    url: "https://github.com/vercel/next.js",
+  },
+  {
+    key: "3",
+    name: "Tailwind CSS v4",
+    url: "https://github.com/tailwindlabs/tailwindcss",
+  },
+];
 
 export default function CreateNewProjectForm() {
   const createProject = useCreateProject();
@@ -100,11 +114,58 @@ export default function CreateNewProjectForm() {
     (url: string, name: string) => {
       setValue("repoUrl", url, { shouldValidate: true, shouldTouch: true });
       if (!projectName) {
-        setValue("projectName", name, { shouldValidate: true, shouldTouch: true });
+        setValue("projectName", name, {
+          shouldValidate: true,
+          shouldTouch: true,
+        });
       }
     },
     [setValue, projectName],
   );
+
+  const onSubmit = useCallback(
+    (data: CreateProjectInput) => {
+      createProject.mutate(data);
+    },
+    [createProject],
+  );
+
+  // ─── Keyboard Shortcuts (⌘/Ctrl+Enter submit & 1-3 presets) ────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ⌘ + Enter to submit
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (isValid && !createProject.isPending) {
+          e.preventDefault();
+          handleSubmit(onSubmit)();
+        }
+      }
+
+      // Quick 1, 2, 3 preset trigger if no input is active
+      const activeElement = document.activeElement;
+      const isInputActive =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable);
+
+      if (!isInputActive && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const matched = PRESETS.find((p) => p.key === e.key);
+        if (matched) {
+          e.preventDefault();
+          handleSelectPreset(matched.url, matched.name);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleSubmit,
+    isValid,
+    createProject.isPending,
+    onSubmit,
+    handleSelectPreset,
+  ]);
 
   // Derive step state
   const currentStep = createProject.isPending
@@ -114,23 +175,19 @@ export default function CreateNewProjectForm() {
       : 1;
   const isLoading = createProject.isPending;
 
-  const onSubmit = (data: CreateProjectInput) => {
-    createProject.mutate(data);
-  };
-
   return (
     <div className="gv-page relative min-h-screen">
-      {/* Background branch graph */}
-      <GitGraphBackground
+      {/* Background branch graph SVG */}
+      {/* <GitGraphBackground
         projectName={projectName}
         repoValid={repoValid}
         repoInfo={repoPreview}
         isSubmitting={createProject.isPending}
         isSubmitted={createProject.isSuccess}
-      />
+      /> */}
 
       {/* Main Content Layout */}
-      <div className="relative z-10 mx-auto w-full max-w-[1320px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
+      <div className="relative z-10 mx-auto w-full max-w-330 px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
         <BackLink />
 
         <motion.div
@@ -148,12 +205,17 @@ export default function CreateNewProjectForm() {
                 <StepTimeline currentStep={currentStep} />
               </div>
 
-              <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-6">
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="mt-8 space-y-6"
+              >
                 <motion.div variants={itemVariants}>
                   <ProjectNameField
                     register={register}
+                    setValue={setValue}
                     errors={errors}
                     value={projectName}
+                    repoUrl={repoUrl}
                     isLoading={isLoading}
                   />
                 </motion.div>

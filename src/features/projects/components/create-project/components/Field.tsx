@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * FORM FIELD COMPONENT — Raised Dark Input with a Soft Focus Ring
+ * FORM FIELD COMPONENT — Linear & Vercel Style Craftsmanship
  * =============================================================================
  */
 
@@ -71,12 +71,10 @@ export function Field({
             registration.onBlur(e);
           }}
           className={cn(
-            "h-11 w-full rounded-lg border border-gv-hairline bg-gv-graphite-2/60 px-4 font-gv-body text-[15px] text-gv-bone transition-all duration-200",
+            "w-full rounded-xl border border-white/[0.08] bg-gv-graphite-2/90 px-4 py-3 font-gv-body text-sm text-gv-bone shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)] transition-all duration-200",
             "placeholder:text-gv-fog/40 focus:outline-none",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
-            "focus:border-gv-amber/60 focus:bg-gv-graphite-2/80 focus:shadow-none focus:ring-[3px] focus:ring-gv-amber/15",
-            ariaInvalid &&
-              "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/15 gv-input-error",
+            "focus:border-gv-amber/70 focus:bg-gv-graphite-2 focus:ring-[3px] focus:ring-gv-amber/15",
+            ariaInvalid && "border-gv-ember/80 focus:border-gv-ember focus:ring-gv-ember/20 gv-input-error",
             disabled && "cursor-not-allowed opacity-50",
           )}
         />
