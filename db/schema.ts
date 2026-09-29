@@ -186,6 +186,15 @@ export const commitsTable = pgTable(
       projectIdIdx: index("commits_project_id_idx").on(table.projectId),
       commitHashIdx: index("commits_commit_hash_idx").on(table.commitHash),
       authorDateIdx: index("commits_author_date_idx").on(table.authorDate),
+      // getCommitChart filters one user's projects then reads their commits
+      // inside a date window. project_id leads so the join is an equality
+      // probe per project; author_date then serves the range. The two
+      // single-column indexes above cannot do both, which is why the chart
+      // fell back to a sequential scan of every commit in the window.
+      projectIdAuthorDateIdx: index("commits_project_id_author_date_idx").on(
+        table.projectId,
+        table.authorDate,
+      ),
       commitHashProjectIdUnique: unique(
         "commits_commit_hash_project_id_unique",
       ).on(table.commitHash, table.projectId),

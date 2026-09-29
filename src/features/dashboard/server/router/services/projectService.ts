@@ -879,6 +879,49 @@ export function createProjectService() {
         .limit(safeLimit);
     },
 
+    /**
+     * Commits per day for the last `days`, for one owner.
+     *
+     * ── Index, and why not a generated date column (T-031) ────────────────────
+     * T-031 recommended option (a): a generated/stored `author_date::date`
+     * column, indexed, so the `date_trunc` grouping could be served by an
+     * index. That was measured before it was built, and the grouping is not
+     * the problem. Measured 2026-09-29 on the dev database through
+     * `neon-http`, worst-case window (365 days, the clamp), 5 projects and
+     * 402 commits for one user:
+     *
+     *   Seq Scan on commits  (cost=0.00..38.02 rows=276)  (actual 0.010..0.097 rows=274)
+     *     Filter: (author_date >= $2)
+     *     Rows Removed by Filter: 128
+     *     Buffers: shared hit=33
+     *   HashAggregate  (actual time=0.259..0.275 rows=65)
+     *   Sort Key: (date_trunc('day', commits.author_date))
+     *   Execution Time: 0.319 ms
+     *
+     * The scan is 0.097 ms of the 0.319; the aggregate and sort are the rest.
+     * Sorting 65-274 rows is not what makes this expensive, so a column that
+     * makes the *grouping* indexable would leave the scan in place and add a
+     * second index to maintain. The scan is the cost, and the reason for it is
+     * that `commits_author_date_idx` and `commits_project_id_idx` are each
+     * single-column: neither can serve the join equality and the date range
+     * together, so Postgres scans everything in the window and joins
+     * afterwards — including commits belonging to *other* users, which is the
+     * part that does not scale on a multi-tenant table.
+     *
+     * So this ships a composite `commits(project_id, author_date)`
+     * (migration 0003) instead: project_id leads so the join is an equality
+     * probe per project, author_date then serves the range, and the read is
+     * bounded by one user's own commits.
+     *
+     * Honest caveat, so nobody reads a seq scan later and thinks this failed:
+     * on the dev database the planner *still* chooses a sequential scan, and
+     * forcing one off makes it pick `commits_author_date_idx` rather than the
+     * new index. On a 33-page table that is the correct choice. The index is
+     * scale insurance, not a measured speedup — T-029 already put this query
+     * at the ~72 ms network floor, so there is no wall-clock win to have here.
+     * The plan will change only once `commits` is large enough for the planner
+     * to prefer it. See db/migrations/0003_commits_project_id_author_date_idx.notes.md.
+     */
     async getCommitChart(userId: string, days = 7) {
       const safeDays = Math.min(days, 365);
       const since = new Date();
