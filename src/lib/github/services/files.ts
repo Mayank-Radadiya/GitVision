@@ -15,7 +15,8 @@ import { createGunzip } from "zlib";
 import { computeHash } from "@/src/features/rag/services/code-chunker";
 import { GITHUB_CONFIG } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
-import { isIgnoredPath, log } from "../utils";
+import { isIgnoredPath } from "../utils";
+import { logger } from "@/src/lib/logger";
 
 /**
  * Fetches ALL repository files via a single tarball download and
@@ -48,7 +49,7 @@ export async function getRepositoryFiles(
       );
     }
 
-    log("info", "Fetching repository files via tarball (stream-to-DB)", {
+    logger.info( "Fetching repository files via tarball (stream-to-DB)", {
       owner,
       repo,
       projectId,
@@ -76,7 +77,7 @@ export async function getRepositoryFiles(
       .set({ totalFiles: totalStored })
       .where(eq(projectTables.id, projectId));
 
-    log("info", `Stored ${totalStored} files from tarball`, {
+    logger.info( `Stored ${totalStored} files from tarball`, {
       owner,
       repo,
       projectId,
@@ -91,7 +92,7 @@ export async function getRepositoryFiles(
       throw error;
     }
 
-    log("error", "Error fetching repository files", {
+    logger.error( "Error fetching repository files", {
       owner,
       repo,
       projectId,
@@ -137,11 +138,30 @@ async function streamAndStoreTarball(
     let totalStored = 0;
     let storedCount = 0;
     let skippedCount = 0;
+    let unsafePathCount = 0;
+    let firstUnsafePath: string | null = null;
 
     extract.on("entry", (header, entryStream, next) => {
+      // GitHub puts every entry under a single `<repo>-<sha>/` prefix.
+      // Dropping that one segment is not sanitisation: a `..` that follows
+      // it survives into `fileName`, which is persisted, rendered in the
+      // file tree, and re-emitted as a RAG citation — attacker-controlled
+      // text from a hostile repository, straight into the model's context.
+      // Nothing here is written to a filesystem, so this was never a
+      // traversal *write*, but a traversal-looking name is not a name we
+      // should be storing either. Dropping the entry is the whole fix: the
+      // run continues, and the count is reported at the end.
       const cleanPath = header.name.split("/").slice(1).join("/");
+      if (cleanPath.split("/").includes("..")) {
+        unsafePathCount++;
+        firstUnsafePath ??= header.name;
+        entryStream.resume();
+        return next();
+      }
 
-      // Skip directories, empty paths, and ignored patterns immediately
+      // Skip directories, empty paths, and ignored patterns immediately.
+      // The `type` guard is what drops symlinks and hardlinks — the parser
+      // exposes `type`, and only `file` entries carry content we want.
       if (header.type !== "file" || !cleanPath || isIgnoredPath(cleanPath)) {
         entryStream.resume();
         return next();
@@ -196,7 +216,7 @@ async function streamAndStoreTarball(
           try {
             await db.insert(projectFiles).values(batch);
             totalStored += batch.length;
-            log("info", `Flushed ${batch.length} files to DB`, {
+            logger.info( `Flushed ${batch.length} files to DB`, {
               totalStored,
             });
             batch = [];
@@ -216,10 +236,19 @@ async function streamAndStoreTarball(
           totalStored += batch.length;
         }
         if (skippedCount > 0) {
-          log(
-            "warn",
+          logger.warn(
             `Skipped ${skippedCount} entries over ${GITHUB_CONFIG.MAX_FILE_BYTES} bytes`,
             { projectId, totalStored },
+          );
+        }
+        if (unsafePathCount > 0) {
+          // An error, not a warning: a well-formed GitHub tarball has no
+          // `..` segments. One appearing means the archive is hostile or
+          // hand-crafted, and every dropped entry is a name that was about
+          // to be cited back to the model.
+          logger.error(
+            `Dropped ${unsafePathCount} tar entries whose path escaped the repo`,
+            { projectId, totalStored, firstUnsafePath },
           );
         }
         resolve(totalStored);
@@ -230,6 +259,25 @@ async function streamAndStoreTarball(
 
     extract.on("error", reject);
 
-    stream.pipe(createGunzip()).pipe(extract);
+    // A truncated or corrupt response — a proxy that cut the body, a 5xx with
+    // an HTML body, a dropped connection — makes the gunzip stream emit
+    // `error`. Created inline in the pipe chain it had no listener, and an
+    // `error` on a stream with no listener is an *uncaught exception* in
+    // Node: the process died mid-ingestion, so the Inngest run neither
+    // failed nor retried and the project just stopped at some fraction of
+    // its files. It is now handled like `extract` above.
+    const gunzip = createGunzip();
+    gunzip.on("error", (err) =>
+      reject(
+        new GitHubAPIError(
+          `Corrupt tarball response: gzip stream failed — ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+          502,
+        ),
+      ),
+    );
+
+    stream.pipe(gunzip).pipe(extract);
   });
 }

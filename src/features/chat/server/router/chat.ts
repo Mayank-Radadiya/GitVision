@@ -19,13 +19,20 @@ export const chatRouter = createTRPCRouter({
     .input(
       z.object({
         type: z.enum(["project", "general"]),
-        projectId: z.string().uuid().optional(),
+        projectId: z.uuid().optional(),
         title: z.string().max(255).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       if (input.type === "project" && !input.projectId) {
-        throw new Error("Project ID required for project chats");
+        // A TRPCError with a specific code, not a bare Error: tRPC turns a bare
+        // Error into INTERNAL_SERVER_ERROR, which is the one code the formatter
+        // masks in production — so a plain validation failure reached the user
+        // as an opaque "An error occurred".
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Project ID required for project chats",
+        });
       }
 
       // Tenant isolation: never link a chat to a project the user doesn't own
@@ -106,7 +113,7 @@ export const chatRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(
       z.object({
-        chatId: z.string().uuid(),
+        chatId: z.uuid(),
         messageLimit: z
           .number()
           .int()
@@ -139,7 +146,13 @@ export const chatRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!chat) throw new Error("Chat not found");
+      if (!chat) {
+        // Same reason as the throw in `create` above. Note the message is safe
+        // to surface: it says nothing about whether the chat exists but belongs
+        // to someone else, which is what the `userId` predicate already folds
+        // into a single "not found".
+        throw new TRPCError({ code: "NOT_FOUND", message: "Chat not found" });
+      }
 
       // Take the newest N messages, then flip them back to chronological order
       // so the AI SDK still sees the conversation in the order it happened.
@@ -159,16 +172,27 @@ export const chatRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ chatId: z.string().uuid() }))
+    .input(z.object({ chatId: z.uuid() }))
     .mutation(async ({ input, ctx }) => {
-      await db
+      // `.returning()` is what makes the answer honest. Without it the DELETE
+      // is fire-and-forget, and `{ success: true }` claimed a chat was gone
+      // when the statement may well have matched nothing.
+      //
+      // `userId` stays in the same WHERE rather than becoming a second query,
+      // and a miss stays a miss. "Not yours" and "not there" are both a single
+      // zero-row delete and both answer `deleted: false`: telling them apart
+      // would be an existence oracle, letting a caller enumerate chat ids and
+      // learn which are real. This matches `getById`, which already folds
+      // "exists but is somebody else's" into the same NOT_FOUND.
+      const deleted = await db
         .delete(projectChats)
         .where(
           and(
             eq(projectChats.id, input.chatId),
             eq(projectChats.userId, ctx.userId),
           ),
-        );
-      return { success: true };
+        )
+        .returning({ id: projectChats.id });
+      return { success: true, deleted: deleted.length > 0 };
     }),
 });

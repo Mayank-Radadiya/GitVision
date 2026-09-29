@@ -47,6 +47,9 @@ describe.skipIf(!hasTestDatabase)("hot-path indexes exist", () => {
   const indexExists = (name: string) =>
     psql(`SELECT 1 FROM pg_indexes WHERE indexname = '${name}';`) === "1";
 
+  const indexDefinition = (name: string) =>
+    psql(`SELECT indexdef FROM pg_indexes WHERE indexname = '${name}';`);
+
   it.each([
     // getNeedsAttention filters state = 'open' on every dashboard load.
     ["issues_state_idx", "issues(state) — getNeedsAttention, projectService.ts:759,783"],
@@ -64,7 +67,58 @@ describe.skipIf(!hasTestDatabase)("hot-path indexes exist", () => {
     ],
     // cleanupStaleData purges expired windows by windowStart, functions.ts:375.
     ["rate_limits_window_start_idx", "rate_limits(window_start) — stale-window cleanup, functions.ts:375"],
+    // getCommitChart joins one user's projects to their commits inside a date
+    // window. Neither single-column index can serve both, so it scanned every
+    // commit in the window — other users' included. projectService.ts:882.
+    [
+      "commits_project_id_author_date_idx",
+      "commits(project_id, author_date) — getCommitChart, projectService.ts:882",
+    ],
+    // getAll pages project_chats by updated_at DESC, so the single-column
+    // user_id index matched every chat a user has and then sorted the page.
+    [
+      "chats_user_id_updated_at_idx",
+      "project_chats(user_id, updated_at) — chat.getAll, chat.ts:60-104",
+    ],
+    // getProjectContext's SELECT DISTINCT language is the only query that reads
+    // project_files.language; it grouped a seq scan of the whole table.
+    [
+      "project_files_project_id_language_idx",
+      "project_files(project_id, language) — getProjectContext, vector-search.ts:91",
+    ],
   ])("%s", (indexName, _why) => {
     expect(indexExists(indexName)).toBe(true);
+  });
+
+  /**
+   * An index on the wrong columns is a migration that applied cleanly and
+   * still does nothing, so the column order is asserted, not just the name.
+   * The chart reads one project at a time and then a date range, so
+   * project_id has to lead.
+   */
+  it("commits_project_id_author_date_idx leads with project_id", () => {
+    const definition = indexDefinition("commits_project_id_author_date_idx");
+    expect(definition).toContain("commits");
+    expect(definition).toMatch(/\(project_id, ?author_date\)/);
+  });
+
+  /**
+   * Same reasoning for the two chat/file indexes: an index on the right table
+   * but the wrong column order applies cleanly and still does nothing. The
+   * chat page is scoped to one user and then sorted, so user_id leads; the
+   * DISTINCT is scoped to one project, so project_id leads and language
+   * follows — that is also the order that lets Postgres answer the DISTINCT
+   * from the index alone, with no re-sort and no heap visit per row.
+   */
+  it("chats_user_id_updated_at_idx leads with user_id", () => {
+    const definition = indexDefinition("chats_user_id_updated_at_idx");
+    expect(definition).toContain("project_chats");
+    expect(definition).toMatch(/\(user_id, ?updated_at\)/);
+  });
+
+  it("project_files_project_id_language_idx leads with project_id", () => {
+    const definition = indexDefinition("project_files_project_id_language_idx");
+    expect(definition).toContain("project_files");
+    expect(definition).toMatch(/\(project_id, ?language\)/);
   });
 });

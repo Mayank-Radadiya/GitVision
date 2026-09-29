@@ -1,0 +1,1 @@
+CREATE INDEX "commits_project_id_author_date_idx" ON "commits" USING btree ("project_id","author_date");

@@ -72,7 +72,11 @@ export const RETRYABLE_STATUS_CODES = [404, 429, 500, 502, 503, 504] as const;
 
 /** Fallback values for missing author metadata */
 export const DEFAULTS = {
-  AVATAR: "https://via.placeholder.com/150",
+  // `ui-avatars.com` rather than `via.placeholder.com`, which has been shut
+  // down and whose host was not in `next.config.ts`'s remotePatterns — so
+  // next/image would have refused the fallback anyway. ui-avatars is already
+  // allowed and returns a deterministic identicon for the same URL.
+  AVATAR: "https://ui-avatars.com/api/?name=Unknown&size=150&background=1f1f23&color=e4e4e7",
   EMAIL: "unknown@example.com",
   NAME: "Unknown",
 } as const;
@@ -113,6 +117,17 @@ export const IGNORED_FILE_PATTERNS = [
   /\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i,
   /\.(woff2?|ttf|eot|otf)$/i,
   /\.pyc$/,
+  // Secrets and credentials. Everything below is anchored to a path segment
+  // or a file extension on purpose: an unanchored /\.key would swallow every
+  // `something.keyboard.ts` in the repository, and these patterns are the only
+  // thing keeping a committed private key out of the vector store, where RAG
+  // would hand it back as a citation.
+  /^\.git\//,
+  /\.(pem|key|p12|pfx)$/i,
+  /(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/i,
+  /(^|\/)\.(npmrc|netrc)$/i,
+  /(^|\/)credentials$/i,
+  /\.tfvars(\.json)?$/i,
 ] as const;
 
 /**

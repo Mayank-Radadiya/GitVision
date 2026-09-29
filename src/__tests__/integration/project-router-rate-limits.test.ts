@@ -12,20 +12,27 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 /** Flipped by each test to simulate an exhausted window. */
 let limitAllowed = true;
 
-/** Records the key each guarded procedure asked about. */
-const limitedKeys: string[] = [];
+/**
+ * Records the (scope, userId, request) each guarded procedure asked about, so
+ * these tests can prove the IP dimension is reachable at all — mocking
+ * `rateLimit` away, as this file used to, could not see it.
+ */
+const limitCalls: { scope: string; userId: string; req: Request | null }[] = [];
 
 vi.mock("@/src/lib/rate-limit", () => ({
-  rateLimit: async (key: string) => {
-    limitedKeys.push(key);
-    return { allowed: limitAllowed, limit: 10, remaining: limitAllowed ? 9 : 0 };
+  enforceLimits: async (
+    scope: string,
+    userId: string,
+    req?: Request | null,
+  ) => {
+    limitCalls.push({ scope, userId, req: req ?? null });
+    return {
+      allowed: limitAllowed,
+      limit: 10,
+      remaining: limitAllowed ? 9 : 0,
+      scope: "user",
+    };
   },
-  keys: new Proxy(
-    {},
-    {
-      get: (_target, name: string) => (userId: string) => `${name}:${userId}`,
-    },
-  ),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -58,9 +65,16 @@ import { projectRouter } from "@/src/features/dashboard/server/router/project";
 import { createCallerFactory } from "@/src/lib/trpc/init";
 
 const createCaller = createCallerFactory(projectRouter);
+
+/** A request carrying an address, as the fetch adapter would always supply. */
+const callerRequest = () =>
+  new Request("http://localhost/api/trpc/project.create", {
+    headers: { "x-vercel-forwarded-for": "203.0.113.7" },
+  });
+
 const caller = createCaller({
   userId: "user_1",
-  req: undefined,
+  req: callerRequest(),
   requestId: "test-request",
 });
 
@@ -68,25 +82,35 @@ const UUID = "11111111-1111-4111-8111-111111111111";
 
 beforeEach(() => {
   limitAllowed = true;
-  limitedKeys.length = 0;
+  limitCalls.length = 0;
   serviceCalls.length = 0;
 });
 
-/** Each case names a procedure, a valid input, and the key it must be limited by. */
+/**
+ * Each case names a procedure, the metered scope it must be limited under, and
+ * a valid input. The scope is asserted, not derived: two procedures sharing a
+ * scope would share a counter, which is a fact worth pinning.
+ */
 const MUTATIONS = [
   {
     name: "create",
+    scope: "projectCreate",
     run: () => caller.create({ projectName: "p", repoUrl: "https://github.com/a/b" }),
   },
   {
     name: "generateAiSummary",
+    scope: "summary",
     run: () => caller.generateAiSummary({ projectId: UUID, commitId: UUID }),
   },
-  { name: "syncIssues", run: () => caller.syncIssues({ projectId: UUID }) },
+  {
+    name: "syncIssues",
+    scope: "issuesSync",
+    run: () => caller.syncIssues({ projectId: UUID }),
+  },
 ] as const;
 
 describe("project router rate limits", () => {
-  for (const { name, run } of MUTATIONS) {
+  for (const { name, scope, run } of MUTATIONS) {
     it(`${name} is rejected with TOO_MANY_REQUESTS once the window is exhausted`, async () => {
       limitAllowed = false;
 
@@ -101,11 +125,22 @@ describe("project router rate limits", () => {
       expect(serviceCalls).not.toContain(name);
     });
 
-    it(`${name} is limited against a key scoped to the caller`, async () => {
+    it(`${name} is limited against the caller and not anyone else`, async () => {
       await run();
 
-      expect(limitedKeys).toHaveLength(1);
-      expect(limitedKeys[0]).toContain("user_1");
+      expect(limitCalls).toHaveLength(1);
+      expect(limitCalls[0]!.userId).toBe("user_1");
+      expect(limitCalls[0]!.scope).toBe(scope);
+    });
+
+    it(`${name} hands the limiter the request, so the IP dimension is reachable`, async () => {
+      // A fresh Clerk account resets the user-scoped budget, so the IP ceiling
+      // is the only thing standing between signup churn and unlimited spend.
+      // If the procedure stopped passing `ctx.req`, that ceiling would silently
+      // stop existing and nothing else in this file would notice.
+      await run();
+
+      expect(limitCalls[0]!.req).not.toBeNull();
     });
 
     it(`${name} still runs the service when the window allows it`, async () => {

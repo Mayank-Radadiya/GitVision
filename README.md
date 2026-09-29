@@ -88,6 +88,11 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 │   └── shared/             # Shared UI components, hooks, utils
 ```
 
+> **New to the codebase?** Read [`docs/architecture.md`](docs/architecture.md)
+> first. It covers the layering above, the ingestion and chat flows with
+> diagrams, and the three structural tensions worth knowing before you change
+> anything (no transactions, no row-level security, two ownership guards).
+
 ---
 
 ## 🚀 Getting Started

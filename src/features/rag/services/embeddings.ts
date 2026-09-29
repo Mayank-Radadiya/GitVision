@@ -5,6 +5,7 @@
  */
 
 import { OpenRouter } from "@openrouter/sdk";
+import { logger } from "@/src/lib/logger";
 
 let openrouterClient: OpenRouter | null = null;
 
@@ -168,11 +169,11 @@ export async function generateEmbeddingsBatch(
 
   // Log errors if any
   if (errors.length > 0) {
-    console.warn(
+    logger.warn(
       `Failed to generate ${errors.length} embeddings out of ${chunks.length}`,
     );
     for (const err of errors) {
-      console.warn(`  - Chunk ${err.index}: ${err.error.message}`);
+      logger.warn(`  - Chunk ${err.index}: ${err.error.message}`);
     }
   }
 

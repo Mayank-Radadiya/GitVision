@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
+import { logger } from "@/src/lib/logger";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is Missing");
@@ -105,16 +106,16 @@ Remember: Your summary should help developers understand this commit in 30 secon
     // Handle specific error types
     const err = error as { status?: number; message?: string };
     if (err?.status === 429) {
-      console.error("Gemini API quota exceeded:", err.message);
+      logger.error("Gemini API quota exceeded", undefined, { detail: err.message });
       return "⏳ AI summary temporarily unavailable due to API quota limits. Please try again later.";
     } else if (err?.status === 404) {
-      console.error("Gemini model not found:", err.message);
+      logger.error("Gemini model not found", undefined, { detail: err.message });
       return "⚠️ AI model not available. Please contact support or check your API configuration.";
     } else if (err?.message?.includes("quota")) {
-      console.error("Gemini API quota issue:", err.message);
+      logger.error("Gemini API quota issue", undefined, { detail: err.message });
       return "⏳ AI summary quota exceeded. Please try again in 24 hours.";
     } else {
-      console.error("Error generating AI summary:", error);
+      logger.error("Error generating AI summary", error);
       return "😥 Could not generate AI summary at this time. Please try again later.";
     }
   }

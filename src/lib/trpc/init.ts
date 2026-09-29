@@ -6,7 +6,11 @@ import { cache } from "react";
 /**
  * Creates context for all tRPC procedures
  * Integrates Clerk authentication and request data
- * opts is optional — present in fetch adapter, absent in server-side callers
+ * opts is optional — present in the fetch adapter, absent in server-side
+ * callers (server components, server actions). `auth()` is not optional and
+ * is the only source of identity, which is why this context is usable from
+ * server components but not from a background job: there is no request for
+ * Clerk to read a session out of. See the `caller` docstring in server.tsx.
  */
 export const createTRPCContext = cache(async (opts?: { req?: Request }) => {
   const { userId } = await auth();

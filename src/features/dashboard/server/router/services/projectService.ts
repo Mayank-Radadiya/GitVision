@@ -10,7 +10,7 @@ import {
   usersTable,
   type LanguageEntry,
 } from "@/db/schema";
-import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
+import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   spendCredits,
@@ -33,6 +33,143 @@ interface PickUpCard {
   description: string;
   href: string;
   projectName: string;
+}
+
+/** Row shape the "continue conversation" card needs from `project_chats`. */
+interface PickUpChatRow {
+  id: string;
+  title: string | null;
+  projectName: string | null;
+}
+
+/** Row shape the "recent commit" card needs from `commits`. */
+interface PickUpCommitRow {
+  id: string;
+  commitMessage: string;
+  projectId: string;
+  projectName: string;
+}
+
+/**
+ * Build the pick-up cards from one chat row and one commit row.
+ *
+ * Shared so the standalone procedure and the consolidated dashboard read
+ * cannot drift — the card's hrefs and its 60-character commit truncation are
+ * the contract T-003 pinned a test against.
+ */
+function buildPickUpCards(
+  lastChat: PickUpChatRow | undefined,
+  recentCommit: PickUpCommitRow | undefined,
+): PickUpCard[] {
+  const cards: PickUpCard[] = [];
+
+  if (lastChat) {
+    cards.push({
+      type: "chat",
+      title: "Continue Conversation",
+      description: lastChat.title || "Your last chat session",
+      // A chat lives at /chat/[chatId] whether or not it has a project —
+      // there is no /projects route in this app.
+      href: `/chat/${lastChat.id}`,
+      projectName: lastChat.projectName ?? "General",
+    });
+  }
+
+  if (recentCommit) {
+    const msg =
+      recentCommit.commitMessage.length > 60
+        ? recentCommit.commitMessage.slice(0, 57) + "..."
+        : recentCommit.commitMessage;
+    cards.push({
+      type: "commit",
+      title: "Recent Commit",
+      description: msg,
+      href: `/dashboard/user-project/${recentCommit.projectId}`,
+      projectName: recentCommit.projectName,
+    });
+  }
+
+  return cards;
+}
+
+/** A decoded keyset position: the last row served, by timestamp and id. */
+interface CursorPosition {
+  at: Date;
+  id: string;
+}
+
+/**
+ * Packs a keyset position into the opaque string the client echoes back.
+ *
+ * Plain `<ISO timestamp>|<uuid>` rather than a signed blob: the cursor names a
+ * row, and reading someone else's rows is prevented by the ownership predicate
+ * in the same statement, not by hiding the position. Encoding the sort key and
+ * not an offset is what makes paging stable when rows are inserted mid-walk —
+ * an offset would shift the window and skip or repeat rows.
+ */
+function encodeCursor(at: Date, id: string): string {
+  return `${at.toISOString()}|${id}`;
+}
+
+/**
+ * Reads a cursor back into its timestamp and id, or `null` when absent.
+ *
+ * Anything unparseable is rejected here rather than handed to Postgres. A bare
+ * `new Date("nonsense")` becomes `Invalid Date`, which drizzle sends as a
+ * parameter the database rejects with a 500 — an opaque server error for what
+ * is a bad request. The router's zod schema is the first gate; this is the
+ * second, because the service is also reachable without one.
+ */
+function decodeCursor(cursor?: string): CursorPosition | null {
+  if (!cursor) return null;
+  const [at, id] = cursor.split("|");
+  if (!at || !id) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cursor" });
+  }
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cursor" });
+  }
+  return { at: parsed, id };
+}
+
+/**
+ * Aggregate the per-project `languages` JSONB into the top-10 breakdown.
+ *
+ * Pure: it reads rows that have already been fetched, so the consolidated
+ * dashboard read can derive the breakdown from its project rows instead of
+ * issuing a third query against the same table.
+ */
+function aggregateLanguages(
+  rows: { languages: LanguageEntry[] | null }[],
+): LanguageEntry[] {
+  // Aggregate byte-sizes across all projects in JS (tiny cardinality)
+  const sizeByLang = new Map<string, { color: string | null; size: number }>();
+
+  for (const row of rows) {
+    if (!row.languages) continue;
+    for (const lang of row.languages) {
+      const existing = sizeByLang.get(lang.name);
+      sizeByLang.set(lang.name, {
+        color: lang.color ?? existing?.color ?? null,
+        size: (existing?.size ?? 0) + lang.size,
+      });
+    }
+  }
+
+  if (sizeByLang.size === 0) return [];
+
+  const totalBytes = [...sizeByLang.values()].reduce((s, v) => s + v.size, 0);
+
+  return [...sizeByLang.entries()]
+    .sort((a, b) => b[1].size - a[1].size) // largest first
+    .slice(0, 10)
+    .map(([name, { color, size }]) => ({
+      name,
+      color,
+      size,
+      percentage: totalBytes > 0 ? Math.round((size / totalBytes) * 1000) / 10 : 0,
+    }));
 }
 
 export function createProjectService() {
@@ -272,8 +409,21 @@ export function createProjectService() {
     // ── Commit Queries ────────────────────────────────────────────────────────
 
     /**
-     * Cursor-based paginated commits. Cursor is a commit ID; we use its
-     * `authorDate` so the DB can use the existing `commits_author_date_idx`.
+     * Cursor-based paginated commits, keyset-paged on `(authorDate, id)`.
+     *
+     * The cursor used to be a bare commit id, which this method resolved to a
+     * date with a second query. That was wrong twice over. `authorDate` is not
+     * unique — a rebase lands a dozen commits on one timestamp — so
+     * `authorDate < cursorDate` skipped every remaining row of a tied run,
+     * silently, from the middle of the history. And a cursor naming a commit
+     * that no longer exists resolved to nothing, which fell through to the
+     * first page and looked like a working pager looping.
+     *
+     * The cursor now carries the whole sort key, so there is no lookup to do
+     * and no position it can fail to resolve. `id` is the tiebreak that makes
+     * the comparison strict: `lte` on the timestamp alone would loop forever on
+     * a run of equal timestamps, and an `or` on the two halves is exactly the
+     * row-value comparison `(authorDate, id) < (cursorDate, cursorId)`.
      */
     async getProjectCommits(
       projectId: string,
@@ -284,42 +434,48 @@ export function createProjectService() {
       await this.verifyOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [eq(commitsTable.projectId, projectId)];
 
-      let cursorDate: Date | undefined;
-      if (cursor) {
-        const cursorCommit = await db
-          .select({ authorDate: commitsTable.authorDate })
-          .from(commitsTable)
-          .where(
+      if (cursorFilter) {
+        // Descending order, so "after" is "older", and the predicate rides in
+        // the same statement as the project filter — a second query for the
+        // cursor's page would let a caller walk another tenant's commits.
+        filters.push(
+          or(
+            lt(commitsTable.authorDate, cursorFilter.at),
             and(
-              eq(commitsTable.id, cursor),
-              eq(commitsTable.projectId, projectId), // tenant safety
+              eq(commitsTable.authorDate, cursorFilter.at),
+              lt(commitsTable.id, cursorFilter.id),
             ),
-          )
-          .limit(1);
-        cursorDate = cursorCommit[0]?.authorDate;
+          )!,
+        );
       }
-
-      const whereClause = cursorDate
-        ? and(
-            eq(commitsTable.projectId, projectId),
-            sql`${commitsTable.authorDate} < ${cursorDate}`,
-          )
-        : eq(commitsTable.projectId, projectId);
 
       const commits = await db
         .select()
         .from(commitsTable)
-        .where(whereClause)
-        .orderBy(desc(commitsTable.authorDate))
+        .where(and(...filters))
+        // The id tiebreak is load-bearing, not cosmetic: without it the order
+        // of equal timestamps is the planner's choice, so the cursor cannot
+        // name a position inside a tied run.
+        .orderBy(desc(commitsTable.authorDate), desc(commitsTable.id))
         .limit(safeLimit + 1); // +1 to detect if next page exists
 
-      let nextCursor: string | undefined;
-      if (commits.length > safeLimit) {
-        nextCursor = commits.pop()!.id;
-      }
+      // One row past the page, purely to learn whether more exist — the same
+      // slice that `getProjectIssues` uses, so the two pagers cannot drift.
+      const hasMore = commits.length > safeLimit;
+      const items = hasMore ? commits.slice(0, safeLimit) : commits;
 
-      return { commits, nextCursor };
+      // The cursor names the last row this page *returned*, not the overflow
+      // row that was dropped — pointing it at c005 would skip c005 on the
+      // next page.
+      const last = items[items.length - 1];
+      const nextCursor = hasMore
+        ? encodeCursor(last!.authorDate, last!.id)
+        : undefined;
+
+      return { commits: items, nextCursor };
     },
 
     // ── File Queries ──────────────────────────────────────────────────────────
@@ -493,37 +649,211 @@ export function createProjectService() {
     },
 
     /**
-     * CONSOLIDATED: Fetches ALL dashboard data in a single server call.
-     * Runs 7 independent queries in parallel via Promise.all() to avoid
-     * sequential HTTP waterfalls — maximum possible concurrency.
+     * Fetches ALL dashboard data in a single server call — and, as of T-030,
+     * in a single database round-trip.
+     *
+     * ── Why this is one batch and not seven calls ────────────────────────────
+     * Under D-11 option (a) the `neon-http` driver is stateless: every
+     * `db.select()` is its own HTTP request. The seven reads below were
+     * therefore ten HTTP requests per dashboard load, wrapped in a
+     * `Promise.all` so they overlapped and wall-clock cost was the slowest
+     * one rather than the sum. `db.batch()` sends its statements as a single
+     * Neon HTTP transaction, so the whole widget is now one request.
+     *
+     * The projections below are deliberately duplicated with the standalone
+     * procedures (`getAllProjects`, `getRecentActivity`, ...). Each of those
+     * is its own tRPC query and must stay independently callable, so the
+     * duplication is the price of the consolidation — not an oversight.
+     *
+     * Four of the ten queries are gone outright, merged into reads that were
+     * happening anyway:
+     *   - getDashboardInfo's SUM(total_commits)/SUM(total_files)/COUNT(id)
+     *     is summed in JS from the project rows below, which are the same
+     *     `WHERE owner_id = ?` rows.
+     *   - getLanguageBreakdown is the same rows' `languages` JSONB.
+     *   - getPickUpWhereYouLeftOff's "recent commit" card is the first row of
+     *     the same `ORDER BY authorDate DESC` the activity list reads, so it
+     *     only needed `hasSummary` added to the projection.
+     *   - getNeedsAttention's open-issue/open-PR counts become
+     *     `FILTER (...) OVER ()` window counts on the rows it already
+     *     fetches. A window function is evaluated over the whole partition
+     *     before LIMIT, so the counts still cover every open issue for the
+     *     user, not just the eight returned.
+     *
+     * The project_chats lookup and the users/credits lookup each own a table
+     * nothing else in this payload reads, so they stay as their own
+     * statements rather than being joined into something larger.
+     *
+     * ── Still the biggest remaining cost (T-029) ─────────────────────────────
+     * `getRecentActivity`'s `commit_message` column is unchanged, and T-029
+     * measured it as two thirds of this widget: it averages 1,092 bytes and
+     * reaches 65,536, over a 72 ms network floor. EXPLAIN puts the database
+     * side at 0.134 ms — this is wire width, not a slow plan. Capping the
+     * column on the way out is the next lever and is deliberately not done
+     * here, because the payload is a contract and truncating it changes what
+     * the widget shows.
+     *
+     * ── Measured before/after (T-030) ────────────────────────────────────────
+     * Same database, same user (5 projects, 402 commits, 72 issues), 5 runs
+     * each, medians:
+     *
+     *                    round-trips   median   range
+     *   before (T-029)          10     717 ms   636-1040 ms
+     *   after                   1     424 ms   235-658 ms
+     *
+     * The `SELECT 1` floor on the same connection drifted 72 → 83 ms between
+     * the two sessions, so read the improvement as roughly 1.7x, not more.
+     * Both halves are real and they are not the same fix: the round-trips
+     * went 10 → 1, and the wall clock came down by the width of the
+     * commit_message column, which is still in there.
      */
     async getDashboardData(userId: string) {
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+
       const [
-        stats,
-        projects,
-        recentActivity,
-        commitChart,
-        pickUp,
-        languages,
-        attention,
-      ] = await Promise.all([
-        this.getDashboardInfo(userId),
-        this.getAllProjects(userId),
-        this.getRecentActivity(userId, 8),
-        this.getCommitChart(userId, 7),
-        this.getPickUpWhereYouLeftOff(userId),
-        this.getLanguageBreakdown(userId),
-        this.getNeedsAttention(userId),
+        projectRows,
+        creditRows,
+        commitRows,
+        chartRows,
+        chatRows,
+        issueRows,
+      ] = await db.batch([
+        db
+          .select({
+            id: projectTables.id,
+            projectName: projectTables.projectName,
+            githubUrl: projectTables.githubUrl,
+            star: projectTables.star,
+            forks: projectTables.forks,
+            totalCommits: projectTables.totalCommits,
+            totalBranches: projectTables.totalBranches,
+            totalContributors: projectTables.totalContributors,
+            totalFiles: projectTables.totalFiles,
+            languages: projectTables.languages,
+            embeddingStatus: projectTables.embeddingStatus,
+            createdAt: projectTables.createdAt,
+            updatedAt: projectTables.updatedAt,
+          })
+          .from(projectTables)
+          .where(eq(projectTables.ownerId, userId))
+          .orderBy(desc(projectTables.createdAt)),
+
+        db
+          .select({ credits: usersTable.credits })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1),
+
+        db
+          .select({
+            id: commitsTable.id,
+            commitMessage: commitsTable.commitMessage,
+            authorName: commitsTable.authorName,
+            authorAvatar: commitsTable.authorAvatar,
+            authorDate: commitsTable.authorDate,
+            projectId: commitsTable.projectId,
+            projectName: projectTables.projectName,
+            // For the pick-up card, not the activity list — stripped below.
+            hasSummary: sql<boolean>`${commitsTable.AiSummary} IS NOT NULL`,
+          })
+          .from(commitsTable)
+          .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
+          .where(eq(projectTables.ownerId, userId))
+          .orderBy(desc(commitsTable.authorDate))
+          .limit(8),
+
+        db
+          .select({
+            date: sql<string>`date_trunc('day', ${commitsTable.authorDate})::date::text`,
+            commits: count(commitsTable.id),
+          })
+          .from(commitsTable)
+          .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
+          .where(
+            and(
+              eq(projectTables.ownerId, userId),
+              sql`${commitsTable.authorDate} >= ${since}`,
+            ),
+          )
+          .groupBy(sql`date_trunc('day', ${commitsTable.authorDate})`)
+          .orderBy(sql`date_trunc('day', ${commitsTable.authorDate})`),
+
+        db
+          .select({
+            id: projectChats.id,
+            title: projectChats.title,
+            projectId: projectChats.projectId,
+            projectName: projectTables.projectName,
+            updatedAt: projectChats.updatedAt,
+          })
+          .from(projectChats)
+          .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
+          .where(eq(projectChats.userId, userId))
+          .orderBy(desc(projectChats.updatedAt))
+          .limit(1),
+
+        db
+          .select({
+            id: issuesTable.id,
+            title: issuesTable.title,
+            issueNumber: issuesTable.issueNumber,
+            isPullRequest: issuesTable.isPullRequest,
+            authorLogin: issuesTable.authorLogin,
+            authorAvatar: issuesTable.authorAvatar,
+            projectId: issuesTable.projectId,
+            projectName: projectTables.projectName,
+            githubUpdatedAt: issuesTable.githubUpdatedAt,
+            aiComplexity: issuesTable.aiComplexity,
+            aiTags: issuesTable.aiTags,
+            // Window counts over the whole open-issue set, stripped below.
+            openIssues: sql<number>`count(*) FILTER (WHERE ${issuesTable.isPullRequest} = false) OVER ()`,
+            openPRs: sql<number>`count(*) FILTER (WHERE ${issuesTable.isPullRequest} = true) OVER ()`,
+          })
+          .from(issuesTable)
+          .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
+          .where(
+            and(
+              eq(projectTables.ownerId, userId),
+              eq(issuesTable.state, "open"),
+            ),
+          )
+          .orderBy(desc(issuesTable.githubUpdatedAt))
+          .limit(8),
       ]);
 
+      const firstIssue = issueRows[0];
+
       return {
-        stats,
-        projects,
-        recentActivity,
-        commitChart,
-        pickUp,
-        languages,
-        attention,
+        stats: {
+          totalProjects: projectRows.length,
+          totalCommits: projectRows.reduce(
+            (sum, p) => sum + (p.totalCommits ?? 0),
+            0,
+          ),
+          totalFiles: projectRows.reduce(
+            (sum, p) => sum + (p.totalFiles ?? 0),
+            0,
+          ),
+          userCredits: creditRows[0]?.credits ?? 0,
+        },
+        projects: projectRows,
+        // `hasSummary` rides along for the pick-up card and is not part of the
+        // activity list's shape.
+        recentActivity: commitRows.map(({ hasSummary: _summary, ...rest }) => rest),
+        commitChart: chartRows.map((r) => ({
+          date: r.date,
+          commits: Number(r.commits),
+        })),
+        pickUp: { cards: buildPickUpCards(chatRows[0], commitRows[0]) },
+        languages: aggregateLanguages(projectRows),
+        attention: {
+          openIssuesCount: Number(firstIssue?.openIssues ?? 0),
+          openPRsCount: Number(firstIssue?.openPRs ?? 0),
+          items: issueRows.map(
+            ({ openIssues: _issues, openPRs: _prs, ...item }) => item,
+          ),
+        },
       };
     },
 
@@ -548,6 +878,49 @@ export function createProjectService() {
         .limit(safeLimit);
     },
 
+    /**
+     * Commits per day for the last `days`, for one owner.
+     *
+     * ── Index, and why not a generated date column (T-031) ────────────────────
+     * T-031 recommended option (a): a generated/stored `author_date::date`
+     * column, indexed, so the `date_trunc` grouping could be served by an
+     * index. That was measured before it was built, and the grouping is not
+     * the problem. Measured 2026-09-29 on the dev database through
+     * `neon-http`, worst-case window (365 days, the clamp), 5 projects and
+     * 402 commits for one user:
+     *
+     *   Seq Scan on commits  (cost=0.00..38.02 rows=276)  (actual 0.010..0.097 rows=274)
+     *     Filter: (author_date >= $2)
+     *     Rows Removed by Filter: 128
+     *     Buffers: shared hit=33
+     *   HashAggregate  (actual time=0.259..0.275 rows=65)
+     *   Sort Key: (date_trunc('day', commits.author_date))
+     *   Execution Time: 0.319 ms
+     *
+     * The scan is 0.097 ms of the 0.319; the aggregate and sort are the rest.
+     * Sorting 65-274 rows is not what makes this expensive, so a column that
+     * makes the *grouping* indexable would leave the scan in place and add a
+     * second index to maintain. The scan is the cost, and the reason for it is
+     * that `commits_author_date_idx` and `commits_project_id_idx` are each
+     * single-column: neither can serve the join equality and the date range
+     * together, so Postgres scans everything in the window and joins
+     * afterwards — including commits belonging to *other* users, which is the
+     * part that does not scale on a multi-tenant table.
+     *
+     * So this ships a composite `commits(project_id, author_date)`
+     * (migration 0003) instead: project_id leads so the join is an equality
+     * probe per project, author_date then serves the range, and the read is
+     * bounded by one user's own commits.
+     *
+     * Honest caveat, so nobody reads a seq scan later and thinks this failed:
+     * on the dev database the planner *still* chooses a sequential scan, and
+     * forcing one off makes it pick `commits_author_date_idx` rather than the
+     * new index. On a 33-page table that is the correct choice. The index is
+     * scale insurance, not a measured speedup — T-029 already put this query
+     * at the ~72 ms network floor, so there is no wall-clock win to have here.
+     * The plan will change only once `commits` is large enough for the planner
+     * to prefer it. See db/migrations/0003_commits_project_id_author_date_idx.notes.md.
+     */
     async getCommitChart(userId: string, days = 7) {
       const safeDays = Math.min(days, 365);
       const since = new Date();
@@ -652,37 +1025,7 @@ export function createProjectService() {
           .limit(1),
       ]);
 
-      const cards: PickUpCard[] = [];
-
-      if (lastChat[0]) {
-        const c = lastChat[0];
-        cards.push({
-          type: "chat",
-          title: "Continue Conversation",
-          description: c.title || "Your last chat session",
-          href: c.projectId
-            ? `/projects/${c.projectId}/chat/${c.id}`
-            : `/chat/${c.id}`,
-          projectName: c.projectName ?? "General",
-        });
-      }
-
-      if (recentCommit[0]) {
-        const cm = recentCommit[0];
-        const msg =
-          cm.commitMessage.length > 60
-            ? cm.commitMessage.slice(0, 57) + "..."
-            : cm.commitMessage;
-        cards.push({
-          type: "commit",
-          title: "Recent Commit",
-          description: msg,
-          href: `/projects/${cm.projectId}`,
-          projectName: cm.projectName,
-        });
-      }
-
-      return { cards };
+      return { cards: buildPickUpCards(lastChat[0], recentCommit[0]) };
     },
 
     /**
@@ -702,40 +1045,7 @@ export function createProjectService() {
         .from(projectTables)
         .where(eq(projectTables.ownerId, userId));
 
-      // Aggregate byte-sizes across all projects in JS (tiny cardinality)
-      const sizeByLang = new Map<
-        string,
-        { color: string | null; size: number }
-      >();
-
-      for (const row of rows) {
-        if (!row.languages) continue;
-        for (const lang of row.languages) {
-          const existing = sizeByLang.get(lang.name);
-          sizeByLang.set(lang.name, {
-            color: lang.color ?? existing?.color ?? null,
-            size: (existing?.size ?? 0) + lang.size,
-          });
-        }
-      }
-
-      if (sizeByLang.size === 0) return [];
-
-      const totalBytes = [...sizeByLang.values()].reduce(
-        (s, v) => s + v.size,
-        0,
-      );
-
-      return [...sizeByLang.entries()]
-        .sort((a, b) => b[1].size - a[1].size) // largest first
-        .slice(0, 10)
-        .map(([name, { color, size }]) => ({
-          name,
-          color,
-          size,
-          percentage:
-            totalBytes > 0 ? Math.round((size / totalBytes) * 1000) / 10 : 0,
-        }));
+      return aggregateLanguages(rows);
     },
 
     /**
@@ -801,18 +1111,53 @@ export function createProjectService() {
     /**
      * Fetches paginated issues/PRs for a single project.
      * Now includes AI triage fields so issue list views can display badges.
+     *
+     * Keyset paging on `(githubUpdatedAt, id)`. The previous limit-only paging
+     * was not pagination: a project with 300 issues could never show issue 101,
+     * and nothing in the response said 100 of 300 had come back, so the list
+     * read as complete. `id` is in the key because `githubUpdatedAt` is not
+     * unique — `syncIssues` upserts many rows in the same transaction and they
+     * land on the same timestamp — and a timestamp-only key silently drops
+     * every row that ties with the last one served.
      */
     async getProjectIssues(
       projectId: string,
       userId: string,
       isPullRequest: boolean,
       limit = 50,
+      cursor?: string,
     ) {
       await this.verifyOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
+      // One row past the page, purely to learn whether more exist. Counting is
+      // a second query against the same rows for an answer this already has.
+      const fetchLimit = safeLimit + 1;
 
-      return db
+      // The cursor rides in the same `where` as the ownership and issue/PR
+      // filters. A second statement for the cursor's page would let a caller
+      // page through another tenant's issues with a guessed cursor.
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [
+        eq(issuesTable.projectId, projectId),
+        eq(issuesTable.isPullRequest, isPullRequest),
+      ];
+      if (cursorFilter) {
+        // Descending order, so "after" is "older", and the id tiebreak keeps the
+        // predicate strict — `lte` on the timestamp alone would loop forever on
+        // a run of equal timestamps.
+        filters.push(
+          or(
+            lt(issuesTable.githubUpdatedAt, cursorFilter.at),
+            and(
+              eq(issuesTable.githubUpdatedAt, cursorFilter.at),
+              lt(issuesTable.id, cursorFilter.id),
+            ),
+          )!,
+        );
+      }
+
+      const rows = await db
         .select({
           id: issuesTable.id,
           title: issuesTable.title,
@@ -828,21 +1173,34 @@ export function createProjectService() {
           aiSummary: issuesTable.aiSummary,
         })
         .from(issuesTable)
-        .where(
-          and(
-            eq(issuesTable.projectId, projectId),
-            eq(issuesTable.isPullRequest, isPullRequest),
-          ),
-        )
-        .orderBy(desc(issuesTable.githubUpdatedAt))
-        .limit(safeLimit);
+        .where(and(...filters))
+        .orderBy(desc(issuesTable.githubUpdatedAt), desc(issuesTable.id))
+        .limit(fetchLimit);
+
+      const hasMore = rows.length > safeLimit;
+      const items = hasMore ? rows.slice(0, safeLimit) : rows;
+      const last = items[items.length - 1];
+
+      return {
+        items,
+        hasMore,
+        nextCursor: hasMore && last ? encodeCursor(last.githubUpdatedAt, last.id) : null,
+      };
     },
 
     /**
      * Fetches comments for a specific issue.
      * Ownership verified through the issue → project chain.
+     *
+     * Keyset paging on `(githubCreatedAt, id)`, ascending — a thread is read
+     * top to bottom, so "after" is "newer", the opposite of the issue list.
      */
-    async getIssueComments(issueId: string, userId: string) {
+    async getIssueComments(
+      issueId: string,
+      userId: string,
+      limit = 50,
+      cursor?: string,
+    ) {
       // Ownership is part of the lookup, not a second step. Splitting it out
       // made "no such issue" and "someone else's issue" two distinguishable
       // failures, which is an existence oracle for cross-tenant issue ids.
@@ -862,7 +1220,22 @@ export function createProjectService() {
         throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
       }
 
-      return db
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [eq(issueCommentsTable.issueId, issueId)];
+      if (cursorFilter) {
+        filters.push(
+          or(
+            gt(issueCommentsTable.githubCreatedAt, cursorFilter.at),
+            and(
+              eq(issueCommentsTable.githubCreatedAt, cursorFilter.at),
+              gt(issueCommentsTable.id, cursorFilter.id),
+            ),
+          )!,
+        );
+      }
+
+      const rows = await db
         .select({
           id: issueCommentsTable.id,
           body: issueCommentsTable.body,
@@ -871,9 +1244,23 @@ export function createProjectService() {
           githubCreatedAt: issueCommentsTable.githubCreatedAt,
         })
         .from(issueCommentsTable)
-        .where(eq(issueCommentsTable.issueId, issueId))
-        .orderBy(issueCommentsTable.githubCreatedAt)
-        .limit(50);
+        .where(and(...filters))
+        .orderBy(
+          issueCommentsTable.githubCreatedAt,
+          issueCommentsTable.id,
+        )
+        .limit(safeLimit + 1);
+
+      const hasMore = rows.length > safeLimit;
+      const comments = hasMore ? rows.slice(0, safeLimit) : rows;
+      const last = comments[comments.length - 1];
+
+      return {
+        comments,
+        hasMore,
+        nextCursor:
+          hasMore && last ? encodeCursor(last.githubCreatedAt, last.id) : null,
+      };
     },
   };
 }

@@ -7,6 +7,7 @@
 import { Octokit } from "octokit";
 import axios, { AxiosRequestConfig } from "axios";
 import { GITHUB_CONFIG, RETRYABLE_STATUS_CODES } from "./constants";
+import { logger } from "@/src/lib/logger";
 import {
   GitHubAPIError,
   GitHubRateLimitError,
@@ -60,7 +61,7 @@ export async function fetchWithRetry(
           delay * Math.pow(2, attempt),
           GITHUB_CONFIG.MAX_RETRY_DELAY,
         );
-        console.warn(
+        logger.warn(
           `[GitHub] Retry ${attempt + 1}/${retries} after ${statusCode} — waiting ${waitTime}ms`,
           { url },
         );

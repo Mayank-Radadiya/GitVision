@@ -8,6 +8,7 @@ import { projectTables, projectFiles } from "@/db/schema";
 import { eq, like, or, and } from "drizzle-orm";
 import type { ClassifiedQuery } from "./query-classifier";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
+import { logger } from "@/src/lib/logger";
 
 // Initialize Octokit
 const octokit = new Octokit({
@@ -202,7 +203,7 @@ async function fetchDependencyContext(projectId: string): Promise<CodeContext> {
       };
     }
   } catch (error) {
-    console.error("Error fetching package.json:", error);
+    logger.error("Error fetching package.json", error);
   }
 
   return {

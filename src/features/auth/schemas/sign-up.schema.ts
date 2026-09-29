@@ -2,7 +2,12 @@ import * as z from "zod";
 
 export const signUpZodSchema = z
   .object({
-    email: z.string().email().nonempty({ message: "Email is required" }),
+    // `z.email()` is the Zod 4 top-level form. The chained `.nonempty()` is kept
+    // because it is the only thing that reports an empty field as "required"
+    // rather than "invalid address" — dropping it would make the message below
+    // unreachable. `z.email()` still supports the chain, verified by the test
+    // that asserts both messages.
+    email: z.email().nonempty({ message: "Email is required" }),
     password: z
       .string()
       .nonempty({ message: "Password is required" })

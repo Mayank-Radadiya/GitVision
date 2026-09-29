@@ -20,8 +20,18 @@ export function removeGitSuffix(url: string): string {
 
 /**
  * Parse a GitHub URL into its owner/repo pair.
- * Supports HTTPS, SSH, and shorthand formats.
- * @throws {GitHubValidationError} if the URL cannot be parsed
+ *
+ * HTTPS only, and only the two forms `validators.githubUrl` accepts:
+ * `https://github.com/owner/repo` and the same with a `.git` suffix. It takes
+ * the last two `/`-separated segments and trusts whatever it is given — the
+ * host and the number of segments are NOT checked, so an SSH remote
+ * (`git@github.com:owner/repo.git`), an Enterprise host, or a deep link all
+ * parse into a plausible-looking wrong answer rather than an error. D-9 chose
+ * the docstring fix over parsing them; `validators.githubUrl` is what rejects
+ * them, and it runs before this on the create-project path.
+ *
+ * @throws {GitHubValidationError} if the URL is not a string, or has no
+ *   non-empty segment in the owner or repo position
  */
 export function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
   if (!githubUrl || typeof githubUrl !== "string") {
@@ -47,11 +57,36 @@ export function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
 }
 
 /**
+ * The subset of a GitHub REST commit payload that `createCommitData` reads.
+ *
+ * Octokit's `RepositoryCommit` is accurate but enormously wider, and typing the
+ * parameter as that would let a field be renamed upstream with nothing to catch
+ * it: every field read below falls back to `DEFAULTS` on `undefined`, so a
+ * rename degrades to "Unknown" instead of failing to compile. Naming the fields
+ * here means the rename is a type error at the boundary.
+ *
+ * Optional because GitHub genuinely omits them — a commit authored through the
+ * API has no `author`, and a commit can have no message body. That is the
+ * difference between "absent" and "renamed", and only one of them is a bug.
+ */
+interface GitHubCommitPayload {
+  sha: string;
+  author?: { avatar_url?: string | null } | null;
+  commit: {
+    message?: string | null;
+    author?: { name?: string | null; email?: string | null; date?: string | null } | null;
+    committer?: { name?: string | null; email?: string | null; date?: string | null } | null;
+  };
+}
+
+/**
  * Transform raw GitHub REST API commit data into our database shape.
  * Falls back to DEFAULTS for missing author metadata.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createCommitData(commit: any, projectId: string): CommitData {
+export function createCommitData(
+  commit: GitHubCommitPayload,
+  projectId: string,
+): CommitData {
   return {
     commitHash: commit.sha,
     commitMessage: commit.commit.message || "",
@@ -118,20 +153,4 @@ export function buildSmartDiff(files: GitHubFile[]): string {
   }
 
   return smartDiff;
-}
-
-/** Structured console logging with consistent `[GitHub:*]` prefix */
-export function log(
-  level: "info" | "warn" | "error",
-  message: string,
-  meta?: Record<string, unknown>,
-): void {
-  const tag = `[GitHub:${level.charAt(0).toUpperCase() + level.slice(1)}]`;
-  const fn =
-    level === "error"
-      ? console.error
-      : level === "warn"
-        ? console.warn
-        : console.log;
-  fn(`${tag} ${message}`, meta || "");
 }

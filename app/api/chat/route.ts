@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { projectChats, chatMessages, projectTables, usersTable } from "@/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
-import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { enforceLimits } from "@/src/lib/rate-limit";
 import { logger } from "@/src/lib/logger";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
@@ -298,8 +298,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Per-user cap on LLM-backed chat messages (20/min)
-    const rl = await rateLimit(keys.chat(userId), 20, 60);
+    // Per-user cap on LLM-backed chat messages (20/min), plus an IP ceiling
+    // and the global daily backstop — see rate-limit.ts. A new Clerk account
+    // resets the user budget, so the per-user cap alone is not a budget.
+    const rl = await enforceLimits("chat", userId, req);
     if (!rl.allowed) {
       return new Response(
         JSON.stringify({
@@ -316,7 +318,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const parsed = chatRequestSchema.safeParse(await req.json());
+    // `req.json()` throws a SyntaxError on a malformed body, and that throw
+    // happened *before* `safeParse` could reject it — so the generic catch at
+    // the bottom of this handler turned a client's own bug into a 500 "Something
+    // went wrong". Read the body defensively and let both failure modes take
+    // the same 400 path, so the client renders one message either way.
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: "Request body must be valid JSON",
+          code: "invalid_request",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
+      );
+    }
+
+    const parsed = chatRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
       return new Response(
         JSON.stringify({
@@ -613,10 +639,18 @@ export async function POST(req: Request) {
                 .where(eq(projectChats.id, chatId))
                 .limit(1);
 
+              // Only the placeholders this app actually writes. `chat.create`
+              // (src/features/chat/server/router/chat.ts:58) supplies one of
+              // these two whenever the caller supplies no title, and it is the
+              // only insert into `project_chats` — so they identify "never
+              // named" exactly. Matching the `"New Chat"` column default as
+              // well was a false positive: it is unreachable from any code
+              // path, and a user who deliberately named their chat "New Chat"
+              // had it overwritten on their first turn. A row that somehow
+              // arrives on the column default simply keeps that title.
               if (
                 chat?.title === "General Chat" ||
-                chat?.title === "Project Chat" ||
-                chat?.title === "New Chat"
+                chat?.title === "Project Chat"
               ) {
                 await db
                   .update(projectChats)
