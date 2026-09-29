@@ -36,9 +36,14 @@ const nextConfig: NextConfig = {
     ],
   },
   compiler: {
+    // Keep `log` alongside error/warn. `logger.info` writes through
+    // console.log, so excluding only error+warn stripped every INFO line in
+    // production — including the Inngest pipeline progress and embedding
+    // diagnostics, which is exactly what you need when a job is stuck.
+    // console.debug/dir/table/trace are still removed.
     removeConsole:
       process.env.NODE_ENV === "production"
-        ? { exclude: ["error", "warn"] }
+        ? { exclude: ["error", "warn", "log"] }
         : false,
   },
   async headers() {

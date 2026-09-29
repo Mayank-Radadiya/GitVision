@@ -12,6 +12,7 @@ import { projectChats, chatMessages, projectTables, usersTable } from "@/db/sche
 import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { spendCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
 import { categorizeModelError } from "@/src/shared/lib/chat-errors";
@@ -318,19 +319,10 @@ async function retrieveContext(
 // Route handler
 // ---------------------------------------------------------------------------
 
-/**
- * Atomically spend one credit. Returns the remaining balance, or null when
- * the user has none left. Concurrency-safe via the `credits >= 1` guard.
- */
-async function spendCredit(userId: string): Promise<number | null> {
-  const rows = await db
-    .update(usersTable)
-    .set({ credits: sql`${usersTable.credits} - 1`, updatedAt: new Date() })
-    .where(and(eq(usersTable.id, userId), gte(usersTable.credits, 1)))
-    .returning({ credits: usersTable.credits });
-
-  return rows[0]?.credits ?? null;
-}
+// Without an explicit budget the platform applies its own default timeout,
+// which can cut a long stream off mid-answer. This route is a long-lived SSE
+// stream (retrieval + generation), so state the ceiling explicitly.
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -449,7 +441,7 @@ export async function POST(req: Request) {
 
     // Enforce the credit budget — atomic spend, 402 when exhausted.
     // Spent after validation so invalid requests don't burn credits.
-    const remaining = await spendCredit(userId);
+    const remaining = await spendCredits(userId, CHAT_TURN_COST);
     if (remaining === null) {
       return new Response(
         JSON.stringify({

@@ -19,14 +19,16 @@ import { isIgnoredPath, log } from "../utils";
 
 /**
  * Fetches ALL repository files via a single tarball download and
- * streams them directly into the database with O(1) memory usage.
+ * streams them directly into the database with bounded memory usage.
  *
  * ── HOW IT WORKS ──
  *  1. Downloads the repo as .tar.gz in 1 API call
  *  2. Pipes through gunzip → tar-stream extractor
  *  3. For each file entry, accumulates into a small batch
  *  4. When batch is full → flush to DB → clear batch → continue
- *  5. Memory never exceeds (FILE_BATCH_SIZE × avg file size)
+ *  5. Memory is bounded by (FILE_BATCH_SIZE × MAX_FILE_BYTES): entries over
+ *     MAX_FILE_BYTES are dropped mid-stream rather than buffered whole, and
+ *     ingestion stops after MAX_FILES_PER_REPO entries
  *
  * @param owner - GitHub repository owner
  * @param repo - GitHub repository name
@@ -64,7 +66,7 @@ export async function getRepositoryFiles(
       timeout: 120000, // 2-minute timeout for large repos
     });
 
-    // ── Stream directly into DB (O(1) memory) ──
+    // ── Stream directly into DB (bounded memory) ──
     const totalStored = await streamAndStoreTarball(response.data, projectId);
 
     // ── Persist the final file count to the project row ──
@@ -133,6 +135,8 @@ async function streamAndStoreTarball(
       updatedAt: Date;
     }[] = [];
     let totalStored = 0;
+    let storedCount = 0;
+    let skippedCount = 0;
 
     extract.on("entry", (header, entryStream, next) => {
       const cleanPath = header.name.split("/").slice(1).join("/");
@@ -143,13 +147,40 @@ async function streamAndStoreTarball(
         return next();
       }
 
+      // Per-file guard. The entry is buffered in full before it can be
+      // hashed, so the byte cap is what bounds peak memory here; once it is
+      // exceeded we stop accumulating and drop the entry.
+      if (storedCount >= GITHUB_CONFIG.MAX_FILES_PER_REPO) {
+        entryStream.resume();
+        return next();
+      }
+      if ((header.size ?? 0) > GITHUB_CONFIG.MAX_FILE_BYTES) {
+        skippedCount++;
+        entryStream.resume();
+        return next();
+      }
+
       const chunks: Buffer[] = [];
-      entryStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let size = 0;
+      let overflowed = false;
+      entryStream.on("data", (chunk: Buffer) => {
+        if (overflowed) return;
+        size += chunk.length;
+        if (size > GITHUB_CONFIG.MAX_FILE_BYTES) {
+          overflowed = true;
+          chunks.length = 0;
+          skippedCount++;
+          return;
+        }
+        chunks.push(chunk);
+      });
       entryStream.on("end", async () => {
+        if (overflowed) return next();
         const content = Buffer.concat(chunks).toString("utf-8");
 
         // Skip binary files
         if (!content.includes("\0")) {
+          storedCount++;
           batch.push({
             fileName: cleanPath,
             code: content,
@@ -183,6 +214,13 @@ async function streamAndStoreTarball(
         if (batch.length > 0) {
           await db.insert(projectFiles).values(batch);
           totalStored += batch.length;
+        }
+        if (skippedCount > 0) {
+          log(
+            "warn",
+            `Skipped ${skippedCount} entries over ${GITHUB_CONFIG.MAX_FILE_BYTES} bytes`,
+            { projectId, totalStored },
+          );
         }
         resolve(totalStored);
       } catch (err) {

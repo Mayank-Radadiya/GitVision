@@ -13,6 +13,11 @@ import {
 import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
 import {
+  spendCredits,
+  PROJECT_CREATION_COST,
+  COMMIT_SUMMARY_COST,
+} from "@/src/lib/credits";
+import {
   createNewProject as createGitHubProject,
   getAiSummaryOfCommit,
   syncIssuesAndComments,
@@ -153,14 +158,8 @@ export function createProjectService() {
         // Atomic, concurrency-safe deduction. The read above is only a fast-fail
         // for the common case; this guarded UPDATE is the real authority, so two
         // concurrent requests can never drive the balance negative.
-        const charged = await db
-          .update(usersTable)
-          .set({
-            credits: sql`${usersTable.credits} - 10`,
-            updatedAt: new Date(),
-          })
-          .where(and(eq(usersTable.id, userId), gte(usersTable.credits, 10)))
-          .returning({ credits: usersTable.credits });
+        const chargedBalance = await spendCredits(userId, PROJECT_CREATION_COST);
+        const charged = chargedBalance === null ? [] : [{ credits: chargedBalance }];
 
         if (charged.length === 0) {
           // Lost the race against a concurrent request that drained the balance.
@@ -576,6 +575,17 @@ export function createProjectService() {
 
       if (!commitRecord || commitRecord.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Commit not found" });
+      }
+
+      // Each call is a real Gemini request. Ownership alone does not bound it —
+      // a user could walk every commit in their project for free — so charge
+      // before doing the work, using the same atomic primitive as chat.
+      const remaining = await spendCredits(userId, COMMIT_SUMMARY_COST);
+      if (remaining === null) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You're out of credits. Please top up to generate summaries.",
+        });
       }
 
       return getAiSummaryOfCommit(

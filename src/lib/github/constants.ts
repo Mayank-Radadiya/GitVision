@@ -21,6 +21,18 @@ export const GITHUB_CONFIG = {
    * Files are flushed to the database every N entries to keep memory flat.
    */
   FILE_BATCH_SIZE: 10,
+  /**
+   * Largest single file that will be read out of a tarball, in bytes.
+   * Each entry is buffered in full before hashing, so this is the real bound
+   * on per-file memory. Anything larger is skipped rather than risking the
+   * worker's heap (a 400 MB blob in a repo would otherwise OOM the job).
+   */
+  MAX_FILE_BYTES: 1_000_000,
+  /**
+   * Upper bound on files ingested from a single repository tarball. Stops a
+   * pathological repo from filling the project_files table.
+   */
+  MAX_FILES_PER_REPO: 50_000,
   /** Max character length of diff data sent to AI summariser */
   DIFF_MAX_LENGTH: 10000,
   /** HTTP timeout for generic API calls (ms) */

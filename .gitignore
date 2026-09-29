@@ -44,3 +44,7 @@ next-env.d.ts
 .vscode
 .codex
 .agents
+.opencode
+audit.md
+plan.md
+
