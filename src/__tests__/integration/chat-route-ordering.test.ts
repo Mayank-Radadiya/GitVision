@@ -18,6 +18,25 @@ const calls: string[] = [];
 /** Toggles whether the mocked project lookup returns an owned row. */
 let projectIsOwned = true;
 
+/** The title currently on the chat row, for the auto-rename cases. */
+let chatTitle = "General Chat";
+
+/**
+ * The route's `streamText` `onFinish` callback, captured from the mock below.
+ * The auto-rename lives inside it, and nothing in this file awaits it, so the
+ * rename tests drive it directly instead of racing the mock.
+ */
+let onFinish:
+  | ((result: { text: string; finishReason: string }) => Promise<void>)
+  | undefined;
+
+/** The stream's `execute`, captured from the `ai` mock. See `onFinish`. */
+let executeStream:
+  | ((ctx: { writer: unknown }) => Promise<void>)
+  | undefined;
+
+const WRITER = { write: () => {}, merge: () => {} };
+
 const ownedProject = { id: "p1", ownerId: "user_1", projectName: "proj" };
 
 // `project_chats.id` and `projects.id` are uuid columns, so the fixtures have
@@ -63,7 +82,9 @@ vi.mock("@/db", async () => {
       select: () => ({
         from: (table: unknown) => {
           if (table === schema.projectChats) {
-            return chain([{ id: "chat_1", userId: "user_1" }]);
+            // One row serves both the ownership lookup and the auto-rename's
+            // title read, so the chat needs an owner AND a title.
+            return chain([{ id: "chat_1", userId: "user_1", title: chatTitle }]);
           }
           if (table === schema.projectTables) {
             return chain(projectIsOwned ? [ownedProject] : []);
@@ -75,9 +96,26 @@ vi.mock("@/db", async () => {
         calls.push("insert");
         return chain();
       },
-      update: () => {
-        calls.push("update:users");
-        return chain([{ credits: 42 }]);
+      update: (table: unknown) => {
+        if (table === schema.usersTable) {
+          calls.push("update:users");
+          return chain([{ credits: 42 }]);
+        }
+        // Two updates target the chat row — the `updatedAt` bump and the
+        // auto-rename — so the payload, not the table, is what tells them
+        // apart.
+        const builder: Record<string, unknown> = {
+          set: (values: Record<string, unknown>) => {
+            calls.push("title" in values ? "rename-chat" : "touch-chat");
+            return builder;
+          },
+        };
+        builder.then = (resolve: (v: unknown) => unknown) =>
+          Promise.resolve([]).then(resolve);
+        for (const method of ["where", "limit", "from"]) {
+          builder[method] = () => builder;
+        }
+        return builder;
       },
       delete: () => {
         calls.push("delete");
@@ -112,15 +150,31 @@ vi.mock("@ai-sdk/google", () => ({
 }));
 
 vi.mock("ai", () => ({
-  streamText: () => {
+  streamText: (options: {
+    onFinish?: (result: {
+      text: string;
+      finishReason: string;
+    }) => Promise<void>;
+  }) => {
     calls.push("streamText");
+    // Captured, not invoked: the handler is only ever run by a test that
+    // asks for it, so a rejected request still cannot reach the model.
+    onFinish = options.onFinish;
     throw new Error("streamText must not run in these tests");
   },
   generateText: () => {
     calls.push("generateText");
     throw new Error("generateText must not run in these tests");
   },
-  createUIMessageStream: () => ({ pipe: () => ({}), onError: () => ({}) }),
+  createUIMessageStream: (options: {
+    execute?: (ctx: { writer: unknown }) => Promise<void>;
+  }) => {
+    // Captured, not invoked. The existing ordering tests want the request to
+    // stop dead before the model, so nothing here calls `execute`; the
+    // auto-rename tests drive it themselves.
+    executeStream = options.execute;
+    return { pipe: () => ({}), onError: () => ({}) };
+  },
   createUIMessageStreamResponse: () => ({}),
   toUIMessageStream: () => ({}),
 }));
@@ -168,6 +222,9 @@ function postChat() {
 beforeEach(() => {
   calls.length = 0;
   projectIsOwned = true;
+  chatTitle = "General Chat";
+  onFinish = undefined;
+  executeStream = undefined;
 });
 
 describe("/api/chat side-effect ordering", () => {
@@ -203,5 +260,58 @@ describe("/api/chat side-effect ordering", () => {
     // model layer, which is out of scope here — the assertion is that both
     // writes are reachable only after authorization cleared.)
     expect(calls).toEqual(["insert", "update:users"]);
+  });
+});
+
+/**
+ * T-048 — the auto-rename must only ever overwrite a placeholder the app
+ * itself inserted. It used to treat "New Chat" as a sentinel too, so a user
+ * who deliberately named their chat "New Chat" lost that name on their first
+ * turn. `chat.create` only ever writes "General Chat" or "Project Chat" when
+ * the caller supplies no title; "New Chat" is a column default no insert path
+ * uses, so matching it bought nothing and cost a real title.
+ */
+describe("/api/chat auto-rename", () => {
+  /** Run one completed turn and return what the route did to the chat row. */
+  async function completeTurn(finishReason = "stop") {
+    await postChat();
+    expect(executeStream).toBeTypeOf("function");
+    // The mocked model layer throws by design; the rename happens in the
+    // `onFinish` the route handed it, so the throw is expected, not a failure.
+    await executeStream!({ writer: WRITER }).catch(() => undefined);
+    expect(onFinish).toBeTypeOf("function");
+    calls.length = 0;
+    await onFinish!({ text: "an answer", finishReason });
+    return calls;
+  }
+
+  it("names a freshly created general chat from the first message", async () => {
+    chatTitle = "General Chat";
+
+    expect(await completeTurn()).toContain("rename-chat");
+  });
+
+  it("names a freshly created project chat from the first message", async () => {
+    chatTitle = "Project Chat";
+
+    expect(await completeTurn()).toContain("rename-chat");
+  });
+
+  it("leaves a title the user chose alone", async () => {
+    chatTitle = "Refactoring the auth middleware";
+
+    expect(await completeTurn()).not.toContain("rename-chat");
+  });
+
+  it("leaves a chat the user deliberately named \"New Chat\" alone", async () => {
+    chatTitle = "New Chat";
+
+    expect(await completeTurn()).not.toContain("rename-chat");
+  });
+
+  it("does not rename a turn that ended in an error", async () => {
+    chatTitle = "General Chat";
+
+    expect(await completeTurn("error")).not.toContain("rename-chat");
   });
 });

@@ -637,10 +637,18 @@ export async function POST(req: Request) {
                 .where(eq(projectChats.id, chatId))
                 .limit(1);
 
+              // Only the placeholders this app actually writes. `chat.create`
+              // (src/features/chat/server/router/chat.ts:58) supplies one of
+              // these two whenever the caller supplies no title, and it is the
+              // only insert into `project_chats` — so they identify "never
+              // named" exactly. Matching the `"New Chat"` column default as
+              // well was a false positive: it is unreachable from any code
+              // path, and a user who deliberately named their chat "New Chat"
+              // had it overwritten on their first turn. A row that somehow
+              // arrives on the column default simply keeps that title.
               if (
                 chat?.title === "General Chat" ||
-                chat?.title === "Project Chat" ||
-                chat?.title === "New Chat"
+                chat?.title === "Project Chat"
               ) {
                 await db
                   .update(projectChats)
