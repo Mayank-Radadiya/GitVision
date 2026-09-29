@@ -98,11 +98,16 @@ export async function getRepositoryFiles(
       error: error instanceof Error ? error.message : "Unknown error",
     });
 
+    // Carry the underlying reason in the message: this error is what lands in
+    // the Inngest retry log, and "Failed to fetch repository files" on its own
+    // tells an operator nothing about which stage broke.
+    const reason = error instanceof Error ? error.message : String(error);
+
     throw new GitHubError(
-      "Failed to fetch repository files",
+      `Failed to fetch repository files: ${reason}`,
       "FILE_FETCH_ERROR",
       500,
-      { originalError: error instanceof Error ? error.message : String(error) },
+      { originalError: reason },
     );
   }
 }
@@ -230,6 +235,18 @@ async function streamAndStoreTarball(
 
     extract.on("error", reject);
 
-    stream.pipe(createGunzip()).pipe(extract);
+    // The gunzip stage is its own stream and needs its own handler. Without
+    // one, a truncated or corrupt .tar.gz emits `error` on a listener-less
+    // stream, which is an uncaught exception: the process dies instead of the
+    // promise rejecting and the Inngest run retrying.
+    const gunzip = createGunzip();
+    gunzip.on("error", (err) =>
+      reject(
+        new Error(
+          `Corrupt or truncated GitHub tarball: gunzip failed (${err.message})`,
+        ),
+      ),
+    );
+    stream.pipe(gunzip).pipe(extract);
   });
 }
