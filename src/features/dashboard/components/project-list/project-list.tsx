@@ -6,7 +6,7 @@
  */
 
 import { memo, useMemo, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { FolderGit2 } from "lucide-react";
 import { useUserProjects } from "@/features/dashboard/hooks/use-dashboard";
 import type { ProjectSortKey } from "@/features/dashboard/types/dashboard.types";
@@ -15,7 +15,7 @@ import ProjectCard from "./project-card";
 import ProjectListSkeleton from "./project-list-skeleton";
 import EmptyState from "../empty-state";
 
-const listStagger = {
+const listStagger: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -23,7 +23,7 @@ const listStagger = {
   },
 };
 
-const listItem = {
+const listItem: Variants = {
   hidden: { opacity: 0, y: 8 },
   visible: {
     opacity: 1,

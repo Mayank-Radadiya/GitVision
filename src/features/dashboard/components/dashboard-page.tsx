@@ -9,7 +9,7 @@
 
 import { useEffect } from "react";
 import toast from "react-hot-toast";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { useDashboardInfo } from "@/features/dashboard/hooks/use-dashboard";
 import DashboardHeader from "./dashboard-header";
 import ProjectList from "./project-list/project-list";
@@ -17,7 +17,7 @@ import CommitChart from "./commit-chart";
 import LanguageBreakdown from "./language-breakdown";
 import NeedsAttention from "./needs-attention";
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -28,7 +28,7 @@ const staggerContainer = {
   },
 };
 
-const staggerItem = {
+const staggerItem: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
