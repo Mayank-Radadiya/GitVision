@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   GitCommit,
   GitFork,
@@ -70,8 +70,6 @@ function ProjectCard({
   totalCommits,
   totalContributors,
 }: ProjectCardProps) {
-  const router = useRouter();
-
   const repoPath = useMemo(() => {
     try {
       const url = new URL(githubUrl);
@@ -83,19 +81,12 @@ function ProjectCard({
 
   return (
     <div
-      onClick={() => router.push(`/dashboard/user-project/${id}`)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) =>
-        e.key === "Enter" && router.push(`/dashboard/user-project/${id}`)
-      }
       className={cn(
         "group border-border/50 relative cursor-pointer rounded-2xl border p-4",
         "bg-card/40 backdrop-blur-xl",
         "shadow-sm transition-all duration-300",
         "hover:bg-card/80 hover:border-primary/40 hover:shadow-primary/5 hover:-translate-y-0.5 hover:shadow-md",
       )}
-      aria-label={`Open project ${projectName}`}
     >
       <div className="flex items-center gap-4">
         {/* Project icon */}
@@ -111,14 +102,20 @@ function ProjectCard({
         {/* Name + URL */}
         <div className="min-w-0 flex-1">
           <h3 className="text-foreground group-hover:text-primary truncate text-base font-semibold tracking-tight transition-colors">
-            {projectName}
+            {/* Stretched link: the ::after covers the card, so the whole card
+                navigates and the repository link below stays a separate link. */}
+            <Link
+              href={`/dashboard/user-project/${id}`}
+              className="after:absolute after:inset-0 after:content-['']"
+            >
+              {projectName}
+            </Link>
           </h3>
           <a
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-muted-foreground/60 hover:text-primary mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
+            className="text-muted-foreground/60 hover:text-primary relative z-10 mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             aria-label={`View ${repoPath} on GitHub`}
           >
             <ExternalLink className="h-3 w-3" />

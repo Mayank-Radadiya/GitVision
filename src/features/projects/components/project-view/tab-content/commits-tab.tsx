@@ -147,6 +147,7 @@ function CommitRow({
   onGenerateSummary,
 }: CommitRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const panelId = `commit-panel-${commit.commitHash}`;
 
   const firstLine = commit.commitMessage.split("\n")[0] ?? "";
   const bodyLines = commit.commitMessage.split("\n").slice(1).join("\n").trim();
@@ -173,9 +174,6 @@ function CommitRow({
       <div
         className="flex cursor-pointer items-start gap-4 px-5 py-4"
         onClick={() => setExpanded((v) => !v)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
       >
         {/* Dynamic Icon / Avatar Block */}
         <div className="shrink-0 pt-0.5">
@@ -222,9 +220,18 @@ function CommitRow({
                 </Badge>
               )}
             </div>
-            <p className="text-foreground truncate pt-0.5 text-[15px] leading-snug font-semibold">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={panelId}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+              className="text-foreground truncate pt-0.5 text-left text-[15px] leading-snug font-semibold"
+            >
               {rest || firstLine}
-            </p>
+            </button>
           </div>
 
           {/* Meta row */}
@@ -287,6 +294,7 @@ function CommitRow({
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
+            id={panelId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

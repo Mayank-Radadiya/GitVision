@@ -8,7 +8,7 @@
  */
 
 import { memo, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import {
@@ -57,7 +57,6 @@ function CodeViewerProjectGrid() {
     undefined,
     { staleTime: 5 * 60 * 1000 },
   );
-  const router = useRouter();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -166,14 +165,7 @@ function CodeViewerProjectGrid() {
               transition={{ duration: 0.3, delay: i * 0.04 }}
             >
               <div
-                onClick={() => router.push(`/code-viewer/${project.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && router.push(`/code-viewer/${project.id}`)
-                }
                 className="group border-border/60 hover:border-primary/30 bg-card/80 relative flex min-h-45 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-lg"
-                aria-label={`Browse code for ${project.projectName}`}
               >
                 {/* Ambient glow */}
                 <div className="from-primary absolute -top-6 -right-6 h-24 w-24 rounded-full bg-linear-to-br to-blue-400 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
@@ -187,14 +179,21 @@ function CodeViewerProjectGrid() {
 
                     <div className="min-w-0 flex-1">
                       <h3 className="text-foreground group-hover:text-primary truncate font-semibold transition-colors">
-                        {project.projectName}
+                        {/* Stretched link: the ::after covers the card, so the
+                            whole card navigates and the repository link below
+                            stays a separate link. */}
+                        <Link
+                          href={`/code-viewer/${project.id}`}
+                          className="after:absolute after:inset-0 after:content-['']"
+                        >
+                          {project.projectName}
+                        </Link>
                       </h3>
                       <a
                         href={project.githubUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs transition-colors"
+                        className="text-muted-foreground hover:text-primary relative z-10 inline-flex items-center gap-1 text-xs transition-colors"
                       >
                         <ExternalLink className="h-3 w-3" />
                         <span className="truncate">{repoPath}</span>
