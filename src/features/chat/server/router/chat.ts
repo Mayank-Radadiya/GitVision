@@ -25,7 +25,14 @@ export const chatRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       if (input.type === "project" && !input.projectId) {
-        throw new Error("Project ID required for project chats");
+        // A TRPCError with a specific code, not a bare Error: tRPC turns a bare
+        // Error into INTERNAL_SERVER_ERROR, which is the one code the formatter
+        // masks in production — so a plain validation failure reached the user
+        // as an opaque "An error occurred".
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Project ID required for project chats",
+        });
       }
 
       // Tenant isolation: never link a chat to a project the user doesn't own
@@ -139,7 +146,13 @@ export const chatRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!chat) throw new Error("Chat not found");
+      if (!chat) {
+        // Same reason as the throw in `create` above. Note the message is safe
+        // to surface: it says nothing about whether the chat exists but belongs
+        // to someone else, which is what the `userId` predicate already folds
+        // into a single "not found".
+        throw new TRPCError({ code: "NOT_FOUND", message: "Chat not found" });
+      }
 
       // Take the newest N messages, then flip them back to chronological order
       // so the AI SDK still sees the conversation in the order it happened.
