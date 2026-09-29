@@ -110,12 +110,11 @@ cd GitVision
 ### 2. Install dependencies
 
 ```bash
-# Using bun (default)
 bun install
-
-# Or with yarn
-yarn install
 ```
+
+The repository is a bun workspace — it ships a `bun.lock` and no `package-lock.json`
+or `yarn.lock`. Use bun, or the lockfile will drift from what CI installs.
 
 ### 3. Configure environment variables
 
@@ -168,17 +167,29 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 ## 📜 Available Scripts
 
-| Command            | Description                                  |
-| ------------------ | -------------------------------------------- |
-| `bun dev`         | Start Next.js dev server with Turbopack      |
-| `bun build`       | Production build                             |
-| `bun start`       | Start production server                      |
-| `bun lint`        | Run ESLint                                   |
-| `bun db:generate` | Generate Drizzle migration files             |
-| `bun db:push`     | Push schema changes to database              |
-| `bun db:studio`   | Open Drizzle Studio (DB GUI)                 |
-| `bun inngest`     | Start Inngest dev server for background jobs |
-| `bun clean`       | Remove build artifacts and caches            |
+| Command               | Description                                        |
+| --------------------- | -------------------------------------------------- |
+| `bun dev`             | Start Next.js dev server with Turbopack            |
+| `bun build`           | Production build                                   |
+| `bun start`           | Start production server                            |
+| `bun lint`            | Run ESLint                                         |
+| `bun typecheck`       | Run `tsc --noEmit`                                 |
+| `bun test`            | Run the Vitest suite once                          |
+| `bun test:watch`      | Vitest in watch mode                               |
+| `bun test:coverage`   | Vitest with a coverage report                      |
+| `bun test:e2e`        | Run the Playwright end-to-end suite                |
+| `bun db:generate`     | Generate Drizzle migration files                   |
+| `bun db:init`         | Create the database and apply migrations           |
+| `bun db:push`         | Init, then push the schema straight to the database |
+| `bun db:migrate`      | Apply the committed migration files                |
+| `bun db:backup`       | Write a verified SQL dump                          |
+| `bun db:studio`       | Open Drizzle Studio (DB GUI)                       |
+| `bun inngest`         | Start Inngest dev server for background jobs       |
+| `bun clean`           | Remove build artifacts and caches                  |
+
+`db:push` and `db:migrate` both change the database. `db:push` reconciles from
+the schema files and is the right choice for local development; `db:migrate`
+replays the committed SQL migrations and is the right choice anywhere shared.
 
 ---
 
