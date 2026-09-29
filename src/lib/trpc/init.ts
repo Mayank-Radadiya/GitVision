@@ -57,8 +57,6 @@ export const createTRPCRouter = t.router;
 // Used to generate a server-side caller (e.g., for RSC or actions)
 export const createCallerFactory = t.createCallerFactory;
 
-// Base TRPC procedure (e.g., used to define queries, mutations)
-export const baseProcedure = t.procedure;
 /**
  * Protected procedure - requires Clerk authentication
  * Throws UNAUTHORIZED if user is not authenticated
@@ -79,4 +77,4 @@ const isAuthed = middleware(async ({ ctx, next }) => {
   });
 });
 
-export const protectedProcedure = baseProcedure.use(isAuthed);
+export const protectedProcedure = t.procedure.use(isAuthed);

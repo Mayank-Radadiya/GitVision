@@ -8,8 +8,8 @@ import {
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { projectChats, chatMessages, projectTables, usersTable } from "@/db/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { projectChats, chatMessages, projectTables } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
 import { logger } from "@/src/lib/logger";
