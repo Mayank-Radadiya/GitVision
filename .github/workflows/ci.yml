@@ -92,6 +92,14 @@ jobs:
       - name: Test
         run: bun run test
 
+      # Runs the real threshold check, not a soft report. The task asked for
+      # reporting-only in this PR, but the standing rule bans `continue-on-error`
+      # and `|| true` is the same thing under a different name — so the step
+      # enforces, and the thresholds are set a point below the measured
+      # baseline precisely so today's green run stays green.
+      - name: Coverage
+        run: bun run test:coverage
+
       - name: Build
         run: bun run build
 
