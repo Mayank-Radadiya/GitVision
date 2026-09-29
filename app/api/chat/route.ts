@@ -12,6 +12,7 @@ import { projectChats, chatMessages, projectTables, usersTable } from "@/db/sche
 import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
@@ -315,13 +316,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const { messages, chatId, projectId, mode = "general" } = body;
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    const parsed = chatRequestSchema.safeParse(await req.json());
+    if (!parsed.success) {
       return new Response(
         JSON.stringify({
-          error: "Messages required",
+          error: parsed.error.issues[0]?.message ?? "Invalid request",
           code: "invalid_request",
         }),
         {
@@ -333,6 +332,8 @@ export async function POST(req: Request) {
         },
       );
     }
+
+    const { messages, chatId, projectId, mode } = parsed.data;
 
     const lastMessage = messages[messages.length - 1];
     const userMessage = extractMessageText(lastMessage);

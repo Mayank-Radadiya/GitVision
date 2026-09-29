@@ -20,6 +20,12 @@ let projectIsOwned = true;
 
 const ownedProject = { id: "p1", ownerId: "user_1", projectName: "proj" };
 
+// `project_chats.id` and `projects.id` are uuid columns, so the fixtures have
+// to be real uuids for the request to get past /api/chat's schema validation
+// and reach the ownership check this file is actually about.
+const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const CHAT_ID = "22222222-2222-4222-8222-222222222222";
+
 /** Chainable no-op query builder. `limit`/`returning` resolve to `rows`. */
 function chain(rows: unknown[] = []) {
   const builder: Record<string, unknown> = {
@@ -150,8 +156,8 @@ function postChat() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         mode: "project",
-        projectId: "p1",
-        chatId: "chat_1",
+        projectId: PROJECT_ID,
+        chatId: CHAT_ID,
         message: "hello",
         messages: [{ role: "user", content: "hello" }],
       }),
