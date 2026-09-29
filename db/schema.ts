@@ -272,6 +272,13 @@ export const issuesTable = pgTable(
     return {
       projectIdIdx: index("issues_project_id_idx").on(table.projectId),
       issueNumberIdx: index("issues_issue_number_idx").on(table.issueNumber),
+      // syncIssues deletes a project's issues and re-pulls them. Without this
+      // the second run doubles every row: the duplicates get distinct uuids,
+      // so nothing downstream notices.
+      projectIdIssueNumberUnique: unique("issues_project_id_issue_number_unique").on(
+        table.projectId,
+        table.issueNumber,
+      ),
     };
   },
 );

@@ -1,0 +1,69 @@
+import { execFileSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+/**
+ * Throwaway Postgres for migration tests.
+ *
+ * Gated on TEST_DATABASE_URL so local runs and any environment without a
+ * database still pass — the suite skips these files entirely rather than
+ * failing. CI points TEST_DATABASE_URL at its pgvector service container.
+ *
+ * ponytail: shells out to `psql` instead of adding a pg driver dependency.
+ * That keeps the test suite dependency-free, at the cost of not supporting
+ * transactions or per-row error codes. Add a driver if a test ever needs
+ * either.
+ */
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
+
+export const hasTestDatabase = Boolean(TEST_DATABASE_URL);
+
+/** Run SQL against the test database. Throws on any non-zero exit. */
+export function psql(sql: string): string {
+  if (!TEST_DATABASE_URL) {
+    throw new Error("psql() called without TEST_DATABASE_URL set");
+  }
+  return execFileSync(
+    // libpq takes the connection string as a bare positional argument.
+    "psql",
+    [TEST_DATABASE_URL, "-v", "ON_ERROR_STOP=1", "-q", "-tAc", sql],
+    { encoding: "utf8", env: { ...process.env, PGCONNECT_TIMEOUT: "5" } },
+  ).trim();
+}
+
+/** Does `sql` succeed? Used to assert a constraint is NOT yet enforced. */
+export function psqlSucceeds(sql: string): boolean {
+  try {
+    psql(sql);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const MIGRATIONS_DIR = path.resolve(process.cwd(), "db/migrations");
+
+/**
+ * Apply every generated migration, in journal order, exactly the way drizzle
+ * would. `--> statement-breakpoint` is drizzle's own separator, so splitting
+ * on it reproduces the real apply path rather than a hand-written paraphrase
+ * of the schema.
+ */
+export function applyMigrations(): void {
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  if (files.length === 0) {
+    throw new Error(`No migrations found in ${MIGRATIONS_DIR}`);
+  }
+
+  for (const file of files) {
+    const sql = readFileSync(path.join(MIGRATIONS_DIR, file), "utf8");
+    for (const statement of sql.split("--> statement-breakpoint")) {
+      if (statement.trim()) {
+        psql(statement);
+      }
+    }
+  }
+}
