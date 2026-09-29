@@ -136,6 +136,9 @@ export default function ProjectPage() {
             isLoading={isLoading}
             projectId={projectId}
             onOpenCodeViewer={handleOpenCodeViewer}
+            embeddingStatus={project?.embeddingStatus}
+            totalFiles={project?.totalFiles}
+            embeddingError={project?.embeddingError}
           />
 
           {/* Sub-navigation tabs */}
