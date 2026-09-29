@@ -4,7 +4,7 @@ Branch: `lane/p1-c` (off `main`). Lane C owns `src/lib/logger.ts` + `src/lib/log
 
 | Task | Status | Reason | Commit |
 |---|---|---|---|
-| T-019 | done | Logger redaction at all four levels, deep through `context` and errors | PENDING |
+| T-019 | done | Logger redaction at all four levels, deep through `context` and errors | `f6e00ab` |
 | T-020 | todo | depends on D-4, which is not in TASKS.md "Decisions made" | |
 
 ## Notes
