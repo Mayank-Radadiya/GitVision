@@ -21,8 +21,8 @@ import {
   parseGitHubUrl,
   createCommitData,
   buildSmartDiff,
-  log,
 } from "../utils";
+import { logger } from "@/src/lib/logger";
 
 /**
  * @deprecated Use `createNewProject` which now fetches initial commits
@@ -41,7 +41,7 @@ export const getCommitHashes = async (
 ): Promise<number> => {
   try {
     const { owner, repo } = parseGitHubUrl(githubUrl);
-    log("info", "Fetching commits from GitHub (REST paginate)", {
+    logger.info( "Fetching commits from GitHub (REST paginate)", {
       owner,
       repo,
       projectId,
@@ -53,7 +53,7 @@ export const getCommitHashes = async (
       per_page: GITHUB_CONFIG.DEFAULT_PER_PAGE,
     });
 
-    log("info", `Fetched ${commits.length} commits`, { owner, repo });
+    logger.info( `Fetched ${commits.length} commits`, { owner, repo });
 
     const batchSize = GITHUB_CONFIG.COMMIT_BATCH_SIZE;
     let totalStored = 0;
@@ -66,7 +66,7 @@ export const getCommitHashes = async (
         await db.insert(commitsTable).values(rows);
         totalStored += rows.length;
       } catch (dbError) {
-        log("error", "Failed to store commit batch", {
+        logger.error( "Failed to store commit batch", {
           batchNumber: Math.floor(i / batchSize) + 1,
           error: dbError instanceof Error ? dbError.message : "Unknown error",
         });
@@ -74,7 +74,7 @@ export const getCommitHashes = async (
       }
     }
 
-    log("info", "Stored all commits", { totalCommits: totalStored });
+    logger.info( "Stored all commits", { totalCommits: totalStored });
     return totalStored;
   } catch (error) {
     if (
@@ -84,7 +84,7 @@ export const getCommitHashes = async (
       throw error;
     }
 
-    log("error", "Error fetching/storing commits", {
+    logger.error( "Error fetching/storing commits", {
       githubUrl,
       projectId,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -149,7 +149,7 @@ export async function getAiSummaryOfCommit(
     const commitHashToUse = commitRecord.commitHash || commitHash;
     const { owner, repo } = parseGitHubUrl(githubUrl);
 
-    log("info", `Fetching diff for commit ${commitHashToUse}`, { owner, repo });
+    logger.info( `Fetching diff for commit ${commitHashToUse}`, { owner, repo });
 
     const commitMessage = commitRecord.commitMessage || "No message available";
     let diffData = "";
@@ -194,7 +194,7 @@ export async function getAiSummaryOfCommit(
 
         throw new Error("Unexpected response format");
       } catch (err) {
-        log("warn", "JSON diff failed, trying JSON fallback", {
+        logger.warn( "JSON diff failed, trying JSON fallback", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
 
@@ -221,7 +221,7 @@ export async function getAiSummaryOfCommit(
         diffData = await fetchMethods[i]();
         if (diffData?.trim().length) break;
       } catch (err) {
-        log("warn", `Diff method ${i + 1} failed`, {
+        logger.warn( `Diff method ${i + 1} failed`, {
           error: err instanceof Error ? err.message : "Unknown error",
         });
       }
@@ -229,7 +229,7 @@ export async function getAiSummaryOfCommit(
 
     // Fallback: commit message when no diff available
     if (!diffData?.trim().length) {
-      log("warn", "All diff methods failed — using commit message as fallback");
+      logger.warn( "All diff methods failed — using commit message as fallback");
       diffData = `Commit: ${commitHashToUse}\nMessage: ${commitMessage}\n\nNo diff data available.`;
     }
 
@@ -240,7 +240,7 @@ export async function getAiSummaryOfCommit(
           "\n\n[diff truncated due to size]"
         : diffData;
 
-    log("info", `Generating AI summary for commit ${commitHashToUse}`);
+    logger.info( `Generating AI summary for commit ${commitHashToUse}`);
 
     const aiSummary = await aISummariesCommit(truncatedData);
 
@@ -254,7 +254,7 @@ export async function getAiSummaryOfCommit(
       .set({ AiSummary: aiSummary })
       .where(eq(commitsTable.id, commitRecord.id));
 
-    log("info", `Updated AI summary for commit ${commitHashToUse}`);
+    logger.info( `Updated AI summary for commit ${commitHashToUse}`);
     return aiSummary;
   } catch (error) {
     if (
@@ -264,7 +264,7 @@ export async function getAiSummaryOfCommit(
       throw error;
     }
 
-    log("error", "Error generating AI summary", {
+    logger.error( "Error generating AI summary", {
       githubUrl,
       commitHash,
       projectId,

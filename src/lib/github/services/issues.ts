@@ -12,7 +12,8 @@ import type { GraphQLIssuesData, IssueOrPrNode } from "../types";
 import { GITHUB_CONFIG, DEFAULTS, ISSUES_AND_PRS_QUERY } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
 import { octokit } from "../client";
-import { parseGitHubUrl, log } from "../utils";
+import { parseGitHubUrl } from "../utils";
+import { logger } from "@/src/lib/logger";
 
 /**
  * Fetches issues AND pull requests with their comments via a single
@@ -31,7 +32,7 @@ export const syncIssuesAndComments = async (
 ): Promise<{ issuesFetched: number; commentsFetched: number }> => {
   try {
     const { owner, repo } = parseGitHubUrl(githubUrl);
-    log("info", "Fetching issues + PRs via GraphQL", {
+    logger.info( "Fetching issues + PRs via GraphQL", {
       owner,
       repo,
       projectId,
@@ -139,7 +140,7 @@ export const syncIssuesAndComments = async (
       issueCursor = issues.pageInfo.endCursor;
       prCursor = pullRequests.pageInfo.endCursor;
 
-      log("info", `Synced issues/PRs page ${pages}`, {
+      logger.info( `Synced issues/PRs page ${pages}`, {
         owner,
         repo,
         projectId,
@@ -147,8 +148,7 @@ export const syncIssuesAndComments = async (
       });
     }
 
-    log(
-      "info",
+    logger.info(
       `Stored ${issuesStored} issues/PRs, ${commentsStored} comments`,
       { owner, repo, projectId },
     );
@@ -161,7 +161,7 @@ export const syncIssuesAndComments = async (
     ) {
       throw error;
     }
-    log("error", "Error fetching/storing issues and comments", {
+    logger.error( "Error fetching/storing issues and comments", {
       githubUrl,
       projectId,
       error: error instanceof Error ? error.message : "Unknown error",

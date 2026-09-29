@@ -15,7 +15,8 @@ import { createGunzip } from "zlib";
 import { computeHash } from "@/src/features/rag/services/code-chunker";
 import { GITHUB_CONFIG } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
-import { isIgnoredPath, log } from "../utils";
+import { isIgnoredPath } from "../utils";
+import { logger } from "@/src/lib/logger";
 
 /**
  * Fetches ALL repository files via a single tarball download and
@@ -48,7 +49,7 @@ export async function getRepositoryFiles(
       );
     }
 
-    log("info", "Fetching repository files via tarball (stream-to-DB)", {
+    logger.info( "Fetching repository files via tarball (stream-to-DB)", {
       owner,
       repo,
       projectId,
@@ -76,7 +77,7 @@ export async function getRepositoryFiles(
       .set({ totalFiles: totalStored })
       .where(eq(projectTables.id, projectId));
 
-    log("info", `Stored ${totalStored} files from tarball`, {
+    logger.info( `Stored ${totalStored} files from tarball`, {
       owner,
       repo,
       projectId,
@@ -91,7 +92,7 @@ export async function getRepositoryFiles(
       throw error;
     }
 
-    log("error", "Error fetching repository files", {
+    logger.error( "Error fetching repository files", {
       owner,
       repo,
       projectId,
@@ -215,7 +216,7 @@ async function streamAndStoreTarball(
           try {
             await db.insert(projectFiles).values(batch);
             totalStored += batch.length;
-            log("info", `Flushed ${batch.length} files to DB`, {
+            logger.info( `Flushed ${batch.length} files to DB`, {
               totalStored,
             });
             batch = [];
@@ -235,8 +236,7 @@ async function streamAndStoreTarball(
           totalStored += batch.length;
         }
         if (skippedCount > 0) {
-          log(
-            "warn",
+          logger.warn(
             `Skipped ${skippedCount} entries over ${GITHUB_CONFIG.MAX_FILE_BYTES} bytes`,
             { projectId, totalStored },
           );
@@ -246,8 +246,7 @@ async function streamAndStoreTarball(
           // `..` segments. One appearing means the archive is hostile or
           // hand-crafted, and every dropped entry is a name that was about
           // to be cited back to the model.
-          log(
-            "error",
+          logger.error(
             `Dropped ${unsafePathCount} tar entries whose path escaped the repo`,
             { projectId, totalStored, firstUnsafePath },
           );

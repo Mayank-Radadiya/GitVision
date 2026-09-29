@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { describe, it, expect, vi } from "vitest";
 import { logger, type LogContext } from "@/src/lib/logger";
 
@@ -160,5 +162,64 @@ describe("Logger Service", () => {
     expect(record.statusCode).toBe(200);
     expect(record.durationMs).toBe(12);
     expect(String(record.timestamp)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+/**
+ * L14 — the redaction above only protects what goes *through* the logger. Ten
+ * files were calling `console.*` directly, which means the auth and RAG paths
+ * printed straight past redaction, truncation and the JSON envelope, and
+ * would not reach any aggregated sink once the error transport ships.
+ *
+ * `logger.ts` itself is the sink, so it is the one file allowed to reach for
+ * `console`. Everything else goes through the logger, and this test is what
+ * makes that stick — the alternative is a review checklist nobody runs.
+ */
+describe("every call site goes through the logger", () => {
+  const SRC = join(process.cwd(), "src");
+  const SINK = "lib/logger.ts";
+
+  /** Every `.ts`/`.tsx` under `src/`, tests included, so nothing hides there. */
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return sourceFiles(full);
+      return /\.tsx?$/.test(entry.name) ? [full] : [];
+    });
+  }
+
+  it("calls console.* nowhere except the logger that implements it", () => {
+    const offenders: string[] = [];
+    let inBlockComment = false;
+
+    for (const file of sourceFiles(SRC)) {
+      const rel = relative(SRC, file).split(sep).join("/");
+      // `logger.ts` is the sink. Test files are exempt because this very test
+      // stubs `console` on purpose — asserting on it is the point there.
+      if (rel === SINK || rel.startsWith("__tests__/")) continue;
+
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          // Comments are prose about `console`, not calls to it, and a doc
+          // comment is allowed to mention the method. Track block comments
+          // rather than deleting them so the reported line number still points
+          // at the offending call.
+          if (inBlockComment) {
+            if (line.includes("*/")) inBlockComment = false;
+            return;
+          }
+          if (line.trimStart().startsWith("/*")) {
+            if (!line.includes("*/")) inBlockComment = true;
+            return;
+          }
+          const code = line.replace(/\/\/.*$/, "");
+          if (/(?<![\w.])console\s*\./.test(code)) {
+            offenders.push(`${rel}:${i + 1}: ${code.trim()}`);
+          }
+        });
+    }
+
+    expect(offenders).toEqual([]);
   });
 });

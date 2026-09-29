@@ -119,19 +119,3 @@ export function buildSmartDiff(files: GitHubFile[]): string {
 
   return smartDiff;
 }
-
-/** Structured console logging with consistent `[GitHub:*]` prefix */
-export function log(
-  level: "info" | "warn" | "error",
-  message: string,
-  meta?: Record<string, unknown>,
-): void {
-  const tag = `[GitHub:${level.charAt(0).toUpperCase() + level.slice(1)}]`;
-  const fn =
-    level === "error"
-      ? console.error
-      : level === "warn"
-        ? console.warn
-        : console.log;
-  fn(`${tag} ${message}`, meta || "");
-}

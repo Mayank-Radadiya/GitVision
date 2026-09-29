@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { chatMessages } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
+import { logger } from "@/src/lib/logger";
 
 export interface Message {
   id?: string;
@@ -71,7 +72,7 @@ export async function getRecentChatHistoryForContext(
 
     return items.map((i) => i.text).join("\n\n");
   } catch (error) {
-    console.error("Error getting recent chat history:", error);
+    logger.error("Error getting recent chat history", error);
     return "Error retrieving chat history.";
   }
 }

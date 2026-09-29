@@ -8,6 +8,7 @@ import { signUpZodSchema } from "@/features/auth/schemas/sign-up.schema";
 import { ClerkAPIError } from "@clerk/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import toast from "react-hot-toast";
+import { logger } from "@/src/lib/logger";
 
 export function useSignUpLogic() {
   const router = useRouter();
@@ -73,7 +74,7 @@ export function useSignUpLogic() {
         redirectUrlComplete: "/dashboard",
       });
     } catch (err) {
-      console.error("Error signing up with Google:", err);
+      logger.error("Error signing up with Google", err);
       if (isClerkAPIResponseError(err)) setError(err.errors);
       toast.error("Error signing up with Google. Please try again.");
       setIsLoading(false);

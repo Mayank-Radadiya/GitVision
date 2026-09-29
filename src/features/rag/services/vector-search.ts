@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { codeEmbeddings, projectFiles } from "@/db/schema";
 import { cosineDistance, sql, eq, and, asc } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
+import { logger } from "@/src/lib/logger";
 
 export interface SearchResult {
   id: string;
@@ -67,7 +68,7 @@ export async function searchSimilarCode(
       .filter((result) => Number(result.similarity) >= minSimilarity)
       .slice(0, limit);
   } catch (error) {
-    console.error("Error searching similar code:", error);
+    logger.error("Error searching similar code", error);
     throw new Error(
       `Failed to search similar code: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -276,7 +277,7 @@ export async function searchSimilarCodeInFile(
 
     return results;
   } catch (error) {
-    console.error("Error in searchSimilarCodeInFile:", error);
+    logger.error("Error in searchSimilarCodeInFile", error);
     throw new Error(
       `Failed to search within file: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -356,7 +357,7 @@ export async function getAllProjectFilesForContext(
 
     return items.map((i) => i.text).join("\n\n");
   } catch (error) {
-    console.error("Error fetching all project files:", error);
+    logger.error("Error fetching all project files", error);
     throw new Error(
       `Failed to fetch project files: ${error instanceof Error ? error.message : String(error)}`,
     );

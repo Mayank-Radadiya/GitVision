@@ -7,6 +7,7 @@ import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { ClerkAPIError } from "@clerk/types";
 import { useSignIn } from "@clerk/nextjs/legacy";
 import toast from "react-hot-toast";
+import { logger } from "@/src/lib/logger";
 
 export function useSignInLogic() {
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +39,9 @@ export function useSignInLogic() {
         await setActive({ session: signInAttempt.createdSessionId });
         toast.success("Sign in successful!");
       } else {
-        console.error(JSON.stringify(signInAttempt, null, 2));
+        logger.error("Sign-in attempt did not complete", undefined, {
+          status: signInAttempt.status,
+        });
         toast.error("Invalid credentials. Please try again.");
       }
     } catch (err) {
@@ -63,7 +66,7 @@ export function useSignInLogic() {
         redirectUrlComplete: "/dashboard",
       });
     } catch (err) {
-      console.error("Error signing in with Google:", err);
+      logger.error("Error signing in with Google", err);
       if (isClerkAPIResponseError(err)) setError(err.errors);
       toast.error("Error signing in with Google. Please try again.");
       setIsLoading(false);

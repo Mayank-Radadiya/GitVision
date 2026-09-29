@@ -18,7 +18,8 @@ import {
   GitHubRateLimitError,
 } from "../errors";
 import { octokit } from "../client";
-import { parseGitHubUrl, log } from "../utils";
+import { parseGitHubUrl } from "../utils";
+import { logger } from "@/src/lib/logger";
 
 /**
  * Creates a new project in the database with GitHub repository information.
@@ -57,7 +58,7 @@ export async function createNewProject(
     }
 
     const { owner, repo } = parseGitHubUrl(url);
-    log("info", "Creating new project (GraphQL)", {
+    logger.info( "Creating new project (GraphQL)", {
       owner,
       repo,
       projectName,
@@ -164,10 +165,10 @@ export async function createNewProject(
         await db.insert(commitsTable).values(commitRows);
       }
 
-      log("info", `Stored ${history.nodes.length} commits via GraphQL`);
+      logger.info( `Stored ${history.nodes.length} commits via GraphQL`);
     }
 
-    log("info", "Project created successfully", {
+    logger.info( "Project created successfully", {
       projectId: newProject.id,
       stats: {
         stars: newProject.star,
@@ -188,7 +189,7 @@ export async function createNewProject(
       throw error;
     }
 
-    log("error", "Error creating project", {
+    logger.error( "Error creating project", {
       url,
       projectName,
       userId,
