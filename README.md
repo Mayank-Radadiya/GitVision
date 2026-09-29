@@ -191,7 +191,7 @@ The app uses a relational schema with vector extensions:
 - **project_files** — Full repository file contents with SHA-256 hashing
 - **code_embeddings** — 768-dim Gemini vectors with HNSW cosine similarity index
 - **commits** — Commit history with AI-generated summaries
-- **issues / issue_comments** — GitHub issues & PRs with AI triage metadata
+- **issues / issue_comments** — GitHub issues & PRs, and their comments
 - **project_chats / chat_messages** — Normalized chat history per project
 
 ---
