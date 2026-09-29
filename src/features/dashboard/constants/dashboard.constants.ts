@@ -101,30 +101,8 @@ export const COLOR_TOKENS: Record<
   },
 };
 
-// ─── Animation Presets ───────────────────────────────────────────────────────
-
-/** Staggered fade-in for list items */
-export const STAGGER_ANIMATION = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0 },
-  transition: (index: number) => ({
-    duration: 0.35,
-    delay: index * 0.06,
-    ease: "easeOut" as const,
-  }),
-};
-
-/** Card hover lift effect */
-export const CARD_HOVER = {
-  whileHover: { y: -3 },
-  transition: { duration: 0.2 },
-};
-
 /** Skeleton count for loading states */
 export const SKELETON_COUNT = 4;
-
-/** Max recent activity items */
-export const ACTIVITY_LIMIT = 8;
 
 /** Days to show in commit chart */
 export const CHART_DAYS = 7;

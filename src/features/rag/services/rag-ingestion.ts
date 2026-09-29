@@ -5,7 +5,7 @@
 
 import { db } from "@/db";
 import { projectFiles, codeEmbeddings } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { chunkCode, computeHash, detectLanguage } from "./code-chunker";
 import {
   generateEmbeddingsBatch,
@@ -158,54 +158,4 @@ export async function processFileForRag(
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-/**
- * Check if a project has been processed for RAG
- */
-export async function isProjectProcessed(projectId: string): Promise<boolean> {
-  const embeddings = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(codeEmbeddings)
-    .where(eq(codeEmbeddings.projectId, projectId))
-    .limit(1);
-
-  return embeddings.length > 0 && embeddings[0].count > 0;
-}
-
-/**
- * Get processing status for a project
- */
-export async function getProjectProcessingStatus(projectId: string): Promise<{
-  totalFiles: number;
-  processedFiles: number;
-  totalEmbeddings: number;
-}> {
-  const [filesCount, embeddingsCount] = await Promise.all([
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId)),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(codeEmbeddings)
-      .where(eq(codeEmbeddings.projectId, projectId)),
-  ]);
-
-  const totalFiles = filesCount[0]?.count || 0;
-  const totalEmbeddings = embeddingsCount[0]?.count || 0;
-
-  // Count files with embeddings (processed files)
-  const processedFilesResult = await db
-    .select({ count: sql<number>`count(distinct ${codeEmbeddings.fileId})` })
-    .from(codeEmbeddings)
-    .where(eq(codeEmbeddings.projectId, projectId));
-
-  const processedFiles = processedFilesResult[0]?.count || 0;
-
-  return {
-    totalFiles,
-    processedFiles,
-    totalEmbeddings,
-  };
 }

@@ -210,27 +210,3 @@ function extractKeywords(query: string): string[] {
 
   return [...new Set(words)]; // Remove duplicates
 }
-
-/**
- * Helper to check if query is asking for multiple files
- */
-export function isMultiFileQuery(query: string): boolean {
-  const multiFileIndicators = [
-    /all.*files?/i,
-    /every.*files?/i,
-    /list.*files?/i,
-    /show.*files?/i,
-  ];
-
-  return multiFileIndicators.some((pattern) => pattern.test(query));
-}
-
-/**
- * Helper to extract action from query (explain, list, show, etc.)
- */
-export function extractAction(query: string): string {
-  const actionPattern =
-    /^(explain|describe|show|list|analyze|summarize|what|how)/i;
-  const match = query.match(actionPattern);
-  return match ? match[1].toLowerCase() : "explain";
-}

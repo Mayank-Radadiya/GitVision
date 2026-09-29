@@ -115,39 +115,4 @@ export const chatRouter = createTRPCRouter({
         );
       return { success: true };
     }),
-
-  updateTitle: protectedProcedure
-    .input(
-      z.object({
-        chatId: z.string().uuid(),
-        title: z.string().min(1).max(255),
-      }),
-    )
-    .mutation(async ({ input, ctx }) => {
-      await db
-        .update(projectChats)
-        .set({ title: input.title, updatedAt: new Date() })
-        .where(
-          and(
-            eq(projectChats.id, input.chatId),
-            eq(projectChats.userId, ctx.userId),
-          ),
-        );
-      return { success: true };
-    }),
-
-  getByProject: protectedProcedure
-    .input(z.object({ projectId: z.string().uuid() }))
-    .query(async ({ input, ctx }) => {
-      return db
-        .select()
-        .from(projectChats)
-        .where(
-          and(
-            eq(projectChats.userId, ctx.userId),
-            eq(projectChats.projectId, input.projectId),
-          ),
-        )
-        .orderBy(desc(projectChats.updatedAt));
-    }),
 });

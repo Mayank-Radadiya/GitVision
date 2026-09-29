@@ -154,19 +154,4 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       return projectService.syncIssues(input.projectId, ctx.userId);
     }),
-
-  /**
-   * NEW — powers the "Needs Attention" triage widget.
-   * Returns the top N open issues/PRs with aiComplexity of 'high' or 'medium'
-   * across all of the user's projects. Defaults to 5 items.
-   */
-  getRecentTriageIssues: protectedProcedure
-    .input(
-      z
-        .object({ limit: z.number().min(1).max(20).optional().default(5) })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      return projectService.getRecentTriageIssues(ctx.userId, input?.limit);
-    }),
 });

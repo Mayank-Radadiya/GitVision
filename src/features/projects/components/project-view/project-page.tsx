@@ -147,6 +147,7 @@ export default function ProjectPage() {
                     repoUrl={project?.githubUrl || ""}
                     commits={commits}
                     totalContributors={project?.totalContributors ?? 0}
+                    languages={project?.languages ?? []}
                   />
                 )}
               </motion.div>

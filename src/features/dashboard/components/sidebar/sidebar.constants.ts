@@ -56,9 +56,6 @@ export const SIDEBAR_WIDTH_COLLAPSED = 72;
 /** Sidebar width in pixels when fully expanded */
 export const SIDEBAR_WIDTH_EXPANDED = 256;
 
-/** Mobile sidebar width in pixels */
-export const SIDEBAR_WIDTH_MOBILE = 288; // 72 * 4 = 288 (w-72)
-
 /** Current app version displayed in sidebar footer */
 export const APP_VERSION = "v2.2.0";
 

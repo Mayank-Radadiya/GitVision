@@ -10,6 +10,7 @@
 
 import { memo } from "react";
 import type { Commit } from "@/features/projects/types/project.types";
+import type { LanguageEntry } from "@/db/schema";
 import ProjectPulseWidget from "./project-pulse-widget";
 import ContributorWidget from "./contributor-widget";
 import TechStackWidget from "./tech-stack-widget";
@@ -40,6 +41,8 @@ interface BentoGridProps {
   repoUrl: string;
   commits: Commit[];
   totalContributors: number;
+  /** Real per-project language breakdown (projects.languages JSONB). */
+  languages: LanguageEntry[];
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -49,13 +52,14 @@ function BentoGrid({
   repoUrl,
   commits,
   totalContributors,
+  languages,
 }: BentoGridProps) {
   return (
     <div className="space-y-4">
       {/* Row 1: Tech Stack (1 col) + Contributors (1 col) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <BentoCard>
-          <TechStackWidget />
+          <TechStackWidget languages={languages} />
         </BentoCard>
 
         <BentoCard>
