@@ -103,20 +103,22 @@ Remember: Your summary should help developers understand this commit in 30 secon
     });
     return text;
   } catch (error: unknown) {
-    // Handle specific error types
+    // Log the specific cause, then let the failure propagate. This used to
+    // return a friendly "😥 …" string, but a string that reads like a summary
+    // is indistinguishable from a real one, and it was persisted as `AiSummary`
+    // while the caller kept the credit it had already spent. The sole caller
+    // (`getAiSummaryOfCommit`) and its own caller (`generateAiSummary`) both
+    // handle a throw: the first propagates it, the second refunds.
     const err = error as { status?: number; message?: string };
     if (err?.status === 429) {
       logger.error("Gemini API quota exceeded", undefined, { detail: err.message });
-      return "⏳ AI summary temporarily unavailable due to API quota limits. Please try again later.";
     } else if (err?.status === 404) {
       logger.error("Gemini model not found", undefined, { detail: err.message });
-      return "⚠️ AI model not available. Please contact support or check your API configuration.";
     } else if (err?.message?.includes("quota")) {
       logger.error("Gemini API quota issue", undefined, { detail: err.message });
-      return "⏳ AI summary quota exceeded. Please try again in 24 hours.";
     } else {
       logger.error("Error generating AI summary", error);
-      return "😥 Could not generate AI summary at this time. Please try again later.";
     }
+    throw error;
   }
 };

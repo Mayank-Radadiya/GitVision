@@ -13,6 +13,7 @@ import {
 import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
+import { logger } from "@/src/lib/logger";
 import {
   spendCredits,
   refundCredits,
@@ -976,12 +977,24 @@ export function createProjectService() {
         });
       }
 
-      return getAiSummaryOfCommit(
-        project.githubUrl,
-        commitRecord[0].commitHash,
-        projectId,
-        commitId,
-      );
+      try {
+        return await getAiSummaryOfCommit(
+          project.githubUrl,
+          commitRecord[0].commitHash,
+          projectId,
+          commitId,
+        );
+      } catch (error) {
+        // The credit is spent above, before the work. A summary that was never
+        // produced has to be paid back, or a provider outage silently charges
+        // every user for a failure.
+        try {
+          await refundCredits(userId, COMMIT_SUMMARY_COST);
+        } catch (refundError) {
+          logger.error("Commit summary credit refund failed", refundError);
+        }
+        throw error;
+      }
     },
 
     async getPickUpWhereYouLeftOff(
@@ -1022,6 +1035,36 @@ export function createProjectService() {
       ]);
 
       return { cards: buildPickUpCards(lastChat[0], recentCommit[0]) };
+
+      const cards: PickUpCard[] = [];
+
+      if (lastChat[0]) {
+        const c = lastChat[0];
+        cards.push({
+          type: "chat",
+          title: "Continue Conversation",
+          description: c.title || "Your last chat session",
+          href: `/chat/${c.id}`,
+          projectName: c.projectName ?? "General",
+        });
+      }
+
+      if (recentCommit[0]) {
+        const cm = recentCommit[0];
+        const msg =
+          cm.commitMessage.length > 60
+            ? cm.commitMessage.slice(0, 57) + "..."
+            : cm.commitMessage;
+        cards.push({
+          type: "commit",
+          title: "Recent Commit",
+          description: msg,
+          href: `/dashboard/user-project/${cm.projectId}`,
+          projectName: cm.projectName,
+        });
+      }
+
+      return { cards };
     },
 
     /**

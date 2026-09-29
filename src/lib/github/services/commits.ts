@@ -247,7 +247,7 @@ export async function getAiSummaryOfCommit(
     const aiSummary = await aISummariesCommit(truncatedData);
 
     if (!aiSummary) {
-      return "😥 Sorry, something went wrong. No summary available.";
+      throw new Error("AI summary generation returned no content");
     }
 
     // Persist the AI summary to the database
@@ -273,6 +273,8 @@ export async function getAiSummaryOfCommit(
       error: error instanceof Error ? error.message : "Unknown error",
     });
 
-    return "😥 Could not generate AI summary. Please try again later.";
+    // A failed summary must not look like a successful one. The caller bills
+    // for this work, so it needs to be able to tell the two apart and refund.
+    throw error;
   }
 }
