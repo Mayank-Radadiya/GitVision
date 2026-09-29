@@ -72,7 +72,12 @@ async function main() {
     console.error(
       "❌ pg_dump failed. Install the PostgreSQL client tools and retry.",
     );
-    console.error("Error detail:", error);
+    // Do not log the error object. An execSync failure's message is
+    // `Command failed: pg_dump "<DATABASE_URL>" …` and the URL carries the
+    // password — which, in CI, is production. pg_dump's own stderr is already
+    // inherited above, so the exit status is the only thing left worth adding.
+    const { status } = error as { status?: number };
+    console.error("pg_dump exit status:", status ?? "unknown");
     process.exit(1);
   }
 

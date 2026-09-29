@@ -1,0 +1,54 @@
+# Customer source code lives in this database and nothing else takes a copy of
+# it: `syncIssues` deletes before it re-pulls, `user.deleted` is a hard cascade,
+# and Neon's point-in-time recovery is not something this repo can verify. So the
+# dump runs on a schedule rather than when someone remembers.
+name: Backup
+
+on:
+  # 03:17, not 03:00. Scheduled workflows all fire on the hour and GitHub drops
+  # the queue when runners saturate; an off-hour slot is still picked up.
+  schedule:
+    - cron: "17 3 * * *"
+  # The cron only fires from the default branch, and this is the only way to take
+  # a dump until the file is merged.
+  workflow_dispatch:
+
+# A manual run should queue behind the scheduled one, not cancel it.
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    name: pg_dump and verify
+    runs-on: ubuntu-latest
+    env:
+      # The real database. ci.yml's placeholder would give a green run that backs
+      # up nothing.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # scripts/db-backup.ts refuses to write inside the checkout, so point it at
+      # the runner's scratch directory.
+      BACKUP_DIR: ${{ runner.temp }}/backups
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Dump and verify
+        # pg_dump ships in postgresql-client, which ubuntu-latest already carries.
+        # If a future image drops it this step fails and the job goes red, which is
+        # the intended behaviour — not a silent no-op. Do not wrap it in `|| true`.
+        run: bun run db:backup
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: ${{ runner.temp }}/backups/*.sql
+          # D-12: 14 days, matching the S3 bucket's lifecycle rule.
+          retention-days: 14
+          # An empty upload means the dump went somewhere we did not expect. Fail.
+          if-no-files-found: error
