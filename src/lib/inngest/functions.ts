@@ -26,6 +26,29 @@ export const projectCreated = inngest.createFunction(
     id: "project-created",
     retries: 3,
     triggers: [{ event: "project/created" }],
+    // Without this the project is stranded at embeddingStatus: "pending" forever,
+    // because nothing else ever advances it once the retries are exhausted.
+    onFailure: async ({ event, error }) => {
+      const failedProjectId = event.data.event.data?.projectId;
+      if (!failedProjectId) {
+        logger.error(
+          `[Inngest] projectCreated failed but no projectId on the event: ${error.message}`,
+        );
+        return;
+      }
+      logger.error(
+        `[Inngest] projectCreated exhausted retries for ${failedProjectId}: ${error.message}`,
+      );
+      await db
+        .update(projectTables)
+        .set({
+          embeddingStatus: "failed",
+          embeddingError: `Project setup failed after all retries: ${error.message}`,
+          lastEmbeddingAttempt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(projectTables.id, failedProjectId));
+    },
   },
   async ({ event, step }) => {
     const { projectId, repoUrl, owner, repo } = event.data;
@@ -354,6 +377,14 @@ export const cleanupStaleData = inngest.createFunction(
   {
     id: "cleanup-stale-data",
     triggers: [{ cron: "0 3 * * *" }],
+    // Cron-triggered, so there is no project to write status to. The failure
+    // still has to be visible somewhere, otherwise a broken sweep looks like a
+    // healthy one.
+    onFailure: async ({ error }) => {
+      logger.error(
+        `[Inngest] cleanupStaleData failed: ${error.message}`,
+      );
+    },
   },
   async ({ step }) => {
     // 1. Purge expired rate limit windows.

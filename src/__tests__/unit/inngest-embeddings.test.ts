@@ -44,14 +44,18 @@ vi.mock("@/db", () => ({
   },
 }));
 
-const { handlers } = vi.hoisted(
-  () => ({ handlers: new Map<string, (args: any) => Promise<unknown>>() }),
+const { handlers, configs } = vi.hoisted(
+  () => ({
+    handlers: new Map<string, (args: any) => Promise<unknown>>(),
+    configs: new Map<string, { id: string; onFailure?: (args: any) => Promise<unknown> }>(),
+  }),
 );
 
 vi.mock("@/src/lib/inngest/client", () => ({
   inngest: {
-    createFunction: (config: { id: string }, handler: (args: any) => Promise<unknown>) => {
+    createFunction: (config: any, handler: (args: any) => Promise<unknown>) => {
       handlers.set(config.id, handler);
+      configs.set(config.id, config);
       return { id: config.id };
     },
   },
@@ -65,7 +69,20 @@ vi.mock("@/src/features/rag/services/rag-ingestion", () => ({
 
 vi.mock("@/src/lib/github", () => ({ getRepositoryFiles: vi.fn(), syncIssuesAndComments: vi.fn() }));
 
-import { generateEmbeddings } from "@/src/lib/inngest/functions";
+const { logs } = vi.hoisted(() => ({ logs: { error: [] as string[] } }));
+
+vi.mock("@/src/lib/logger", () => ({
+  logger: {
+    error: (m: string) => {
+      logs.error.push(m);
+    },
+    info: () => undefined,
+    warn: () => undefined,
+    debug: () => undefined,
+  },
+}));
+
+import { cleanupStaleData, generateEmbeddings, projectCreated } from "@/src/lib/inngest/functions";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 
 const step = {
@@ -119,6 +136,47 @@ describe("generateEmbeddings finalize", () => {
     const final = updates.at(-1)!;
     expect(final.embeddingStatus).toBe("completed");
     expect(final.embeddingProgress).toBe(100);
+  });
+});
+
+describe("onFailure hooks", () => {
+  beforeEach(() => {
+    logs.error = [];
+  });
+
+  it("projectCreated records a failed embedding status instead of stranding the project", async () => {
+    void projectCreated;
+    const onFailure = configs.get("project-created")!.onFailure;
+    expect(onFailure).toBeTypeOf("function");
+
+    await onFailure!({
+      event: { data: { event: { data: { projectId: "project-1" } } } },
+      error: { message: "boom" },
+    });
+
+    const final = updates.at(-1)!;
+    expect(final.embeddingStatus).toBe("failed");
+    expect(final.embeddingError).toContain("boom");
+  });
+
+  it("projectCreated logs and skips the write when the event carries no projectId", async () => {
+    void projectCreated;
+    const onFailure = configs.get("project-created")!.onFailure!;
+
+    await expect(
+      onFailure({ event: { data: { event: { data: {} } } }, error: { message: "boom" } }),
+    ).resolves.toBeUndefined();
+    expect(updates).toEqual([]);
+    expect(logs.error.join(" ")).toContain("boom");
+  });
+
+  it("cleanupStaleData logs a failed sweep rather than failing silently", async () => {
+    void cleanupStaleData;
+    const onFailure = configs.get("cleanup-stale-data")!.onFailure;
+    expect(onFailure).toBeTypeOf("function");
+
+    await expect(onFailure!({ error: { message: "sweep blew up" } })).resolves.toBeUndefined();
+    expect(logs.error.join(" ")).toContain("sweep blew up");
   });
 });
 
