@@ -4,7 +4,7 @@ Branch: `lane/p1-e` (off `main` @ `c9ffe92`). Lane E owns `e2e/**`, `playwright.
 
 | Task | Status | Reason | Commit |
 |---|---|---|---|
-| T-032 | done | The suite now boots its own server; `bun run test:e2e` passes from a cold start | `PLACEHOLDER` |
+| T-032 | done | The suite now boots its own server; `bun run test:e2e` passes from a cold start | `9746a25` |
 | T-033 | todo | | |
 | T-034 | todo | | |
 | T-035 | todo | | |
