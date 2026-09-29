@@ -2,6 +2,10 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 
+/** Upper bound on particles per canvas. The density prop saturates this on any
+ *  viewport under ~80x smaller than the default, so it is the real cost. */
+const MAX_PARTICLES = 300;
+
 interface SparklesProps {
   id?: string;
   className?: string;
@@ -114,12 +118,19 @@ export const SparklesCore = ({
     const particleCount = Math.min(
       Math.floor((canvasSize.current.w * canvasSize.current.h) / 8000) *
         particleDensity,
-      1000,
+      MAX_PARTICLES,
     );
 
     for (let i = 0; i < particleCount; i++) {
       particles.push(new Particle());
     }
+
+    // The canvas is always sized to the viewport, so the density formula
+    // saturates MAX_PARTICLES on any laptop. Every particle is an arc + fill
+    // per frame, and the page mounts two of these canvases, so the cap is the
+    // real per-frame cost.
+    let frame = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const animate = () => {
       if (!ctx) return;
@@ -130,13 +141,40 @@ export const SparklesCore = ({
         particle.draw();
       });
 
-      requestAnimationFrame(animate);
+      frame = requestAnimationFrame(animate);
     };
 
-    animate();
+    const start = () => {
+      if (frame !== 0 || reducedMotion.matches) return;
+      frame = requestAnimationFrame(animate);
+    };
+
+    const stop = () => {
+      if (frame === 0) return;
+      cancelAnimationFrame(frame);
+      frame = 0;
+    };
+
+    // A hidden tab or an off-screen section is invisible either way, so the
+    // loop is pure cost there.
+    const onVisibilityChange = () => (document.hidden ? stop() : start());
+    const onMotionChange = () => (reducedMotion.matches ? stop() : start());
+    const intersection = new IntersectionObserver(([entry]) =>
+      entry.isIntersecting ? start() : stop(),
+    );
+
+    intersection.observe(canvas);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    reducedMotion.addEventListener("change", onMotionChange);
+
+    start();
 
     return () => {
       window.removeEventListener("resize", resizeCanvas);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      reducedMotion.removeEventListener("change", onMotionChange);
+      intersection.disconnect();
+      stop();
     };
   }, [
     minSize,
