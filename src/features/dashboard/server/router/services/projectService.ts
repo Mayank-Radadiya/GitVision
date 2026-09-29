@@ -712,9 +712,7 @@ export function createProjectService() {
     },
 
     /**
-     * "Needs Attention" widget — open issues/PRs with AI complexity signal.
-     * Now surfaces `aiComplexity` and `aiTags` so the frontend can show
-     * severity badges without an extra round-trip.
+     * "Needs Attention" widget — open issues/PRs across every owned project.
      */
     async getNeedsAttention(userId: string) {
       const [counts, items] = await Promise.all([
@@ -733,7 +731,7 @@ export function createProjectService() {
             ),
           ),
 
-        // Fetch items with AI triage columns included
+        // Fetch the items themselves
         db
           .select({
             id: issuesTable.id,
@@ -745,8 +743,6 @@ export function createProjectService() {
             projectId: issuesTable.projectId,
             projectName: projectTables.projectName,
             githubUpdatedAt: issuesTable.githubUpdatedAt,
-            aiComplexity: issuesTable.aiComplexity, // ← new: severity badge
-            aiTags: issuesTable.aiTags, // ← new: chip labels
           })
           .from(issuesTable)
           .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
@@ -773,7 +769,6 @@ export function createProjectService() {
 
     /**
      * Fetches paginated issues/PRs for a single project.
-     * Now includes AI triage fields so issue list views can display badges.
      */
     async getProjectIssues(
       projectId: string,
@@ -796,9 +791,6 @@ export function createProjectService() {
           authorAvatar: issuesTable.authorAvatar,
           githubUpdatedAt: issuesTable.githubUpdatedAt,
           githubCreatedAt: issuesTable.githubCreatedAt,
-          aiComplexity: issuesTable.aiComplexity,
-          aiTags: issuesTable.aiTags,
-          aiSummary: issuesTable.aiSummary,
         })
         .from(issuesTable)
         .where(

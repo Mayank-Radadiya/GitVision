@@ -9,7 +9,7 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
 | T-012 | done | Prepare counts every project file; Finalize stores `partial` when the cap bit; 3 tests added | `ff91397` |
 | T-013 | done | index badge now reads "Partial index — indexed N of M files" for a capped index; 5 tests added | `dda38cf` |
 | T-024 | done | retention table row 2 no longer advertises a 30-day orphan sweep that does not exist | `d42c004` |
-| T-028 | todo | | |
+| T-028 | done | AI-triage fields dropped from both issue selects and from the insert; 4 tests added | `PENDING` |
 
 ## Notes
 
@@ -50,6 +50,19 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
     Real embedding deletion: `rag-ingestion.ts:88` deletes by `fileId` before
     re-embedding, and `codeEmbeddings` cascades from both `projectId` and
     `fileId`.
+  - T-028 needed no edit at all to `db/schema.ts` (the task's own
+    recommendation): the three nullable columns stay, because dropping them
+    costs a migration and a `.notes.md` and buys nothing user-visible. It also
+    needed no edit to `src/features/dashboard/server/router/project.ts` — that
+    router declares no hand-written output types for `getNeedsAttention` /
+    `getIssues`, so removing the fields from the service selects is what narrows
+    the tRPC output. There were no AI-triage rendering components to delete
+    either: `needs-attention.tsx` only ever read `id`, `isPullRequest`, `title`,
+    `projectName`, `issueNumber` and `githubUpdatedAt`, and `AttentionItem` in
+    `dashboard.types.ts` never declared an AI field. So the affordance was
+    advertised by comments and by the payload, never by the markup. The
+    unrelated `aiSummary` in `src/lib/github/services/commits.ts` is the
+    commit-summary LLM write against a different table and was left alone.
 - **Foreign commit on this branch:** `dc2c3b7 [T-037] single ownership check for
   routers and route handlers` appeared above my T-012 commit without this session
   making it — a parallel agent working in this same worktree committed it. It is
