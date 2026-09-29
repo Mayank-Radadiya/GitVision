@@ -493,9 +493,65 @@ export function createProjectService() {
     },
 
     /**
-     * CONSOLIDATED: Fetches ALL dashboard data in a single server call.
-     * Runs 7 independent queries in parallel via Promise.all() to avoid
-     * sequential HTTP waterfalls — maximum possible concurrency.
+     * Fetches ALL dashboard data in a single server call, the seven reads
+     * issued in parallel so there is no sequential HTTP waterfall.
+     *
+     * ── Measured inventory (T-029) ───────────────────────────────────────────
+     * Measured 2026-09-29 against the dev database through the `neon-http`
+     * driver, for the heaviest user there (5 projects, 402 commits, 72
+     * issues), 5 runs per call, medians. Re-measure before trusting these
+     * again — they are a floor for one region, not a promise.
+     *
+     * The cost here is round-trips, not row counts. `SELECT 1` on the same
+     * connection is ~72 ms, which is the floor every number below includes.
+     *
+     *   call                        queries  tables               median
+     *   getDashboardInfo                  2  projects, users          99 ms
+     *   getAllProjects                    1  projects                 83 ms
+     *   getRecentActivity                 1  commits ⋈ projects      475 ms
+     *   getCommitChart                    1  commits ⋈ projects       72 ms
+     *   getPickUpWhereYouLeftOff          2  project_chats, commits   102 ms
+     *   getLanguageBreakdown              1  projects                 99 ms
+     *   getNeedsAttention                 2  issues ⋈ projects        106 ms
+     *
+     * So it is ten queries across seven service calls, not seven. The
+     * Promise.all is working: the two-query calls cost only ~20 ms more
+     * than the one-query calls, because they overlap. End-to-end
+     * `getDashboardData` measured 636-1040 ms, ~717 ms median.
+     *
+     * getRecentActivity is the outlier, and it is not the planner's fault.
+     * EXPLAIN ANALYZE on its exact SQL reports 0.134 ms of database time
+     * (backward index scan on commits_author_date_idx, 10 shared buffers).
+     * The time is on the wire: it returns full `commit_message` text,
+     * which averages 1,092 bytes and reaches 65,536. The same query with
+     * `c.id` instead is ~90 ms, and adding back author_avatar, author_name
+     * or projects.name one at a time is still ~72-100 ms. Only
+     * commit_message moves the number (300-775 ms). getPickUpWhereYouLeftOff
+     * escapes it only because it takes the single most recent row, not 8.
+     *
+     * Mergeability, for whoever consolidates this next:
+     *   - projects, read three times — getAllProjects (all columns),
+     *     getDashboardInfo's SUM() and getLanguageBreakdown's `languages`.
+     *     All three are `WHERE owner_id = ?`, and getAllProjects already
+     *     returns every row, so both aggregates are derivable in JS with no
+     *     extra query at all. 3 → 1.
+     *   - commits ⋈ projects, read three times — getRecentActivity's top 8,
+     *     getCommitChart's 7-day aggregate, and getPickUpWhereYouLeftOff's
+     *     top 1. The two row reads can share one query (getRecentActivity's
+     *     ordering already contains the top 1; it only needs to also select
+     *     `hasSummary`). The aggregate can become `count(*) OVER ()` on the
+     *     same rows. 3 → 1.
+     *   - issues ⋈ projects, read twice — getNeedsAttention's count
+     *     aggregate and its top 8 rows share an identical FROM and WHERE,
+     *     so the count is a `count(*) OVER ()` on the same result. 2 → 1.
+     *   - users (credits) and project_chats ⋈ projects (the last chat) are
+     *     one row each on their own tables. Nothing to merge them into;
+     *     getting from 5 requests to 3 means batching them onto the same
+     *     Neon HTTP statement, not joining.
+     *
+     * Order matters if this is picked up: capping `commit_message` on the
+     * way out buys far more than any merge above, because no merge removes
+     * the 64 KB row. getRecentActivity alone is two thirds of the widget.
      */
     async getDashboardData(userId: string) {
       const [
