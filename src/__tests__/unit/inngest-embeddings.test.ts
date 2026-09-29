@@ -102,13 +102,14 @@ async function run() {
 beforeEach(() => {
   updates = [];
   limits = [];
-  // claim, files, embedding count, token sum
+  // claim, files, project_files count, embedding count, token sum
   results = [
     [{ id: "project-1" }],
     [
       { id: "f1", fileName: "a.ts", code: "const a = 1;" },
       { id: "f2", fileName: "b.ts", code: "const b = 2;" },
     ],
+    [{ total: 2 }],
     [{ count: 42 }],
     [{ total: 1000 }],
   ];
@@ -193,5 +194,45 @@ describe("generateEmbeddings Prepare", () => {
     // The body handed on to the Inngest step must be capped.
     const call = vi.mocked(processFileForRag).mock.calls[0];
     expect(call[2].length).toBeLessThan(big.length);
+  });
+});
+
+describe("generateEmbeddings truncation", () => {
+  it("marks the project partial, not completed, when the project has more files than the cap", async () => {
+    // Two files come back from the bounded read, but the project has 1200.
+    results[2] = [{ total: 1200 }];
+    fileResults = [
+      { fileId: "f1", filePath: "a.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+      { fileId: "f2", filePath: "b.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+    ];
+
+    const result = await run();
+
+    const final = updates.at(-1)!;
+    expect(final.embeddingStatus).toBe("partial");
+    expect(final.embeddingError).toContain("2 of 1200");
+    expect(result).toMatchObject({ success: true, truncated: true });
+  });
+
+  it("still marks a fully covered project completed", async () => {
+    fileResults = [
+      { fileId: "f1", filePath: "a.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+      { fileId: "f2", filePath: "b.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+    ];
+
+    const result = await run();
+
+    expect(updates.at(-1)!.embeddingStatus).toBe("completed");
+    expect(result).toMatchObject({ truncated: false });
+  });
+
+  it("reports a file error rather than a partial index when files also failed", async () => {
+    results[2] = [{ total: 1200 }];
+
+    const result = await run();
+
+    // f2 errors by default, so the failure is the more urgent signal.
+    expect(updates.at(-1)!.embeddingStatus).toBe("failed");
+    expect(result).toMatchObject({ success: false });
   });
 });

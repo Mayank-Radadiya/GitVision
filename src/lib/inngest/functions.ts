@@ -163,7 +163,7 @@ export const generateEmbeddings = inngest.createFunction(
         logger.info(
           `[Inngest] Embeddings already processing for ${projectId}, skipping`,
         );
-        return { claimed: false, files: [] };
+        return { claimed: false, files: [], total: 0 };
       }
 
       // We own the pipeline — load the files, bounded. This result is
@@ -191,7 +191,15 @@ export const generateEmbeddings = inngest.createFunction(
       logger.info(
         `[Inngest] Found ${allFiles.length} files for embedding in project ${projectId}`,
       );
-      return { claimed: true, files: allFiles };
+
+      // The bounded read above hides how many files the project actually has.
+      // Count them so Finalize can tell a complete index from a capped one.
+      const [countRow] = await db
+        .select({ total: sql<number>`count(*)` })
+        .from(projectFiles)
+        .where(eq(projectFiles.projectId, projectId));
+
+      return { claimed: true, files: allFiles, total: Number(countRow?.total ?? 0) };
     });
 
     if (!prepared.claimed) {
@@ -284,6 +292,7 @@ export const generateEmbeddings = inngest.createFunction(
         .where(eq(codeEmbeddings.projectId, projectId));
 
       const actualCount = countResult?.count ?? 0;
+      const selectedFiles = files.length;
 
       if (actualCount === 0) {
         const errorMsg = `Embedding generation produced 0 embeddings from ${files.length} files. ${
@@ -302,7 +311,7 @@ export const generateEmbeddings = inngest.createFunction(
           })
           .where(eq(projectTables.id, projectId));
 
-        return { success: false, error: errorMsg };
+        return { success: false, error: errorMsg, truncated: false };
       }
 
       // Calculate total tokens for the project size gate
@@ -335,7 +344,36 @@ export const generateEmbeddings = inngest.createFunction(
 
         logger.error(`[Inngest] ⚠️ Embeddings incomplete for ${projectId}: ${errors.length} file error(s)`);
 
-        return { success: false, embeddings: actualCount, error: errorMsg };
+        return { success: false, embeddings: actualCount, error: errorMsg, truncated: false };
+      }
+
+      // The same promise breaks a different way when the project is simply
+      // bigger than the cap: Prepare only ever sees the MAX_EMBEDDING_FILES
+      // smallest files, so "completed" would advertise coverage of files that
+      // were never embedded and never will be on a re-run. A partial index is
+      // still a working index, so it is not "failed" — but it is not the whole
+      // repo either, and the user has to be told which half they got.
+      if (prepared.total > selectedFiles) {
+        const truncatedMsg = `Indexed ${selectedFiles} of ${prepared.total} files — the repository exceeds the ${MAX_EMBEDDING_FILES}-file embedding cap, so the remaining ${
+          prepared.total - selectedFiles
+        } files are not searchable.`;
+
+        await db
+          .update(projectTables)
+          .set({
+            embeddingStatus: "partial",
+            embeddingProgress: 100,
+            embeddingError: truncatedMsg,
+            estimatedTokens,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectTables.id, projectId));
+
+        logger.warn(
+          `[Inngest] ⚠️ Partial index for ${projectId}: ${selectedFiles}/${prepared.total} files embedded`,
+        );
+
+        return { success: true, embeddings: actualCount, truncated: true };
       }
 
       // Mark as completed
@@ -354,13 +392,15 @@ export const generateEmbeddings = inngest.createFunction(
         `[Inngest] ✅ Embeddings complete for ${projectId}: ${actualCount} embeddings, ${totalChunks} chunks`,
       );
 
-      return { success: true, embeddings: actualCount };
+      return { success: true, embeddings: actualCount, truncated: false };
     });
 
     return {
       success: finalResult.success,
       projectId,
       totalFiles: files.length,
+      totalProjectFiles: prepared.total,
+      truncated: finalResult.truncated,
       totalChunks,
       totalEmbeddings,
       errors: errors.length,

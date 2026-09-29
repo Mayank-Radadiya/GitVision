@@ -78,7 +78,7 @@ export const projectTables = pgTable(
     // Embedding status tracking for deferred RAG processing
     embeddingStatus: varchar("embedding_status", { length: 20 })
       .notNull()
-      .default("pending"), // Values: 'pending' | 'processing' | 'completed' | 'failed'
+      .default("pending"), // Values: 'pending' | 'processing' | 'completed' | 'partial' | 'failed'
     embeddingError: text("embedding_error"), // Store error message if failed
     embeddingProgress: integer("embedding_progress").notNull().default(0), // Track progress (0-100)
     lastEmbeddingAttempt: timestamp("last_embedding_attempt"), // Track when last attempted
