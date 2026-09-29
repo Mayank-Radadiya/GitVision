@@ -33,6 +33,8 @@ function makeRows(rows: unknown[]) {
       calls[calls.length - 1].orderBy = clause;
       return chain;
     },
+    // getById LEFT JOINs the projects table to return the project name.
+    leftJoin: () => chain,
     limit: (n: number) => {
       calls[calls.length - 1].limit = n;
       return promise;

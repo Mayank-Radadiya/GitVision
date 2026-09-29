@@ -1,9 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { caller } from "@/src/lib/trpc/server";
-import { db } from "@/db";
-import { projectTables } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { ChatRoom } from "@/src/features/chat/components/chat-room";
 
 interface ChatPageProps {
@@ -23,23 +20,13 @@ export default async function ChatDetailPage({ params }: ChatPageProps) {
     notFound();
   }
 
-  // Get project name if this is a project chat
-  let projectName: string | undefined;
-  if (chatData.projectId) {
-    const [project] = await db
-      .select({ projectName: projectTables.projectName })
-      .from(projectTables)
-      .where(eq(projectTables.id, chatData.projectId))
-      .limit(1);
-    projectName = project?.projectName;
-  }
-
   return (
     <div className="h-screen bg-linear-to-br from-background via-background/95 to-background/90">
       <ChatRoom
         chatId={chatData.id}
         projectId={chatData.projectId}
-        projectName={projectName}
+        // Joined in by chat.getById — no second query needed for the name.
+        projectName={chatData.projectName ?? undefined}
         type={chatData.type as "project" | "general"}
         title={chatData.title}
         // ponytail: only the newest 300 messages load. Longer chats start

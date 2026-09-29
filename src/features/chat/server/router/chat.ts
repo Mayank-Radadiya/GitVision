@@ -5,7 +5,7 @@ import {
   protectedProcedure,
 } from "../../../../lib/trpc/init";
 import { db } from "@/db";
-import { projectChats, chatMessages } from "@/db/schema";
+import { projectChats, chatMessages, projectTables } from "@/db/schema";
 import { eq, and, desc, lt } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
 
@@ -116,9 +116,21 @@ export const chatRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
+      // The page needs the project name too, so join it in rather than making
+      // the caller run a second query for a key the chat row already carries.
       const [chat] = await db
-        .select()
+        .select({
+          id: projectChats.id,
+          projectId: projectChats.projectId,
+          userId: projectChats.userId,
+          type: projectChats.type,
+          title: projectChats.title,
+          createdAt: projectChats.createdAt,
+          updatedAt: projectChats.updatedAt,
+          projectName: projectTables.projectName,
+        })
         .from(projectChats)
+        .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
         .where(
           and(
             eq(projectChats.id, input.chatId),
