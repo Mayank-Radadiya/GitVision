@@ -338,16 +338,26 @@ export const cleanupStaleData = inngest.createFunction(
     triggers: [{ cron: "0 3 * * *" }],
   },
   async ({ step }) => {
-    // 1. Purge expired rate limit windows (> 24h old).
+    // 1. Purge expired rate limit windows.
     // rate_limits has no createdAt/id column — windowStart is the only
     // timestamp, and a rate limit row is dead once its window has elapsed.
+    //
+    // A row may only be dropped after the LONGEST window any caller uses, or
+    // rateLimit() would have to resurrect it from scratch mid-count. The
+    // longest configured window is 3600s (projectCreate); the other two are
+    // 600s (embeddings) and 60s (chat). Keep this >= that, and re-check the
+    // rateLimit() call sites when adding a new limit.
+    const RATE_LIMIT_MAX_WINDOW_SECONDS = 3600;
+
     const rateLimitResult = await step.run(
       "Clean Expired Rate Limits",
       async () => {
-        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const cutoff = new Date(
+          Date.now() - RATE_LIMIT_MAX_WINDOW_SECONDS * 1000,
+        );
         const deleted = await db
           .delete(rateLimitsTable)
-          .where(lt(rateLimitsTable.windowStart, dayAgo))
+          .where(lt(rateLimitsTable.windowStart, cutoff))
           .returning({ limitKey: rateLimitsTable.limitKey });
 
         logger.info(
