@@ -7,8 +7,8 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
 | T-014 | done | projectCreated + cleanupStaleData now have `onFailure`; 3 tests added | `57de263` |
 | T-017 | done | `gemini-*-latest` alias replaced with pinned `gemini-2.0-flash-001`; 2 tests added | `e3ff9be` |
 | T-012 | done | Prepare counts every project file; Finalize stores `partial` when the cap bit; 3 tests added | `ff91397` |
-| T-013 | done | index badge now reads "Partial index — indexed N of M files" for a capped index; 5 tests added | `PENDING` |
-| T-024 | todo | | |
+| T-013 | done | index badge now reads "Partial index — indexed N of M files" for a capped index; 5 tests added | `dda38cf` |
+| T-024 | done | retention table row 2 no longer advertises a 30-day orphan sweep that does not exist | `c251ef3` |
 | T-028 | todo | | |
 
 ## Notes
@@ -40,6 +40,16 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
     NOT touched for T-013: `getProjectById` already returns the whole project
     row, so `embeddingStatus` / `totalFiles` / `embeddingError` already reach
     the client, and the file is lane-D-owned and already dirty.
+  - `docs/operations/backup-retention.md` (T-024). Documentation-only, named
+    directly by the task. Only the retention-table row for orphan code
+    embeddings was rewritten. The other two rows were checked against the code
+    and are accurate, so they were left alone: the rate-limit row matches the
+    `cleanupStaleData` cron (functions.ts:439-450, 1h window, daily sweep), and
+    the project files/commits row matches the `ON DELETE CASCADE` on
+    `projectFiles.projectId` and `commitsTable.projectId` (db/schema.ts:106-108).
+    Real embedding deletion: `rag-ingestion.ts:88` deletes by `fileId` before
+    re-embedding, and `codeEmbeddings` cascades from both `projectId` and
+    `fileId`.
 - **Foreign commit on this branch:** `dc2c3b7 [T-037] single ownership check for
   routers and route handlers` appeared above my T-012 commit without this session
   making it — a parallel agent working in this same worktree committed it. It is
