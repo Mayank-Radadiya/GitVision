@@ -231,6 +231,11 @@ they can predict what a failed check looks like. The tension is that the shared
 guard exists precisely so there is one place to look, and the dashboard service
 not using it means there are two.
 
+There is a fix for this tension in flight under task T-037: make
+`ProjectAccessError` extend `TRPCError` with code NOT_FOUND, then delete
+`verifyOwnership` and point its eight call sites at the guard. If you read this
+section after that lands, there is one primitive and this table is history.
+
 ## What is deliberately absent
 
 - **No Caching layer.** The dashboard makes one batched round-trip rather than
