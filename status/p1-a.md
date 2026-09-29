@@ -8,7 +8,7 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
 | T-017 | done | `gemini-*-latest` alias replaced with pinned `gemini-2.0-flash-001`; 2 tests added | `e3ff9be` |
 | T-012 | done | Prepare counts every project file; Finalize stores `partial` when the cap bit; 3 tests added | `ff91397` |
 | T-013 | done | index badge now reads "Partial index — indexed N of M files" for a capped index; 5 tests added | `dda38cf` |
-| T-024 | done | retention table row 2 no longer advertises a 30-day orphan sweep that does not exist | `c251ef3` |
+| T-024 | done | retention table row 2 no longer advertises a 30-day orphan sweep that does not exist | `d42c004` |
 | T-028 | todo | | |
 
 ## Notes
