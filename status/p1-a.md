@@ -9,7 +9,7 @@ Branch: `lane/p1-a` (off `main` @ `3dec53c`)
 | T-012 | done | Prepare counts every project file; Finalize stores `partial` when the cap bit; 3 tests added | `ff91397` |
 | T-013 | done | index badge now reads "Partial index — indexed N of M files" for a capped index; 5 tests added | `dda38cf` |
 | T-024 | done | retention table row 2 no longer advertises a 30-day orphan sweep that does not exist | `d42c004` |
-| T-028 | done | AI-triage fields dropped from both issue selects and from the insert; 4 tests added | `PENDING` |
+| T-028 | done | AI-triage fields dropped from both issue selects and from the insert; 4 tests added | `b0fcb1b` |
 
 ## Notes
 
