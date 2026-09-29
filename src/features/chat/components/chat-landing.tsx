@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { trpc } from "@/src/lib/trpc/client";
+import { logger } from "@/src/lib/logger";
 import { formatDistanceToNow } from "date-fns";
 
 interface Project {
@@ -189,7 +190,7 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
       }));
       setGeneratingFor(null);
     } catch (error) {
-      console.error("Failed to cancel:", error);
+      logger.error("Failed to cancel embedding generation", error);
     }
   };
 

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { usersTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { logger } from "@/src/lib/logger";
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
       "svix-signature": svix_signature,
     }) as WebhookEvent;
   } catch (err) {
-    console.error("Error verifying webhook:", err);
+    logger.error("Error verifying webhook", err);
     return new Response("Error occured", {
       status: 400,
     });
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
   } catch (err) {
     // Surface the failure. Returning 200 here marks the delivery successful,
     // so Clerk never retries and user provisioning fails silently.
-    console.error("Error processing Clerk webhook:", err);
+    logger.error("Error processing Clerk webhook", err);
     return NextResponse.json(
       { message: "Error processing webhook" },
       { status: 500 },

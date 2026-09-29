@@ -10,10 +10,15 @@ import { cache } from "react";
  */
 export const createTRPCContext = cache(async (opts?: { req?: Request }) => {
   const { userId } = await auth();
+  // Vercel and most proxies send x-request-id. Without one, every log line
+  // from this request would be uncorrelatable, so make our own.
+  const requestId =
+    opts?.req?.headers.get("x-request-id") ?? crypto.randomUUID();
 
   return {
     req: opts?.req,
     userId,
+    requestId,
   };
 });
 

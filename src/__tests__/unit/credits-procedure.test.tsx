@@ -119,6 +119,7 @@ describe("getCredits", () => {
     const caller = createCallerFactory(projectRouter)({
       userId: "user_1",
       req: undefined,
+      requestId: "test-request",
     });
 
     await expect(caller.getCredits()).resolves.toBe(CREDITS);

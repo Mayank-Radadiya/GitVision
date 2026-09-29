@@ -12,6 +12,7 @@ import { projectChats, chatMessages, projectTables, usersTable } from "@/db/sche
 import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { logger } from "@/src/lib/logger";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
@@ -244,10 +245,9 @@ async function retrieveContext(
         }
       }
     } catch (err) {
-      console.warn(
-        "[RAG] fetchContext failed, falling back to vector search:",
-        err,
-      );
+      logger.warn("[RAG] fetchContext failed, falling back to vector search", {
+        error: err,
+      });
     }
   }
 
@@ -443,7 +443,7 @@ export async function POST(req: Request) {
       try {
         await refundCredits(userId, CHAT_TURN_COST);
       } catch (error) {
-        console.error("[Chat] Credit refund failed:", error);
+        logger.error("[Chat] Credit refund failed", error);
       }
     };
 
@@ -455,7 +455,7 @@ export async function POST(req: Request) {
         }
         void refundOnce();
         const { code, message } = categorizeModelError(error);
-        console.error("[Chat] Stream error:", error);
+        logger.error("[Chat] Stream error", error);
         return JSON.stringify({ code, message });
       },
       async execute({ writer }) {
@@ -485,9 +485,9 @@ export async function POST(req: Request) {
                       ),
                   );
                 } catch (historyError) {
-                  console.warn(
-                    "[RAG] Failed to load conversation history, proceeding without it:",
-                    historyError,
+                  logger.warn(
+                    "[RAG] Failed to load conversation history, proceeding without it",
+                    { error: historyError },
                   );
                 }
               }
@@ -560,8 +560,8 @@ export async function POST(req: Request) {
               }
             }
           } catch (ragError) {
-            console.error(
-              "[RAG] Retrieval error, falling back to general mode:",
+            logger.error(
+              "[RAG] Retrieval error, falling back to general mode",
               ragError,
             );
           }
@@ -657,7 +657,7 @@ export async function POST(req: Request) {
         },
       );
     }
-    console.error("Chat API error:", error);
+    logger.error("Chat API error", error);
     return new Response(
       JSON.stringify({
         error: "Something went wrong",

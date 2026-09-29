@@ -58,7 +58,11 @@ import { projectRouter } from "@/src/features/dashboard/server/router/project";
 import { createCallerFactory } from "@/src/lib/trpc/init";
 
 const createCaller = createCallerFactory(projectRouter);
-const caller = createCaller({ userId: "user_1", req: undefined });
+const caller = createCaller({
+  userId: "user_1",
+  req: undefined,
+  requestId: "test-request",
+});
 
 const UUID = "11111111-1111-4111-8111-111111111111";
 
