@@ -16,10 +16,10 @@ let repoMetadata: Record<string, unknown> = {};
 const writes: string[] = [];
 
 vi.mock("@/src/lib/github/client", () => ({
-  octokit: {
+  getOctokit: () => ({
     graphql: async () => ({ repository: repoMetadata }),
     request: async () => ({ data: [] }),
-  },
+  }),
 }));
 
 vi.mock("@/db", () => ({

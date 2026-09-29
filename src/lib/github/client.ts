@@ -14,14 +14,24 @@ import {
 } from "./errors";
 
 // ── Authenticated Octokit singleton ──
+// Built on first use, never at module load. `src/lib/github/index.ts` is
+// imported by the project router and by `_app.ts`, so a module-load throw
+// here took down every tRPC call — chat included, which never touches
+// GitHub — and could break `next build`. The token is still required, it is
+// just required where it is used.
 
-if (!process.env.GITHUB_TOKEN) {
-  throw new Error("GITHUB_TOKEN environment variable is required");
+let octokit: Octokit | null = null;
+
+export function getOctokit(): Octokit {
+  if (!octokit) {
+    const auth = process.env.GITHUB_TOKEN;
+    if (!auth) {
+      throw new Error("GITHUB_TOKEN environment variable is required");
+    }
+    octokit = new Octokit({ auth });
+  }
+  return octokit;
 }
-
-export const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN,
-});
 
 /**
  * HTTP GET with automatic retries and exponential backoff.

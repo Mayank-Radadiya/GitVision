@@ -11,7 +11,7 @@ import { issuesTable, issueCommentsTable } from "@/db/schema";
 import type { GraphQLIssuesData, IssueOrPrNode } from "../types";
 import { GITHUB_CONFIG, DEFAULTS, ISSUES_AND_PRS_QUERY } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
-import { octokit } from "../client";
+import { getOctokit } from "../client";
 import { parseGitHubUrl, log } from "../utils";
 
 /**
@@ -107,6 +107,7 @@ export const syncIssuesAndComments = async (
     let prCursor: string | null = null;
     let hasMoreIssues = true;
     let hasMorePrs = true;
+    const octokit = getOctokit();
     let pages = 0;
 
     while (

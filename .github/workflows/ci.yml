@@ -43,12 +43,15 @@ jobs:
       # run. Points at the throwaway service container above.
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/gitvision_test
 
-      # Placeholders, not secrets. db/index.ts and github/client.ts evaluate
-      # these at module load, so the build fails without them — but nothing
-      # connects during a build. A syntactically valid URL is enough; see the
-      # build log in the commit that added this file.
+      # Placeholder, not a secret. `db/index.ts` evaluates DATABASE_URL at
+      # module load, so the build fails without it — but nothing connects
+      # during a build. A syntactically valid URL is enough; see the build
+      # log in the commit that added this file.
+      #
+      # GITHUB_TOKEN is deliberately NOT set here. The Octokit client is built
+      # on first use rather than at import time, so CI proves the build works
+      # without a GitHub token at all.
       DATABASE_URL: postgres://user:pass@localhost:5432/placeholder
-      GITHUB_TOKEN: ci-placeholder-not-a-real-token
 
     steps:
       - uses: actions/checkout@v4
