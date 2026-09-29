@@ -60,6 +60,29 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Ahead of typecheck so a bad dependency fails in seconds rather than
+      # after the whole toolchain has run. `bun audit` exits non-zero when it
+      # finds an advisory, so this step can genuinely go red — no
+      # `continue-on-error`, which would make it decoration.
+      #
+      # The one ignore is GHSA-67mh-4wv8-2f99 (esbuild dev-server CORS,
+      # fixed in 0.25.0). It reaches us through
+      # drizzle-kit -> @esbuild-kit/esm-loader, which pins esbuild 0.18.20.
+      # Two things make it a non-issue and an override the wrong fix:
+      # drizzle-kit is a devDependency used only by `db:generate`/`db:push`,
+      # and nothing in it ever starts an esbuild dev server — the advisory is
+      # about a server accepting cross-origin requests, and there is no
+      # server. It is also not ours to move: drizzle-kit@latest (0.31.11)
+      # still depends on the same unmaintained @esbuild-kit/esm-loader, so
+      # upgrading does not clear it, and forcing esbuild 0.18 -> 0.25 under
+      # that loader is a much larger risk than the advisory.
+      #
+      # Revisit when @esbuild-kit/esm-loader is replaced upstream, and drop
+      # this ignore in the same commit — the step will tell you if it is
+      # still needed, because an unneeded ignore does not hide anything.
+      - name: Audit dependencies
+        run: bun audit --ignore=GHSA-67mh-4wv8-2f99
+
       - name: Typecheck
         run: bun run typecheck
 
