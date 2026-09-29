@@ -107,6 +107,16 @@ export const projectRouter = createTRPCRouter({
   generateAiSummary: protectedProcedure
     .input(generateAiSummarySchema)
     .mutation(async ({ input, ctx }) => {
+      // This procedure already spends a credit and a full LLM call per commit
+      // (see COMMIT_SUMMARY_COST), so it is metered at the same order as chat:
+      // generous enough to skim a project's commit list, not enough to loop.
+      const rl = await rateLimit(keys.summary(ctx.userId), 20, 3600);
+      if (!rl.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Summary generation limit reached. Please try again later.",
+        });
+      }
       return projectService.generateAiSummary(
         input.projectId,
         input.commitId,
@@ -152,6 +162,16 @@ export const projectRouter = createTRPCRouter({
   syncIssues: protectedProcedure
     .input(projectIdSchema)
     .mutation(async ({ input, ctx }) => {
+      // Delete-and-re-pull of every issue and PR in the repo. Cheap per call,
+      // but the GitHub quota behind it is shared, so it gets the same hourly
+      // shape as projectCreate with a tighter ceiling.
+      const rl = await rateLimit(keys.issuesSync(ctx.userId), 5, 3600);
+      if (!rl.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Issue sync limit reached. Please try again later.",
+        });
+      }
       return projectService.syncIssues(input.projectId, ctx.userId);
     }),
 });

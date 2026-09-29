@@ -52,4 +52,6 @@ export const keys = {
   chat: (userId: string) => `chat:${userId}`,
   projectCreate: (userId: string) => `project-create:${userId}`,
   embeddings: (userId: string) => `embeddings:${userId}`,
+  summary: (userId: string) => `summary:${userId}`,
+  issuesSync: (userId: string) => `issues-sync:${userId}`,
 } as const;
