@@ -163,16 +163,14 @@ describe("getDashboardData round-trips", () => {
     expect(batchSize).toBe(6);
   });
 
-  it("keeps the seven-key payload", async () => {
+  it("keeps the five-key payload", async () => {
     const data = await dashboard();
 
     expect(Object.keys(data).sort()).toEqual([
       "attention",
       "commitChart",
       "languages",
-      "pickUp",
       "projects",
-      "recentActivity",
       "stats",
     ]);
   });
@@ -209,40 +207,6 @@ describe("getDashboardData derives instead of re-querying", () => {
     expect(languages).toEqual([
       { name: "TypeScript", color: "#3178c6", size: 800, percentage: 80 },
       { name: "Rust", color: "#dea584", size: 200, percentage: 20 },
-    ]);
-  });
-
-  it("reuses the most recent commit for the pick-up card", async () => {
-    const { pickUp, recentActivity } = await dashboard();
-
-    // One query serves both: the pick-up card is the first row of the same
-    // `ORDER BY authorDate DESC` the activity list already reads.
-    expect(recentActivity).toEqual([
-      {
-        id: "commit_1",
-        commitMessage: "fix: proxy allowlist",
-        authorName: "dev",
-        authorAvatar: "https://example.test/a.png",
-        authorDate: new Date("2026-01-02T00:00:00.000Z"),
-        projectId: "proj_1",
-        projectName: "gitvision",
-      },
-    ]);
-    expect(pickUp.cards).toEqual([
-      {
-        type: "chat",
-        title: "Continue Conversation",
-        description: "Where is the auth middleware",
-        href: "/chat/chat_1",
-        projectName: "gitvision",
-      },
-      {
-        type: "commit",
-        title: "Recent Commit",
-        description: "fix: proxy allowlist",
-        href: "/dashboard/user-project/proj_1",
-        projectName: "gitvision",
-      },
     ]);
   });
 

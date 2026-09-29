@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { CheckIcon, ArrowRightIcon } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -84,9 +85,12 @@ export function PricingCard({ plan }: PricingCardProps) {
               "group h-11 w-full cursor-pointer rounded-lg transition-all",
               plan.popular && "shadow-primary/20 shadow-md",
             )}
+            asChild
           >
-            <span>{plan.cta}</span>
-            <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            <Link href="/sign-up">
+              <span>{plan.cta}</span>
+              <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </Button>
         </CardFooter>
       </SpotlightCard>

@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
+import { cn } from "@/shared/lib/utils";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -43,24 +44,24 @@ interface SidebarSignOutProps {
  * - Full text when expanded
  */
 export function SidebarSignOut({ isCollapsed }: SidebarSignOutProps) {
-  if (!isCollapsed) {
-    return (
-      <SignOutButton>
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            <Button
-              aria-label="Sign out"
-              // variant="ghost"
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer justify-center rounded-xl bg-transparent"
-            >
-              <LogOut className="h-4.5 w-4.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="font-medium">
-            Sign out
-          </TooltipContent>
-        </Tooltip>
-      </SignOutButton>
-    );
-  }
+  return (
+    <SignOutButton>
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <Button
+            aria-label="Sign out"
+            className={cn(
+              "text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer justify-center rounded-xl bg-transparent",
+              isCollapsed && "h-9 w-9 p-0",
+            )}
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="font-medium">
+          Sign out
+        </TooltipContent>
+      </Tooltip>
+    </SignOutButton>
+  );
 }

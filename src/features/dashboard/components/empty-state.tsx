@@ -35,7 +35,7 @@ function EmptyState() {
 
       {/* CTA */}
       <Button
-        onClick={() => router.push("/dashboard/create-project")}
+        onClick={() => router.push("/create-project")}
         className="shadow-primary/20 mt-8 gap-2 rounded-xl px-6 py-2.5 font-semibold shadow-lg"
         aria-label="Connect a new repository"
       >

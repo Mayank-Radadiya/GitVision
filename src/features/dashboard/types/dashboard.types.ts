@@ -29,35 +29,10 @@ export interface Project {
   updatedAt: Date;
 }
 
-/** Single activity event from `project.getRecentActivity` */
-export interface ActivityEvent {
-  id: string;
-  commitMessage: string;
-  authorName: string;
-  authorAvatar: string | null;
-  authorDate: Date;
-  projectId: string;
-  projectName: string;
-}
-
 /** Daily commit count for the chart */
 export interface CommitChartPoint {
   date: string;
   commits: number;
-}
-
-/** Single action card in the "Pick Up Where You Left Off" section */
-export interface PickUpCard {
-  type: "chat" | "file" | "commit";
-  title: string;
-  description: string;
-  href: string;
-  projectName: string;
-}
-
-/** Data returned by `project.getPickUpWhereYouLeftOff` */
-export interface PickUpData {
-  cards: PickUpCard[];
 }
 
 /** Single language entry for the breakdown chart — matches DB schema in db/schema.ts */

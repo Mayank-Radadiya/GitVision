@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { CSP_DIRECTIVES } from "@/src/lib/csp";
 
 /**
@@ -10,26 +10,33 @@ import { CSP_DIRECTIVES } from "@/src/lib/csp";
  * Adding a page means adding it to this list, and adding a list entry is a
  * visible diff someone can review.
  */
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
+const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
+  /^\/$/,
+  /^\/sign-in(\/.*)?$/,
+  /^\/sign-up(\/.*)?$/,
   // Password reset has to work for people who are, by definition, signed out.
-  "/forgot-password(.*)",
-  "/legal(.*)",
-  "/sso-callback",
+  /^\/forgot-password(\/.*)?$/,
+  /^\/legal(\/.*)?$/,
+  /^\/sso-callback\/?$/,
   // Clerk's webhook is called without a session and is authenticated by its own
   // signature check; Inngest likewise signs its requests.
-  "/api/webhooks/clerk",
-  "/api/inngest(.*)",
+  /^\/api\/webhooks\/clerk\/?$/,
+  /^\/api\/inngest(\/.*)?$/,
   // CSP violation reports are posted by the browser on the page's behalf, so
   // there is no session to present. The collector is unauthenticated by
   // design: it reads a bounded body, writes a log line, and returns 204.
-  "/api/csp-report",
+  /^\/api\/csp-report\/?$/,
   // An uptime monitor has no session. The handler is read-only and returns no
   // customer data — see the "signed-out reachability" test.
-  "/api/health",
-]);
+  /^\/api\/health\/?$/,
+];
+
+function isPublicRoute(req: { nextUrl?: { pathname: string }; url?: string }): boolean {
+  const pathname =
+    req.nextUrl?.pathname ??
+    (req.url ? new URL(req.url, "http://localhost").pathname : "");
+  return PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
+}
 
 export default clerkMiddleware(
   async (auth, req) => {

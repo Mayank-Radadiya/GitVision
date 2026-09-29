@@ -835,14 +835,10 @@ export function createProjectService() {
           userCredits: creditRows[0]?.credits ?? 0,
         },
         projects: projectRows,
-        // `hasSummary` rides along for the pick-up card and is not part of the
-        // activity list's shape.
-        recentActivity: commitRows.map(({ hasSummary: _summary, ...rest }) => rest),
         commitChart: chartRows.map((r) => ({
           date: r.date,
           commits: Number(r.commits),
         })),
-        pickUp: { cards: buildPickUpCards(chatRows[0], commitRows[0]) },
         languages: aggregateLanguages(projectRows),
         attention: {
           openIssuesCount: Number(firstIssue?.openIssues ?? 0),

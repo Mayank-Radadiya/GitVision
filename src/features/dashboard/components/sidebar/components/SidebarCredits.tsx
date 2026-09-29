@@ -11,7 +11,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
@@ -91,9 +90,9 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
     return (
       <Tooltip delayDuration={200}>
         <TooltipTrigger asChild>
-          <Link href="/billing" className="mb-2 ml-1 block w-full">
+          <div className="mb-2 ml-1 block w-full">
             {collapsedContent}
-          </Link>
+          </div>
         </TooltipTrigger>
         <TooltipContent side="right" className="font-medium">
           {credits} Credits Remaining
@@ -104,7 +103,7 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
 
   // Expanded View
   return (
-    <Link href="/billing" className="mb-3 block px-3">
+    <div className="mb-3 block px-3">
       <div className="group bg-accent/30 hover:bg-accent/50 relative overflow-hidden rounded-xl p-4 transition-all duration-300 hover:shadow-md">
         {/* Subtle Background Glow on Hover */}
         <div className="from-primary/0 via-primary/5 to-primary/0 absolute inset-0 bg-linear-to-r opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
@@ -154,12 +153,12 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
 
               {/* Upgrade Trigger Text */}
               <p className="text-muted-foreground group-hover:text-foreground mt-2 text-[10px] font-medium transition-colors">
-                Get more credits →
+                Credits refresh monthly
               </p>
             </motion.div>
           </AnimatePresence>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

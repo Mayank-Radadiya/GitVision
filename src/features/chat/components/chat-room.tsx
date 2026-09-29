@@ -314,7 +314,7 @@ export function ChatRoom({
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" role="log" aria-live="polite" aria-busy={isLoading}>
         {messages.length === 0 && !isRetrieving ? (
           <div className="flex h-full items-center justify-center p-6">
             <div className="max-w-md text-center">

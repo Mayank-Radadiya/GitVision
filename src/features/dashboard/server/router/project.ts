@@ -115,17 +115,6 @@ export const projectRouter = createTRPCRouter({
       );
     }),
 
-  // IMPROVEMENT: Added optional limit parameter for future "View All" pages
-  getRecentActivity: protectedProcedure
-    .input(
-      z
-        .object({ limit: z.number().min(1).max(50).optional().default(8) })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      return projectService.getRecentActivity(ctx.userId, input?.limit);
-    }),
-
   // IMPROVEMENT: Added optional days parameter for chart filtering (7, 30, 90 days)
   getCommitChart: protectedProcedure
     .input(
@@ -156,10 +145,6 @@ export const projectRouter = createTRPCRouter({
         ctx.userId,
       );
     }),
-
-  getPickUpWhereYouLeftOff: protectedProcedure.query(async ({ ctx }) => {
-    return projectService.getPickUpWhereYouLeftOff(ctx.userId);
-  }),
 
   getLanguageBreakdown: protectedProcedure.query(async ({ ctx }) => {
     return projectService.getLanguageBreakdown(ctx.userId);

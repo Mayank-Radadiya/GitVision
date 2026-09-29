@@ -6,7 +6,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { cn } from "@/shared/lib/utils";
 import { useCredits } from "@/features/dashboard/hooks/use-dashboard";
 import {
@@ -69,12 +68,11 @@ export function CreditsGauge() {
         </span>
       </div>
 
-      <Link
-        href="/billing"
-        className="font-gv-mono text-gv-amber hover:text-gv-bone text-xs font-medium transition-colors hover:underline"
+      <span
+        className="font-gv-mono text-gv-muted text-xs font-medium"
       >
-        Top up →
-      </Link>
+        Free tier
+      </span>
     </div>
   );
 }

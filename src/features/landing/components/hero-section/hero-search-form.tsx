@@ -6,10 +6,12 @@ import { SearchIcon } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { fadeInUpVariants } from "./variants";
+import { useRouter } from "next/navigation";
 
 export function HeroSearchForm() {
   const [repoUrl, setRepoUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value),
@@ -21,9 +23,10 @@ export function HeroSearchForm() {
       e.preventDefault();
       if (!repoUrl) return;
       setIsSubmitting(true);
-      setTimeout(() => setIsSubmitting(false), 1000);
+      const encoded = encodeURIComponent(repoUrl);
+      router.push(`/create-project?url=${encoded}`);
     },
-    [repoUrl],
+    [repoUrl, router],
   );
 
   return (
