@@ -1,4 +1,5 @@
 import {
+  check,
   integer,
   pgTable,
   varchar,
@@ -43,7 +44,13 @@ export const usersTable = pgTable("users", {
   isProUser: boolean("is_pro_user").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  // Defence in depth. spendCredits already guards with `WHERE credits >= cost`,
+  // so the app cannot overdraw through its own code path — this catches
+  // anything that bypasses it: a hand-written UPDATE, a script, a future
+  // endpoint, or a bug in a WHERE clause. Credits are a real balance.
+  check("users_credits_non_negative", sql`${table.credits} >= 0`),
+]);
 
 export const projectTables = pgTable(
   "projects",
@@ -141,6 +148,13 @@ export const codeEmbeddings = pgTable(
       embeddingIdx: index("embeddings_vector_idx").using(
         "hnsw",
         table.embedding.op("vector_cosine_ops"),
+      ),
+      // searchSimilarCodeInFile narrows to a single file before ranking
+      // (vector-search.ts:258-278); without this it scans every chunk in the
+      // project and only then discards most of them.
+      projectIdFilePathIdx: index("code_embeddings_project_id_file_path_idx").on(
+        table.projectId,
+        table.filePath,
       ),
     };
   },
@@ -279,6 +293,15 @@ export const issuesTable = pgTable(
         table.projectId,
         table.issueNumber,
       ),
+      // getNeedsAttention filters state = 'open' on every dashboard load.
+      stateIdx: index("issues_state_idx").on(table.state),
+      // Issue feeds sort by recency DESC (projectService.ts:786,837).
+      githubUpdatedAtIdx: index("issues_github_updated_at_idx").on(table.githubUpdatedAt),
+      // The issues/PR tab filters by project + PR-ness, then sorts by
+      // recency (projectService.ts:829-837) — one index serves all three.
+      projectIdIsPullRequestGithubUpdatedAtIdx: index(
+        "issues_project_id_is_pull_request_github_updated_at_idx",
+      ).on(table.projectId, table.isPullRequest, table.githubUpdatedAt),
     };
   },
 );
@@ -287,13 +310,24 @@ export const issuesTable = pgTable(
  * Sliding-window rate limiting counters.
  * One row per (route × subject) key; window resets when it ages out.
  */
-export const rateLimitsTable = pgTable("rate_limits", {
-  limitKey: varchar("limit_key", { length: 255 }).primaryKey(),
-  windowStart: timestamp("window_start", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  count: integer("count").notNull().default(0),
-});
+export const rateLimitsTable = pgTable(
+  "rate_limits",
+  {
+    limitKey: varchar("limit_key", { length: 255 }).primaryKey(),
+    windowStart: timestamp("window_start", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => {
+    return {
+      // cleanupStaleData purges by `windowStart < cutoff` on a nightly cron
+      // (functions.ts:375). windowStart is not the primary key, so without this
+      // that sweep is a full scan of every rate limit row ever written.
+      windowStartIdx: index("rate_limits_window_start_idx").on(table.windowStart),
+    };
+  },
+);
 
 export const issueCommentsTable = pgTable(
   "issue_comments",

@@ -15,6 +15,13 @@
       "when": 1790667761604,
       "tag": "0001_issues_unique_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790668027956,
+      "tag": "0002_credits_check_and_hot_path_indexes",
+      "breakpoints": true
     }
   ]
 }

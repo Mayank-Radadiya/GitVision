@@ -48,6 +48,11 @@ const MIGRATIONS_DIR = path.resolve(process.cwd(), "db/migrations");
  * would. `--> statement-breakpoint` is drizzle's own separator, so splitting
  * on it reproduces the real apply path rather than a hand-written paraphrase
  * of the schema.
+ *
+ * Idempotent within a process: the second describe block in a file must not
+ * re-run `CREATE TABLE` over tables the first one already made. Against a
+ * database that was already migrated, DDL is still re-run, so callers that
+ * want a pristine database should recreate it (see the workflow).
  */
 export function applyMigrations(): void {
   const files = readdirSync(MIGRATIONS_DIR)
@@ -62,7 +67,16 @@ export function applyMigrations(): void {
     const sql = readFileSync(path.join(MIGRATIONS_DIR, file), "utf8");
     for (const statement of sql.split("--> statement-breakpoint")) {
       if (statement.trim()) {
-        psql(statement);
+        try {
+          psql(statement);
+        } catch (error) {
+          // "already exists" means a previous suite in this process already
+          // applied it. Anything else is a real failure and must surface.
+          const message = String((error as { stderr?: string }).stderr ?? error);
+          if (!/already exists/i.test(message)) {
+            throw error;
+          }
+        }
       }
     }
   }
