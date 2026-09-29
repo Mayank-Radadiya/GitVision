@@ -824,17 +824,24 @@ export function createProjectService() {
      * Ownership verified through the issue → project chain.
      */
     async getIssueComments(issueId: string, userId: string) {
+      // Ownership is part of the lookup, not a second step. Splitting it out
+      // made "no such issue" and "someone else's issue" two distinguishable
+      // failures, which is an existence oracle for cross-tenant issue ids.
       const issue = await db
         .select({ projectId: issuesTable.projectId })
         .from(issuesTable)
-        .where(eq(issuesTable.id, issueId))
+        .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
+        .where(
+          and(
+            eq(issuesTable.id, issueId),
+            eq(projectTables.ownerId, userId),
+          ),
+        )
         .limit(1);
 
       if (!issue || issue.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
       }
-
-      await this.verifyOwnership(issue[0].projectId, userId);
 
       return db
         .select({
