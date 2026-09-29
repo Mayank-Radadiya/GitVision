@@ -14,7 +14,7 @@ export interface LogContext {
  * A log record is not a private channel: it goes to the platform's log
  * aggregator, where it is retained for longer than anyone intends, visible to
  * whoever holds access to the platform, and searchable. Anything logged here
- * should be assumed to have been read by somebody. These are the seven keys
+ * should be assumed to have been read by somebody. These are the nine keys
  * that carry credentials or personal data rather than diagnostic value — a
  * bearer token, a provider API key, a session cookie, or a person's email
  * address — so their values are replaced rather than trimmed.
@@ -29,10 +29,12 @@ const REDACTED_KEYS = new Set(
     "token",
     "secret",
     "password",
+    "passwd",
     "authorization",
     "cookie",
     "api_key",
     "email",
+    "credential",
   ].map((key) => key.replace(/[-_]/g, "")),
 );
 

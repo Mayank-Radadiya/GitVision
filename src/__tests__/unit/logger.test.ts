@@ -58,10 +58,12 @@ describe("Logger Service", () => {
     token: "tok_live_51H8xqz",
     secret: "sk-proj-6f1c0a9e",
     password: "correct-horse-battery-staple",
+    passwd: "hunter2",
     authorization: "Bearer eyJhbGciOiJIUzI1NiJ9",
     cookie: "__session=9f2b7c1d",
     api_key: "AIzaSyA1B2C3D4E5F6",
     email: "ada@example.com",
+    credential: "AKIAIOSFODNN7EXAMPLE",
     Authorization: "Bearer eyJhbGciOiJIUzI1NiJ9",
     apiKey: "AIzaSyA1B2C3D4E5F6",
   };
