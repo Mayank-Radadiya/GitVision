@@ -21,6 +21,9 @@ const isPublicRoute = createRouteMatcher([
   // signature check; Inngest likewise signs its requests.
   "/api/webhooks/clerk",
   "/api/inngest(.*)",
+  // An uptime monitor has no session. The handler is read-only and returns no
+  // customer data — see the "signed-out reachability" test.
+  "/api/health",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

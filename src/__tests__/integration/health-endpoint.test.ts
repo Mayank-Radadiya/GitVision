@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 /**
  * H14 — /api/health.
@@ -21,10 +22,17 @@ const STUCK = {
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 
-const selectCalls: { table: string; limit?: number }[] = [];
+const selectCalls: { table: string; limit?: number; fields?: string[] }[] = [];
 let stuckRows: (typeof STUCK)[] = [];
 let probeThrows = false;
 let stuckQueryThrows = false;
+
+/** Records every `auth.protect()` call the real middleware makes. */
+let protectedPaths: string[] = [];
+
+/** Applies a column projection, the way Drizzle would. */
+const pick = (row: Record<string, unknown>, keys: string[]) =>
+  Object.fromEntries(keys.map((k) => [k, row[k]]));
 
 vi.mock("@/db", () => {
   // Liveness probe — the route reaches for `execute` here, not `select`,
@@ -34,8 +42,9 @@ vi.mock("@/db", () => {
       ? Promise.reject(new Error("connection refused"))
       : Promise.resolve([{ ok: 1 }]);
 
-  const select = () => {
-    selectCalls.push({ table: "projects" });
+  const select = (fields?: Record<string, unknown>) => {
+    const keys = fields ? Object.keys(fields) : [];
+    selectCalls.push({ table: "projects", fields: keys });
     const chain = {
       from: () => chain,
       where: () => chain,
@@ -51,7 +60,12 @@ vi.mock("@/db", () => {
         reject?: (e: unknown) => unknown,
       ) => {
         if (stuckQueryThrows) return reject?.(new Error("relation does not exist"));
-        return resolve(stuckRows);
+        // Honour the projection. A mock that hands back the whole row would
+        // report a leak whether or not the route asked for the name, which is
+        // the false confidence this file exists to end.
+        return resolve(
+          keys.length ? stuckRows.map((r) => pick(r, keys)) : stuckRows,
+        );
       },
     };
     return chain;
@@ -64,16 +78,43 @@ vi.mock("@/src/lib/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock("@clerk/nextjs/server", async () => {
+  const actual = await vi.importActual<typeof import("@clerk/nextjs/server")>(
+    "@clerk/nextjs/server",
+  );
+  return {
+    ...actual,
+    // Real createRouteMatcher, signed-out session. The question under test is
+    // which paths reach `auth.protect()`, not what Clerk does once they do.
+    clerkMiddleware:
+      (handler: (auth: unknown, req: unknown) => unknown) =>
+      async (req: unknown) => {
+        const url = new URL((req as { url: string }).url);
+        return handler(
+          {
+            userId: null,
+            protect: () => {
+              protectedPaths.push(url.pathname);
+            },
+          },
+          req,
+        );
+      },
+  };
+});
+
 // The threshold constant is imported from `src/lib/health` rather than the
 // route: Next.js rejects a non-route export from `route.ts` at build time.
 const { GET } = await import("@/app/api/health/route");
 const { STUCK_AFTER_MS } = await import("@/src/lib/health");
+const { default: middleware } = await import("@/proxy");
 
 beforeEach(() => {
   selectCalls.length = 0;
   stuckRows = [];
   probeThrows = false;
   stuckQueryThrows = false;
+  protectedPaths = [];
 });
 
 describe("GET /api/health", () => {
@@ -106,7 +147,7 @@ describe("GET /api/health", () => {
     expect(JSON.stringify(body)).not.toContain("connection refused");
   });
 
-  it("reports 503 and names the project when one is stuck in processing", async () => {
+  it("reports 503 and identifies the project when one is stuck in processing", async () => {
     stuckRows = [STUCK];
 
     const res = await GET();
@@ -117,6 +158,16 @@ describe("GET /api/health", () => {
     expect(body.database).toBe("up");
     expect(body.stuckProjects).toHaveLength(1);
     expect(body.stuckProjects[0].id).toBe("p1");
+  });
+
+  it("keeps customer project names out of the degraded body", async () => {
+    // The endpoint is public, so this body is readable by anyone who can find
+    // the URL. The id is enough to act on; the name is the customer's data.
+    stuckRows = [STUCK];
+
+    const body = await (await GET()).json();
+
+    expect(JSON.stringify(body)).not.toContain("stuck-repo");
   });
 
   it("bounds the stuck-project lookup so a wedged queue cannot grow the response", async () => {
@@ -140,5 +191,24 @@ describe("GET /api/health", () => {
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body.status).toBe("unhealthy");
+  });
+});
+
+describe("signed-out reachability of /api/health", () => {
+  // Every other test in this file calls `GET()` directly, which is why the
+  // endpoint could sit behind a sign-in redirect for this long and still have a
+  // green suite. This one goes through the middleware the request really hits.
+  it("passes the middleware without asking for a session, then reaches the handler", async () => {
+    await middleware(
+      new NextRequest("http://localhost/api/health") as never,
+      {} as never,
+    );
+
+    expect(protectedPaths).not.toContain("/api/health");
+
+    const res = await GET();
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe("ok");
   });
 });

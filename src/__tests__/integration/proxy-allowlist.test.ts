@@ -62,6 +62,7 @@ const PUBLIC = [
   "/sso-callback",
   "/api/webhooks/clerk",
   "/api/inngest",
+  "/api/health",
 ];
 
 /** Routes that must never be reachable without a session. */

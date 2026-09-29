@@ -39,8 +39,9 @@ export async function GET() {
   try {
     const stuck = await db
       .select({
+        // `id` is what an operator needs to act on. `projectName` is the
+        // customer's data and this response is public, so it stays out.
         id: projectTables.id,
-        projectName: projectTables.projectName,
         embeddingStatus: projectTables.embeddingStatus,
         updatedAt: projectTables.updatedAt,
       })
