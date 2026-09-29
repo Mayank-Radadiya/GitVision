@@ -272,6 +272,31 @@ export const generateEmbeddings = inngest.createFunction(
 
       const estimatedTokens = Number(tokenResult?.total ?? 0);
 
+      // "completed" is a promise that every file in the repo is searchable. If
+      // any file failed or only partially embedded, say so instead — a
+      // completed badge on a half-indexed project sends the user to a chat
+      // answer that quietly misses files it claims to know about.
+      if (errors.length > 0) {
+        const errorMsg = `Indexed ${actualCount} embeddings but ${errors.length} file(s) failed. ${errors
+          .slice(0, 3)
+          .join("; ")}`;
+
+        await db
+          .update(projectTables)
+          .set({
+            embeddingStatus: "failed",
+            embeddingError: errorMsg,
+            embeddingProgress: 100,
+            estimatedTokens,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectTables.id, projectId));
+
+        logger.error(`[Inngest] ⚠️ Embeddings incomplete for ${projectId}: ${errors.length} file error(s)`);
+
+        return { success: false, embeddings: actualCount, error: errorMsg };
+      }
+
       // Mark as completed
       await db
         .update(projectTables)
