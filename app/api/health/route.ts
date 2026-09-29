@@ -3,22 +3,11 @@ import { db } from "@/db";
 import { projectTables } from "@/db/schema";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { logger } from "@/src/lib/logger";
+import { STUCK_AFTER_MS } from "@/src/lib/health";
 
 // A health check that gets cached is worse than no health check: it will
 // report "healthy" from a stale response long after the database died.
 export const dynamic = "force-dynamic";
-
-/**
- * How long a project may sit in "processing" with no progress recorded
- * before we call it wedged.
- *
- * This is a *no-progress* window, not a total-runtime window. The embedding
- * pipeline is explicitly allowed to run for up to 30 minutes on large repos,
- * so a flat "running longer than 15 minutes" check would page the operator on
- * every healthy large repo. `updatedAt` is rewritten on each progress write,
- * so it is the heartbeat that actually distinguishes "slow" from "dead".
- */
-export const STUCK_AFTER_MS = 15 * 60 * 1000;
 
 /** Cap the diagnostic list so a wedged queue cannot grow the response. */
 const STUCK_QUERY_LIMIT = 20;

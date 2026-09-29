@@ -22,8 +22,15 @@ export async function prefetchProject(projectId: string) {
     // Project details (standard query)
     prefetch(trpc.project.getDetails.queryOptions({ projectId })),
 
-    // First page of commits (initial load)
-    prefetch(trpc.project.getCommits.queryOptions({ projectId, limit: 10 })),
+    // First page of commits. The client hook is `useInfiniteQuery`, which tags
+    // the key `type: "infinite"` and strips the cursor, so a plain
+    // `queryOptions` prefetch can never match it.
+    prefetch(
+      trpc.project.getCommits.infiniteQueryOptions(
+        { projectId, limit: 10 },
+        { getNextPageParam: (lastPage) => lastPage.nextCursor },
+      ),
+    ),
 
     // Issues + pull requests so tabs render instantly (no loading flash)
     prefetch(

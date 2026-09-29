@@ -62,4 +62,14 @@ describe("prefetchProject", () => {
       "getIssues",
     ]);
   });
+
+  it("builds the commits prefetch as an infinite query so the key matches useInfiniteQuery", async () => {
+    await prefetchProject("p1");
+
+    const commits = h.calls.filter(
+      (c) => (c.input as { limit?: number })?.limit !== undefined,
+    );
+    expect(commits).toHaveLength(1);
+    expect(commits[0].kind).toBe("infinite");
+  });
 });

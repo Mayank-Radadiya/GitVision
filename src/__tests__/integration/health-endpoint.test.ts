@@ -64,7 +64,10 @@ vi.mock("@/src/lib/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-const { GET, STUCK_AFTER_MS } = await import("@/app/api/health/route");
+// The threshold constant is imported from `src/lib/health` rather than the
+// route: Next.js rejects a non-route export from `route.ts` at build time.
+const { GET } = await import("@/app/api/health/route");
+const { STUCK_AFTER_MS } = await import("@/src/lib/health");
 
 beforeEach(() => {
   selectCalls.length = 0;
