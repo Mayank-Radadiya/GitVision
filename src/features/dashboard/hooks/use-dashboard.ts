@@ -1,6 +1,9 @@
 import { trpc } from "@/src/lib/trpc/client";
 
-const DASHBOARD_STALE_TIME = 60_000; // 60s — hydrated data stays fresh
+// Dashboard aggregates do not change under the user while they are on the page,
+// so it opts for twice the hydration default rather than restating the reasoning
+// for that default.
+const DASHBOARD_STALE_TIME = 60_000;
 const DASHBOARD_GC_TIME = 5 * 60_000; // 5min — keep in cache for quick revisits
 
 // ─── Core consolidated query ──────────────────────────────────────────────────
@@ -27,19 +30,9 @@ export const useUserProjects = () => {
   return { data: data?.projects, ...rest };
 };
 
-export const useRecentActivity = () => {
-  const { data, ...rest } = useDashboardData();
-  return { data: data?.recentActivity, ...rest };
-};
-
 export const useCommitChart = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.commitChart, ...rest };
-};
-
-export const usePickUpWhereYouLeftOff = () => {
-  const { data, ...rest } = useDashboardData();
-  return { data: data?.pickUp, ...rest };
 };
 
 export const useLanguageBreakdown = () => {

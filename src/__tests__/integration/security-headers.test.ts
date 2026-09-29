@@ -1,124 +1,78 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import type { NextConfig } from "next";
 import nextConfig from "@/next.config";
+import { CSP_DIRECTIVES } from "@/src/lib/csp";
 
-/**
- * M19 part 1 — Content-Security-Policy, report-only (decision D-5).
- *
- * The report-only phase exists to answer one question before the enforcing
- * phase (T-022): which origins does this app actually reach that the policy
- * does not name? Until that has been read off a real violation report, the
- * header must never be the enforcing kind — a missing origin under
- * `Content-Security-Policy` is a white screen, not a warning.
- */
+/** Every static header `next.config.ts` promises, with the exact value it must carry. */
+const EXPECTED_STATIC_HEADERS: ReadonlyArray<readonly [string, string]> = [
+  ["X-Content-Type-Options", "nosniff"],
+  ["X-Frame-Options", "DENY"],
+  ["Referrer-Policy", "strict-origin-when-cross-origin"],
+  [
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains; preload",
+  ],
+  ["Permissions-Policy", "camera=(), microphone=(), geolocation=()"],
+  ["Cross-Origin-Opener-Policy", "same-origin"],
+];
 
-const COLLECTOR_PATH = "/api/csp-report";
-
-type HeaderRule = { key: string; value: string };
-
-async function globalHeaders(): Promise<HeaderRule[]> {
-  const rules = (await nextConfig.headers?.()) as Awaited<
-    ReturnType<NonNullable<NextConfig["headers"]>>
-  >;
-  const match = rules.find((rule) => rule.source === "/:path*");
-  expect(match).toBeDefined();
-  return match?.headers as HeaderRule[];
-}
-
-function headerValue(headers: HeaderRule[], key: string): string | undefined {
-  return headers.find((h) => h.key === key)?.value;
-}
-
-/** Splits a policy into its individual directives (`"a b; c"` → `["a b", "c"]`). */
-function directives(policy: string): string[] {
-  return policy
-    .split(";")
-    .map((d) => d.trim())
-    .filter(Boolean);
+async function globalHeaderMap(): Promise<Map<string, string>> {
+  expect(nextConfig.headers).toBeDefined();
+  if (!nextConfig.headers) throw new Error("next.config.ts defines no headers()");
+  const configs = await nextConfig.headers();
+  const rule = configs.find((c) => c.source === "/:path*");
+  expect(rule).toBeDefined();
+  return new Map(rule!.headers.map((h) => [h.key, h.value]));
 }
 
 describe("Security Headers Configuration", () => {
-  it("should configure security headers for all routes (/:path*)", async () => {
-    expect(nextConfig.headers).toBeDefined();
-    if (nextConfig.headers) {
-      const headersConfig = await nextConfig.headers();
-      expect(headersConfig.length).toBeGreaterThan(0);
+  it("serves every security header for all routes (/:path*) with its exact value", async () => {
+    const headers = await globalHeaderMap();
 
-      const globalHeaders = headersConfig.find((h) => h.source === "/:path*");
-      expect(globalHeaders).toBeDefined();
-
-      const headerKeys = globalHeaders?.headers.map((h) => h.key);
-      expect(headerKeys).toContain("X-Content-Type-Options");
-      expect(headerKeys).toContain("X-Frame-Options");
-      expect("X-XSS-Protection").toBeDefined();
-      expect(headerKeys).not.toContain("X-XSS-Protection");
-      expect(headerKeys).toContain("Referrer-Policy");
-      expect(headerKeys).toContain("Strict-Transport-Security");
-      expect(headerKeys).toContain("Permissions-Policy");
+    for (const [key, value] of EXPECTED_STATIC_HEADERS) {
+      expect(headers.get(key), `missing header ${key}`).toBe(value);
     }
   });
-});
 
-describe("Content-Security-Policy (report-only)", () => {
-  it("sends the report-only header and never the enforcing one", async () => {
-    const headers = await globalHeaders();
-
-    expect(headerValue(headers, "Content-Security-Policy-Report-Only")).toBeDefined();
-    expect(headerValue(headers, "Content-Security-Policy")).toBeUndefined();
-  });
-
-  it("pins the directives that have no safe lax value", async () => {
-    const policy = headerValue(await globalHeaders(), "Content-Security-Policy-Report-Only") ?? "";
-    const list = directives(policy);
-
-    expect(list).toContain("default-src 'self'");
-    expect(list).toContain("object-src 'none'");
-    expect(list).toContain("frame-ancestors 'none'");
-    expect(list).toContain("base-uri 'self'");
-    expect(list).toContain("form-action 'self'");
-  });
-
-  it("enumerates the third-party origins the app genuinely reaches", async () => {
-    const policy = headerValue(await globalHeaders(), "Content-Security-Policy-Report-Only") ?? "";
-    const list = directives(policy).join("\n");
-
-    // Clerk: widgets, avatars, session polling (script/img/connect/frame).
-    expect(list).toContain("https://*.clerk.com");
-    expect(list).toContain("https://img.clerk.com");
-    // GitHub avatar proxies configured in next.config.ts `images.remotePatterns`.
-    expect(list).toContain("https://avatars.githubusercontent.com");
-    expect(list).toContain("https://camo.githubusercontent.com");
-    expect(list).toContain("https://ui-avatars.com");
-    // Inngest: the dev server runs on its own port, the cloud product on a
-    // subdomain, and both stream over a websocket.
-    expect(list).toContain("https://*.inngest.app");
-    expect(list).toMatch(/wss:\/\/\*\.inngest\.app/);
-    expect(list).toContain("http://localhost:8288");
-    // Vercel: deployment metadata plus the dev overlay's websocket.
-    expect(list).toContain("https://*.vercel.com");
-  });
-
-  it("points the policy at the collector endpoint", async () => {
-    const policy = headerValue(await globalHeaders(), "Content-Security-Policy-Report-Only") ?? "";
-    const list = directives(policy);
-
-    expect(list).toContain(`report-uri ${COLLECTOR_PATH}`);
-    expect(list).toContain("report-to csp-endpoint");
-  });
-
-  it("declares the reporting endpoints under the name the policy references", async () => {
-    const headers = await globalHeaders();
-
-    expect(headerValue(headers, "Reporting-Endpoints")).toContain(
-      `csp-endpoint="${COLLECTOR_PATH}"`,
-    );
-
-    const reportTo = headerValue(headers, "Report-To") ?? "";
-    expect(JSON.parse(reportTo).group).toBe("csp-endpoint");
-    expect(JSON.parse(reportTo).endpoints[0].url).toBe(COLLECTOR_PATH);
+  it("no longer sends the withdrawn X-XSS-Protection header", async () => {
+    const headers = await globalHeaderMap();
+    expect(headers.has("X-XSS-Protection")).toBe(false);
   });
 });
+
+describe("Content Security Policy hardening directives", () => {
+  it("locks down the directives Clerk does not set itself", () => {
+    expect(CSP_DIRECTIVES["object-src"]).toEqual(["'none'"]);
+    expect(CSP_DIRECTIVES["base-uri"]).toEqual(["'self'"]);
+    expect(CSP_DIRECTIVES["frame-ancestors"]).toEqual(["'none'"]);
+  });
+
+  it("keeps fonts same-origin only", () => {
+    expect(CSP_DIRECTIVES["font-src"]).toEqual(["'self'"]);
+  });
+
+  it("allows the inline data URI in globals.css and the GitHub avatar hosts", () => {
+    const img = CSP_DIRECTIVES["img-src"];
+    expect(img).toContain("data:");
+    expect(img).toContain("https://avatars.githubusercontent.com");
+    expect(img).toContain("https://camo.githubusercontent.com");
+    expect(img).toContain("https://via.placeholder.com");
+  });
+
+  it("does not relax scripts or styles beyond what the framework needs", () => {
+    // The nonce and 'strict-dynamic' come from Clerk's strict mode; this app
+    // must not add anything that would widen them.
+    expect(CSP_DIRECTIVES["script-src"]).toBeUndefined();
+    expect(CSP_DIRECTIVES["style-src"]).toBeUndefined();
+  });
+});
+
+/**
+ * The violation collector. The policy itself is now minted per request by
+ * `clerkMiddleware` (see `src/lib/csp.ts`), but the endpoint that receives the
+ * reports it produces is unchanged, and unauthenticated by design: a browser
+ * posts on the page's behalf, so there is no session to present.
+ */
 
 vi.mock("@/src/lib/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -191,7 +145,9 @@ describe("POST /api/csp-report", () => {
     const res = await POST(reportRequest(huge, "application/csp-report"));
 
     expect(res.status).toBe(204);
-    expect(vi.mocked(logger.warn).mock.calls.flat().join(" ")).not.toContain("a".repeat(100));
+    expect(vi.mocked(logger.warn).mock.calls.flat().join(" ")).not.toContain(
+      "a".repeat(100),
+    );
   });
 
   it("never echoes the submitted body back to the caller", async () => {

@@ -39,23 +39,6 @@ export interface Commit {
   createdAt: Date;
 }
 
-/** Response shape from tRPC getCommits (cursor-based) */
-export interface CommitPage {
-  commits: Commit[];
-  /** Both sort keys, or null on the last page. `authorDate` alone is not unique. */
-  nextCursor: { authorDate: Date; id: string } | null;
-}
-
-// ─── Stat Card Config ────────────────────────────────────────────────────────
-
-export interface ProjectStatConfig {
-  key: string;
-  label: string;
-  icon: string; // Lucide icon name reference
-  color: string;
-  getValue: (project: ProjectDetails) => string | number;
-}
-
 // ─── Tab Navigation ──────────────────────────────────────────────────────────
 
 export type ProjectTab = "overview" | "commits" | "pull-requests" | "issues";

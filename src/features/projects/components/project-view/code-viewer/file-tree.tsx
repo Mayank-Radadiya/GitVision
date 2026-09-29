@@ -36,7 +36,15 @@ interface FileTreeProps {
 const ROW_CLASS =
   "outline-none focus-visible:ring-ring/70 rounded-md focus-visible:ring-2 focus-visible:ring-inset";
 
-/** Get icon for file based on language */
+/**
+ * Icon for a file, chosen from its language.
+ *
+ * These carry no information a reader can reach only here: the glyph varies by
+ * broad kind and the filename extension is on screen next to it. Colour alone
+ * separates the eight code languages, and it is decoration, so the icons are
+ * hidden from assistive technology rather than announced as an unlabelled
+ * "code file".
+ */
 function getFileIcon(node: TreeNode) {
   if (node.type === "directory") return null; // handled separately
 
@@ -52,21 +60,21 @@ function getFileIcon(node: TreeNode) {
     case "rust":
     case "go":
     case "java":
-      return <FileCode className={cn(iconClass, "text-blue-400")} />;
+      return <FileCode aria-hidden="true" className={cn(iconClass, "text-blue-400")} />;
     case "json":
-      return <FileJson className={cn(iconClass, "text-yellow-400")} />;
+      return <FileJson aria-hidden="true" className={cn(iconClass, "text-yellow-400")} />;
     case "markdown":
     case "mdx":
     case "text":
-      return <FileText className={cn(iconClass, "text-muted-foreground")} />;
+      return <FileText aria-hidden="true" className={cn(iconClass, "text-muted-foreground")} />;
     case "css":
     case "scss":
-      return <FileCode className={cn(iconClass, "text-pink-400")} />;
+      return <FileCode aria-hidden="true" className={cn(iconClass, "text-pink-400")} />;
     case "html":
     case "xml":
-      return <FileCode className={cn(iconClass, "text-orange-400")} />;
+      return <FileCode aria-hidden="true" className={cn(iconClass, "text-orange-400")} />;
     default:
-      return <FileIcon className={cn(iconClass, "text-muted-foreground")} />;
+      return <FileIcon aria-hidden="true" className={cn(iconClass, "text-muted-foreground")} />;
   }
 }
 
@@ -113,15 +121,16 @@ function DirectoryNode({
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         <ChevronRight
+          aria-hidden="true"
           className={cn(
             "h-3.5 w-3.5 shrink-0 transition-transform duration-150",
             isOpen && "rotate-90",
           )}
         />
         {isOpen ? (
-          <FolderOpen className="text-primary/70 h-4 w-4 shrink-0" />
+          <FolderOpen aria-hidden="true" className="text-primary/70 h-4 w-4 shrink-0" />
         ) : (
-          <Folder className="text-primary/70 h-4 w-4 shrink-0" />
+          <Folder aria-hidden="true" className="text-primary/70 h-4 w-4 shrink-0" />
         )}
         <span className="truncate font-medium">{node.name}</span>
       </button>

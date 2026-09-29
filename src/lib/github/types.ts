@@ -24,14 +24,6 @@ export interface CommitData {
   projectId: string;
 }
 
-/** File metadata returned after storing repository files */
-export interface FileInfo {
-  id: string;
-  path: string;
-  size: number | undefined;
-  sha: string;
-}
-
 /** Result of project creation */
 export interface CreateProjectResult {
   projectId: string;

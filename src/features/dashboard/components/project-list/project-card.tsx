@@ -115,7 +115,7 @@ function ProjectCard({
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground/60 hover:text-primary relative z-10 mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
+            className="text-muted-foreground hover:text-primary relative z-10 mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             aria-label={`View ${repoPath} on GitHub`}
           >
             <ExternalLink className="h-3 w-3" />

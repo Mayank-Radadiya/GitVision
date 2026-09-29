@@ -84,20 +84,6 @@ const EXTENSION_MAP: Record<string, string> = {
   txt: "text",
 };
 
-/** Detect Shiki language from file path */
-export function detectLanguage(filePath: string): string {
-  const fileName = filePath.split("/").pop() || "";
-  const lowerName = fileName.toLowerCase();
-
-  // Special file names
-  if (lowerName === "dockerfile") return "dockerfile";
-  if (lowerName === "makefile") return "makefile";
-  if (lowerName === ".env" || lowerName.startsWith(".env.")) return "bash";
-
-  const ext = fileName.split(".").pop()?.toLowerCase() || "";
-  return EXTENSION_MAP[ext] || "text";
-}
-
 // ─── Tree Building ───────────────────────────────────────────────────────────
 
 /**

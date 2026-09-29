@@ -9,14 +9,6 @@ import { eq, desc } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 import { logger } from "@/src/lib/logger";
 
-export interface Message {
-  id?: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  relatedFiles?: string[];
-  createdAt?: Date;
-}
-
 /**
  * Get recent messages for LLM context (last N messages)
  * Formatted for the system prompt
