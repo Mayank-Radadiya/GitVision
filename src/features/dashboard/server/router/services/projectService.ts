@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
+import { RequestTracer } from "@/src/lib/llm/tracing";
+import { logger } from "@/src/lib/logger";
 import {
   spendCredits,
   refundCredits,
@@ -518,8 +520,69 @@ export function createProjectService() {
      * CONSOLIDATED: Fetches ALL dashboard data in a single server call.
      * Runs 7 independent queries in parallel via Promise.all() to avoid
      * sequential HTTP waterfalls — maximum possible concurrency.
+     *
+     * PERF FIX (measured, not assumed) — set `DASHBOARD_TRACE=1` to re-measure.
+     *
+     * The `neon-http` driver turns every `db.select()` into its own stateless
+     * HTTP request, so `Promise.all` removes the *latency* waterfall but not the
+     * *round-trip* cost. Instrumenting `sql.query` on production Neon
+     * (2026-09-29, user `user_2xDb…`, 5 projects / 402 commits / 72 issues /
+     * 218 issue comments / 111 project files / 0 embeddings) counts **10
+     * round-trips** for one dashboard load, not 7.
+     *
+     * Median of 20 loads, per service call, plus the JSON payload it returns:
+     *
+     *   call                        trips  median   payload
+     *   getDashboardInfo                2     70ms     74 B
+     *   getAllProjects                  1     72ms  3,681 B
+     *   getRecentActivity               1    394ms 145,477 B  ← 96% of the payload
+     *   getCommitChart                  1     76ms      2 B
+     *   getPickUpWhereYouLeftOff        2     81ms    404 B
+     *   getLanguageBreakdown            1     76ms    667 B
+     *   getNeedsAttention               2     84ms  1,682 B
+     *   ────────────────────────────────────────────────────────────────────
+     *   total                         10    394ms 152 KB
+     *
+     * The wall clock equals the slowest call, so 394ms is the load time. But the
+     * cause is **not** the round-trip count: `EXPLAIN ANALYZE` puts every one of
+     * these queries at 0.06–0.10ms of actual server execution time. `Promise.all`
+     * is already doing its job; the 70–80ms floor is HTTP transport per request,
+     * and the remaining 310ms is `getRecentActivity`.
+     *
+     * `getRecentActivity` is slow because `commits.commit_message` stores the
+     * **entire** GitHub PR/merge body, unbounded — the largest rows in the table
+     * are 65,536 bytes, 11,251 and 9,084, against a `varchar(255)`-sized
+     * expectation. Eight rows = 145 KB, while the other six calls together
+     * return 6.4 KB. The feed renders a one-line summary, so almost all of it is
+     * thrown away in transit. A `left(commit_message, N)` in the projection (or a
+     * length cap at ingest) is worth more than every query merge in this file
+     * combined — see T-030.
+     *
+     * Grouped by the table that dominates each, for T-030:
+     *   - `projects`: getDashboardInfo (aggregate), getAllProjects (rows),
+     *     getLanguageBreakdown (`languages` JSONB) and getPickUpWhereYouLeftOff
+     *     (joined) — 4 of the 10 trips read it, and it is the only table joined
+     *     into every other group, so it is the natural first query.
+     *   - `commits`: getRecentActivity, getCommitChart (aggregate),
+     *     getPickUpWhereYouLeftOff — the chart is an aggregate of the same rows
+     *     the activity feed already scans, so one trip could serve both.
+     *   - `issues`: getNeedsAttention issues its *two* separate queries (counts
+     *     and items) over the same filter — the cheapest possible win, 2 → 1.
+     *   - `project_chats`: getPickUpWhereYouLeftOff only.
+     *   - `users`: getDashboardInfo only (the credits read).
+     * That is 10 trips collapsing to 4 (projects / commits / issues / chats) with
+     * no cross-table joins required — 4 rather than 3 because `users` is a
+     * single-row primary-key lookup that costs the same as anything else.
+     * Keep the existing `PERF FIX` invariants when doing it: `getAllProjects`
+     * must not regress into unbounded reads, and `getProjectFiles` must keep
+     * returning only `{id, fileName}` — that projection is what stops a 10MB+
+     * payload.
      */
     async getDashboardData(userId: string) {
+      if (process.env.DASHBOARD_TRACE === "1") {
+        return this.getDashboardDataTraced(userId);
+      }
+
       const [
         stats,
         projects,
@@ -537,6 +600,43 @@ export function createProjectService() {
         this.getLanguageBreakdown(userId),
         this.getNeedsAttention(userId),
       ]);
+
+      return {
+        stats,
+        projects,
+        recentActivity,
+        commitChart,
+        pickUp,
+        languages,
+        attention,
+      };
+    },
+
+    /**
+     * Identical fan-out, wrapped in the shared `RequestTracer` so each of the
+     * seven calls reports its own duration. Debug-gated by `DASHBOARD_TRACE=1`
+     * — in production this method is never reached.
+     */
+    async getDashboardDataTraced(userId: string) {
+      const tracer = new RequestTracer("dashboard");
+
+      const [stats, projects, recentActivity, commitChart, pickUp, languages, attention] =
+        await Promise.all([
+          tracer.timeStage("getDashboardInfo", () => this.getDashboardInfo(userId)),
+          tracer.timeStage("getAllProjects", () => this.getAllProjects(userId)),
+          tracer.timeStage("getRecentActivity", () => this.getRecentActivity(userId, 8)),
+          tracer.timeStage("getCommitChart", () => this.getCommitChart(userId, 7)),
+          tracer.timeStage("getPickUpWhereYouLeftOff", () => this.getPickUpWhereYouLeftOff(userId)),
+          tracer.timeStage("getLanguageBreakdown", () => this.getLanguageBreakdown(userId)),
+          tracer.timeStage("getNeedsAttention", () => this.getNeedsAttention(userId)),
+        ]);
+
+      for (const stage of tracer.getStages()) {
+        logger.info(
+          `[dashboard-trace] ${stage.name} took ${stage.durationMs}ms`,
+          stage.metadata,
+        );
+      }
 
       return {
         stats,
