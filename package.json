@@ -11,13 +11,14 @@
     "db:generate": "drizzle-kit generate",
     "db:init": "bun scripts/db-init.ts",
     "db:push": "bun scripts/db-init.ts && drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:backup": "bun scripts/db-backup.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "clean": "rm -rf dist .next node_modules .turbo .vercel out coverage *.tsbuildinfo bun.lock package-lock.json pnpm-lock.yaml yarn.lock ~/.bun/cache ~/.cache/next",
+    "clean": "rm -rf dist .next node_modules .turbo .vercel out coverage *.tsbuildinfo ~/.bun/cache ~/.cache/next",
     "inngest": "npx inngest-cli@latest dev"
   },
   "overrides": {

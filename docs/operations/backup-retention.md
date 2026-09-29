@@ -9,14 +9,25 @@ This document outlines the backup strategy, data retention schedules, and disast
 
 ### Automated Point-in-Time Recovery (PITR)
 - **Primary Database**: Hosted on Neon PostgreSQL.
-- **PITR Range**: Automatically managed by Neon with point-in-time state restoration up to 14–30 days.
+- **PITR Range**: Managed by Neon, and the retention window depends on the
+  plan you are on. **Confirm this against your Neon dashboard** — it is not
+  configured from this repository, and this document previously stated a
+  14–30 day window that nothing here could enforce.
 
-### Manual / Scheduled SQL Dumps
-- **Command**: `npm run db:backup` or `bun scripts/db-backup.ts`
-- **Output Directory**: `./backups/gitvision_backup_<timestamp>.sql`
-- **Recommended Cadence**:
-  - Daily automated execution via server cron/CI workflow.
-  - Pre-deployment execution before major schema migrations (`npm run db:push`).
+### SQL Dumps — MANUAL ONLY
+- **Command**: `npm run db:backup` (runs `scripts/db-backup.ts`)
+- **Requires**: the PostgreSQL client tools (`pg_dump`) on `PATH`. There is no
+  in-process fallback; the script exits non-zero if `pg_dump` is missing.
+- **Output Directory**: `./backups/gitvision_backup_<timestamp>.sql` (gitignored)
+- **Verification**: the script reopens the dump and refuses to report success
+  unless it is over 1 KB and contains `CREATE TABLE` plus the `projects`,
+  `project_files` and `commits` tables.
+- **Cadence**: *nobody runs this automatically.* There is no cron and no CI
+  step that takes a dump. Until one exists, PITR is your only real protection
+  and a dump happens only when a human remembers.
+- **To automate**: add a scheduled job that runs `bun run db:backup` and
+  uploads the file to object storage. Dumps written to the deploy machine's
+  local disk are lost when that machine is replaced.
 
 ---
 

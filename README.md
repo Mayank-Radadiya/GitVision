@@ -18,8 +18,7 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 
 ### 🧠 AI-Powered Insights
 
-- **Commit Summaries** — Gemini-generated plain-English summaries of every commit
-- **Issue & PR Triage** — Automatic AI classification with complexity estimation and semantic tagging
+- **Commit Summaries** — Gemini-generated plain-English summaries, produced on demand for the 100 most recent commits
 - **RAG Code Chat** — Ask natural-language questions about your codebase; answers are grounded in your actual source code via vector similarity search
 
 ### 📊 Repository Dashboard
@@ -32,7 +31,6 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 ### 🐛 Issues & Pull Requests
 
 - **Live Sync** — Issues and PRs fetched from GitHub with full metadata
-- **AI Triage** — Each issue is auto-summarized with complexity tags (high / medium / low)
 - **Comment Threads** — Inline display of GitHub discussion threads with avatars
 
 ### 📂 Code Browser
@@ -204,7 +202,7 @@ GitVision uses **Clerk** for authentication with webhook-based user sync:
 
 1. Users sign up / sign in via Clerk's hosted UI
 2. A Clerk webhook syncs user data to the local `users` table
-3. Middleware protects all `/dashboard`, `/chat`, and `/code-viewer` routes
+3. `app/(main)/layout.tsx` calls `auth.protect()` for every page under `/dashboard`, `/chat` and `/code-viewer`; each API route and tRPC procedure checks the session itself (24 of 24 tRPC procedures use `protectedProcedure`)
 
 ---
 
@@ -212,7 +210,7 @@ GitVision uses **Clerk** for authentication with webhook-based user sync:
 
 ```
 1.  Project files are streamed from GitHub via Octokit tarball API
-2.  Files are chunked and embedded using Gemini embedding-004 (768 dims)
+2.  Files are chunked and embedded using qwen/qwen3-embedding-8b via OpenRouter (768 dims)
 3.  Embeddings are stored in Neon with pgvector HNSW indexes
 4.  User query → embed → cosine similarity search → top-k chunks
 5.  Top chunks + query are sent to Gemini as grounded context
@@ -235,7 +233,8 @@ Contributions are welcome! Please follow the standard fork → branch → PR wor
 
 ## 📄 License
 
-This project is open source. See the [LICENSE](LICENSE) file for details.
+Not currently licensed. This repository is private and has no LICENSE file, so
+all rights are reserved by default. Add a LICENSE before publishing it anywhere.
 
 ---
 
