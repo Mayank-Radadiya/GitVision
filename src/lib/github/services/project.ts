@@ -77,6 +77,20 @@ export async function createNewProject(
     const repoData = gqlResponse.repository;
     const history = repoData.defaultBranchRef?.target?.history;
 
+    // ── Reject oversized repos before touching the database ──
+    // Per-file and per-repo caps bound ingestion once a tarball is being
+    // streamed, but only after the download has started. `diskUsage` lets us
+    // turn away a repository that is never going to fit in one ingestion job.
+    if (
+      repoData.diskUsage !== null &&
+      repoData.diskUsage > GITHUB_CONFIG.MAX_REPO_DISK_USAGE_KB
+    ) {
+      throw new GitHubValidationError(
+        `Repository is too large to index (${Math.round(repoData.diskUsage / 1024)} MB, ` +
+          `limit ${Math.round(GITHUB_CONFIG.MAX_REPO_DISK_USAGE_KB / 1024)} MB).`,
+      );
+    }
+
     // ── Map language edges → LanguageEntry[] with computed percentages ──
     const languageEdges = repoData.languages?.edges ?? [];
     const totalBytes = languageEdges.reduce((sum, e) => sum + e.size, 0);

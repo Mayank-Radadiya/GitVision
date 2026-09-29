@@ -33,6 +33,14 @@ export const GITHUB_CONFIG = {
    * pathological repo from filling the project_files table.
    */
   MAX_FILES_PER_REPO: 50_000,
+  /**
+   * Largest repository we will index, in kilobytes — GitHub reports
+   * `diskUsage` in KB. Per-file and per-repo caps below bound memory, but they
+   * only act once a tarball has already been streamed; this rejects the job
+   * up front. 200 MB is comfortably above a normal application repository and
+   * far below the size at which ingestion becomes a multi-minute job.
+   */
+  MAX_REPO_DISK_USAGE_KB: 200_000,
   /** Max character length of diff data sent to AI summariser */
   DIFF_MAX_LENGTH: 10000,
   /** HTTP timeout for generic API calls (ms) */
@@ -136,6 +144,7 @@ export const REPO_METADATA_QUERY = `
     repository(owner: $owner, name: $repo) {
       stargazerCount
       forkCount
+      diskUsage
       refs(refPrefix: "refs/heads/") {
         totalCount
       }

@@ -66,6 +66,8 @@ export interface GraphQLRepoData {
   repository: {
     stargazerCount: number;
     forkCount: number;
+    /** Size of the repository on disk, in kilobytes. Null when GitHub cannot report it. */
+    diskUsage: number | null;
     refs: { totalCount: number };
     mentionableUsers: { totalCount: number };
     /** Top 10 languages ordered by byte size. May be empty for repos with no detectable code. */
