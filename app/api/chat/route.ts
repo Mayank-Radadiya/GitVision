@@ -560,10 +560,13 @@ export async function POST(req: Request) {
               }
             }
           } catch (ragError) {
-            logger.error(
-              "[RAG] Retrieval error, falling back to general mode",
-              ragError,
-            );
+            // Retrieval failing means we cannot ground the answer in the
+            // project. Answering anyway would look project-scoped while
+            // carrying no project context, so the turn is failed instead:
+            // the rejection is reported to the stream's `onError`, which
+            // latches a single refund via `refundOnce`.
+            logger.error("[RAG] Retrieval error, failing the turn", ragError);
+            throw ragError;
           }
         }
 
