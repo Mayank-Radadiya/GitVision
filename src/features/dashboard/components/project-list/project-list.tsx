@@ -33,7 +33,7 @@ const listItem: Variants = {
 };
 
 function ProjectList() {
-  const { data, isLoading } = useUserProjects();
+  const { data, isLoading, isError } = useUserProjects();
 
   const projects = useMemo(() => {
     return Array.isArray(data) ? data : [];
@@ -110,15 +110,33 @@ function ProjectList() {
       {/* Content */}
       {isLoading && <ProjectListSkeleton />}
 
-      {!isLoading && projects.length === 0 && <EmptyState />}
-
-      {!isLoading && sorted.length === 0 && projects.length > 0 && (
-        <p className="text-muted-foreground py-12 text-center text-sm">
-          No projects match &ldquo;{query}&rdquo;
-        </p>
+      {!isLoading && isError && (
+        <div
+          role="alert"
+          className="border-border/50 bg-card/40 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-8 py-16 text-center"
+        >
+          <p className="text-foreground text-sm font-medium">
+            Couldn&apos;t load your projects
+          </p>
+          <p className="text-muted-foreground text-sm">
+            The request failed, so this is not an empty account. Try again in a
+            moment.
+          </p>
+        </div>
       )}
 
-      {!isLoading && sorted.length > 0 && (
+      {!isLoading && !isError && projects.length === 0 && <EmptyState />}
+
+      {!isLoading &&
+        !isError &&
+        sorted.length === 0 &&
+        projects.length > 0 && (
+          <p className="text-muted-foreground py-12 text-center text-sm">
+            No projects match &ldquo;{query}&rdquo;
+          </p>
+        )}
+
+      {!isLoading && !isError && sorted.length > 0 && (
         <>
           <motion.div
             className="space-y-2"
