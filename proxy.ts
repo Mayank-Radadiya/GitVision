@@ -21,6 +21,10 @@ const isPublicRoute = createRouteMatcher([
   // signature check; Inngest likewise signs its requests.
   "/api/webhooks/clerk",
   "/api/inngest(.*)",
+  // CSP violation reports are posted by the browser on the page's behalf, so
+  // there is no session to present. The collector is unauthenticated by
+  // design: it reads a bounded body, writes a log line, and returns 204.
+  "/api/csp-report",
   // An uptime monitor has no session. The handler is read-only and returns no
   // customer data — see the "signed-out reachability" test.
   "/api/health",

@@ -122,7 +122,7 @@ export const IGNORED_FILE_PATTERNS = [
   // `something.keyboard.ts` in the repository, and these patterns are the only
   // thing keeping a committed private key out of the vector store, where RAG
   // would hand it back as a citation.
-  /^\.git\//,
+  /(^|\/)\.git\//,
   /\.(pem|key|p12|pfx)$/i,
   /(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/i,
   /(^|\/)\.(npmrc|netrc)$/i,
