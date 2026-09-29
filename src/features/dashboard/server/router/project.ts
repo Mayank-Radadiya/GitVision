@@ -77,7 +77,7 @@ export const projectRouter = createTRPCRouter({
     }),
 
   getFileContent: protectedProcedure
-    .input(z.object({ projectId: z.string(), fileId: z.string() }))
+    .input(z.object({ projectId: z.string().uuid(), fileId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
       return projectService.getFileContent(
         input.projectId,

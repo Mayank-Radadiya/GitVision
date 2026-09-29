@@ -47,11 +47,41 @@ export function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
 }
 
 /**
+ * The slice of GitHub's REST commit payload that {@link createCommitData}
+ * actually reads. Narrower than Octokit's response type on purpose: if GitHub
+ * renames one of these fields the function stops compiling, instead of
+ * quietly writing `undefined` into the database.
+ *
+ * The `author` / `committer` sub-objects are optional because GitHub omits
+ * them for commits with no linked account -- that is exactly the case the
+ * fallbacks below exist for.
+ */
+export interface GitHubCommitPayload {
+  sha: string;
+  author?: { avatar_url?: string | null } | null;
+  commit: {
+    message?: string | null;
+    author?: {
+      name?: string | null;
+      email?: string | null;
+      date?: string | null;
+    } | null;
+    committer?: {
+      name?: string | null;
+      email?: string | null;
+      date?: string | null;
+    } | null;
+  };
+}
+
+/**
  * Transform raw GitHub REST API commit data into our database shape.
  * Falls back to DEFAULTS for missing author metadata.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createCommitData(commit: any, projectId: string): CommitData {
+export function createCommitData(
+  commit: GitHubCommitPayload,
+  projectId: string,
+): CommitData {
   return {
     commitHash: commit.sha,
     commitMessage: commit.commit.message || "",
