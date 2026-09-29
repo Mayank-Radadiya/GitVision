@@ -140,12 +140,20 @@ export async function processFileForRag(
       `[RAG-FILE] ✓ ${filePath}: ${chunks.length} chunks, ${embeddingsResults.length} embeddings`,
     );
 
+    // A short embedding batch leaves chunks unsearchable while the job still
+    // reports success. Surface it so the caller records the file as failed
+    // instead of quietly marking the project "completed".
+    const missing = chunks.length - embeddingsResults.length;
+
     return {
       fileId,
       filePath,
       chunksProcessed: chunks.length,
       embeddingsGenerated: embeddingsResults.length,
       skipped: false,
+      ...(missing > 0
+        ? { error: `Embedding provider returned ${embeddingsResults.length} of ${chunks.length} chunks` }
+        : {}),
     };
   } catch (error) {
     logger.error(`Error processing file ${filePath}`, { error, filePath });
