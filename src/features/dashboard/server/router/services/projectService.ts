@@ -35,6 +35,102 @@ interface PickUpCard {
   projectName: string;
 }
 
+/** Row shape the "continue conversation" card needs from `project_chats`. */
+interface PickUpChatRow {
+  id: string;
+  title: string | null;
+  projectName: string | null;
+}
+
+/** Row shape the "recent commit" card needs from `commits`. */
+interface PickUpCommitRow {
+  id: string;
+  commitMessage: string;
+  projectId: string;
+  projectName: string;
+}
+
+/**
+ * Build the pick-up cards from one chat row and one commit row.
+ *
+ * Shared so the standalone procedure and the consolidated dashboard read
+ * cannot drift — the card's hrefs and its 60-character commit truncation are
+ * the contract T-003 pinned a test against.
+ */
+function buildPickUpCards(
+  lastChat: PickUpChatRow | undefined,
+  recentCommit: PickUpCommitRow | undefined,
+): PickUpCard[] {
+  const cards: PickUpCard[] = [];
+
+  if (lastChat) {
+    cards.push({
+      type: "chat",
+      title: "Continue Conversation",
+      description: lastChat.title || "Your last chat session",
+      // A chat lives at /chat/[chatId] whether or not it has a project —
+      // there is no /projects route in this app.
+      href: `/chat/${lastChat.id}`,
+      projectName: lastChat.projectName ?? "General",
+    });
+  }
+
+  if (recentCommit) {
+    const msg =
+      recentCommit.commitMessage.length > 60
+        ? recentCommit.commitMessage.slice(0, 57) + "..."
+        : recentCommit.commitMessage;
+    cards.push({
+      type: "commit",
+      title: "Recent Commit",
+      description: msg,
+      href: `/dashboard/user-project/${recentCommit.projectId}`,
+      projectName: recentCommit.projectName,
+    });
+  }
+
+  return cards;
+}
+
+/**
+ * Aggregate the per-project `languages` JSONB into the top-10 breakdown.
+ *
+ * Pure: it reads rows that have already been fetched, so the consolidated
+ * dashboard read can derive the breakdown from its project rows instead of
+ * issuing a third query against the same table.
+ */
+function aggregateLanguages(
+  rows: { languages: LanguageEntry[] | null }[],
+): LanguageEntry[] {
+  // Aggregate byte-sizes across all projects in JS (tiny cardinality)
+  const sizeByLang = new Map<string, { color: string | null; size: number }>();
+
+  for (const row of rows) {
+    if (!row.languages) continue;
+    for (const lang of row.languages) {
+      const existing = sizeByLang.get(lang.name);
+      sizeByLang.set(lang.name, {
+        color: lang.color ?? existing?.color ?? null,
+        size: (existing?.size ?? 0) + lang.size,
+      });
+    }
+  }
+
+  if (sizeByLang.size === 0) return [];
+
+  const totalBytes = [...sizeByLang.values()].reduce((s, v) => s + v.size, 0);
+
+  return [...sizeByLang.entries()]
+    .sort((a, b) => b[1].size - a[1].size) // largest first
+    .slice(0, 10)
+    .map(([name, { color, size }]) => ({
+      name,
+      color,
+      size,
+      percentage: totalBytes > 0 ? Math.round((size / totalBytes) * 1000) / 10 : 0,
+    }));
+}
+
 export function createProjectService() {
   return {
     // ── Utility ──────────────────────────────────────────────────────────────
@@ -553,33 +649,212 @@ export function createProjectService() {
      * way out buys far more than any merge above, because no merge removes
      * the 64 KB row. getRecentActivity alone is two thirds of the widget.
      */
+    /**
+     * Fetches ALL dashboard data in a single server call — and, as of T-030,
+     * in a single database round-trip.
+     *
+     * ── Why this is one batch and not seven calls ────────────────────────────
+     * Under D-11 option (a) the `neon-http` driver is stateless: every
+     * `db.select()` is its own HTTP request. The seven reads below were
+     * therefore ten HTTP requests per dashboard load, wrapped in a
+     * `Promise.all` so they overlapped and wall-clock cost was the slowest
+     * one rather than the sum. `db.batch()` sends its statements as a single
+     * Neon HTTP transaction, so the whole widget is now one request.
+     *
+     * The projections below are deliberately duplicated with the standalone
+     * procedures (`getAllProjects`, `getRecentActivity`, ...). Each of those
+     * is its own tRPC query and must stay independently callable, so the
+     * duplication is the price of the consolidation — not an oversight.
+     *
+     * Four of the ten queries are gone outright, merged into reads that were
+     * happening anyway:
+     *   - getDashboardInfo's SUM(total_commits)/SUM(total_files)/COUNT(id)
+     *     is summed in JS from the project rows below, which are the same
+     *     `WHERE owner_id = ?` rows.
+     *   - getLanguageBreakdown is the same rows' `languages` JSONB.
+     *   - getPickUpWhereYouLeftOff's "recent commit" card is the first row of
+     *     the same `ORDER BY authorDate DESC` the activity list reads, so it
+     *     only needed `hasSummary` added to the projection.
+     *   - getNeedsAttention's open-issue/open-PR counts become
+     *     `FILTER (...) OVER ()` window counts on the rows it already
+     *     fetches. A window function is evaluated over the whole partition
+     *     before LIMIT, so the counts still cover every open issue for the
+     *     user, not just the eight returned.
+     *
+     * The project_chats lookup and the users/credits lookup each own a table
+     * nothing else in this payload reads, so they stay as their own
+     * statements rather than being joined into something larger.
+     *
+     * ── Still the biggest remaining cost (T-029) ─────────────────────────────
+     * `getRecentActivity`'s `commit_message` column is unchanged, and T-029
+     * measured it as two thirds of this widget: it averages 1,092 bytes and
+     * reaches 65,536, over a 72 ms network floor. EXPLAIN puts the database
+     * side at 0.134 ms — this is wire width, not a slow plan. Capping the
+     * column on the way out is the next lever and is deliberately not done
+     * here, because the payload is a contract and truncating it changes what
+     * the widget shows.
+     *
+     * ── Measured before/after (T-030) ────────────────────────────────────────
+     * Same database, same user (5 projects, 402 commits, 72 issues), 5 runs
+     * each, medians:
+     *
+     *                    round-trips   median   range
+     *   before (T-029)          10     717 ms   636-1040 ms
+     *   after                   1     424 ms   235-658 ms
+     *
+     * The `SELECT 1` floor on the same connection drifted 72 → 83 ms between
+     * the two sessions, so read the improvement as roughly 1.7x, not more.
+     * Both halves are real and they are not the same fix: the round-trips
+     * went 10 → 1, and the wall clock came down by the width of the
+     * commit_message column, which is still in there.
+     */
     async getDashboardData(userId: string) {
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+
       const [
-        stats,
-        projects,
-        recentActivity,
-        commitChart,
-        pickUp,
-        languages,
-        attention,
-      ] = await Promise.all([
-        this.getDashboardInfo(userId),
-        this.getAllProjects(userId),
-        this.getRecentActivity(userId, 8),
-        this.getCommitChart(userId, 7),
-        this.getPickUpWhereYouLeftOff(userId),
-        this.getLanguageBreakdown(userId),
-        this.getNeedsAttention(userId),
+        projectRows,
+        creditRows,
+        commitRows,
+        chartRows,
+        chatRows,
+        issueRows,
+      ] = await db.batch([
+        db
+          .select({
+            id: projectTables.id,
+            projectName: projectTables.projectName,
+            githubUrl: projectTables.githubUrl,
+            star: projectTables.star,
+            forks: projectTables.forks,
+            totalCommits: projectTables.totalCommits,
+            totalBranches: projectTables.totalBranches,
+            totalContributors: projectTables.totalContributors,
+            totalFiles: projectTables.totalFiles,
+            languages: projectTables.languages,
+            embeddingStatus: projectTables.embeddingStatus,
+            createdAt: projectTables.createdAt,
+            updatedAt: projectTables.updatedAt,
+          })
+          .from(projectTables)
+          .where(eq(projectTables.ownerId, userId))
+          .orderBy(desc(projectTables.createdAt)),
+
+        db
+          .select({ credits: usersTable.credits })
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1),
+
+        db
+          .select({
+            id: commitsTable.id,
+            commitMessage: commitsTable.commitMessage,
+            authorName: commitsTable.authorName,
+            authorAvatar: commitsTable.authorAvatar,
+            authorDate: commitsTable.authorDate,
+            projectId: commitsTable.projectId,
+            projectName: projectTables.projectName,
+            // For the pick-up card, not the activity list — stripped below.
+            hasSummary: sql<boolean>`${commitsTable.AiSummary} IS NOT NULL`,
+          })
+          .from(commitsTable)
+          .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
+          .where(eq(projectTables.ownerId, userId))
+          .orderBy(desc(commitsTable.authorDate))
+          .limit(8),
+
+        db
+          .select({
+            date: sql<string>`date_trunc('day', ${commitsTable.authorDate})::date::text`,
+            commits: count(commitsTable.id),
+          })
+          .from(commitsTable)
+          .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
+          .where(
+            and(
+              eq(projectTables.ownerId, userId),
+              sql`${commitsTable.authorDate} >= ${since}`,
+            ),
+          )
+          .groupBy(sql`date_trunc('day', ${commitsTable.authorDate})`)
+          .orderBy(sql`date_trunc('day', ${commitsTable.authorDate})`),
+
+        db
+          .select({
+            id: projectChats.id,
+            title: projectChats.title,
+            projectId: projectChats.projectId,
+            projectName: projectTables.projectName,
+            updatedAt: projectChats.updatedAt,
+          })
+          .from(projectChats)
+          .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
+          .where(eq(projectChats.userId, userId))
+          .orderBy(desc(projectChats.updatedAt))
+          .limit(1),
+
+        db
+          .select({
+            id: issuesTable.id,
+            title: issuesTable.title,
+            issueNumber: issuesTable.issueNumber,
+            isPullRequest: issuesTable.isPullRequest,
+            authorLogin: issuesTable.authorLogin,
+            authorAvatar: issuesTable.authorAvatar,
+            projectId: issuesTable.projectId,
+            projectName: projectTables.projectName,
+            githubUpdatedAt: issuesTable.githubUpdatedAt,
+            aiComplexity: issuesTable.aiComplexity,
+            aiTags: issuesTable.aiTags,
+            // Window counts over the whole open-issue set, stripped below.
+            openIssues: sql<number>`count(*) FILTER (WHERE ${issuesTable.isPullRequest} = false) OVER ()`,
+            openPRs: sql<number>`count(*) FILTER (WHERE ${issuesTable.isPullRequest} = true) OVER ()`,
+          })
+          .from(issuesTable)
+          .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
+          .where(
+            and(
+              eq(projectTables.ownerId, userId),
+              eq(issuesTable.state, "open"),
+            ),
+          )
+          .orderBy(desc(issuesTable.githubUpdatedAt))
+          .limit(8),
       ]);
 
+      const firstIssue = issueRows[0];
+
       return {
-        stats,
-        projects,
-        recentActivity,
-        commitChart,
-        pickUp,
-        languages,
-        attention,
+        stats: {
+          totalProjects: projectRows.length,
+          totalCommits: projectRows.reduce(
+            (sum, p) => sum + (p.totalCommits ?? 0),
+            0,
+          ),
+          totalFiles: projectRows.reduce(
+            (sum, p) => sum + (p.totalFiles ?? 0),
+            0,
+          ),
+          userCredits: creditRows[0]?.credits ?? 0,
+        },
+        projects: projectRows,
+        // `hasSummary` rides along for the pick-up card and is not part of the
+        // activity list's shape.
+        recentActivity: commitRows.map(({ hasSummary: _summary, ...rest }) => rest),
+        commitChart: chartRows.map((r) => ({
+          date: r.date,
+          commits: Number(r.commits),
+        })),
+        pickUp: { cards: buildPickUpCards(chatRows[0], commitRows[0]) },
+        languages: aggregateLanguages(projectRows),
+        attention: {
+          openIssuesCount: Number(firstIssue?.openIssues ?? 0),
+          openPRsCount: Number(firstIssue?.openPRs ?? 0),
+          items: issueRows.map(
+            ({ openIssues: _issues, openPRs: _prs, ...item }) => item,
+          ),
+        },
       };
     },
 
@@ -708,37 +983,7 @@ export function createProjectService() {
           .limit(1),
       ]);
 
-      const cards: PickUpCard[] = [];
-
-      if (lastChat[0]) {
-        const c = lastChat[0];
-        cards.push({
-          type: "chat",
-          title: "Continue Conversation",
-          description: c.title || "Your last chat session",
-          // A chat lives at /chat/[chatId] whether or not it has a project —
-          // there is no /projects route in this app.
-          href: `/chat/${c.id}`,
-          projectName: c.projectName ?? "General",
-        });
-      }
-
-      if (recentCommit[0]) {
-        const cm = recentCommit[0];
-        const msg =
-          cm.commitMessage.length > 60
-            ? cm.commitMessage.slice(0, 57) + "..."
-            : cm.commitMessage;
-        cards.push({
-          type: "commit",
-          title: "Recent Commit",
-          description: msg,
-          href: `/dashboard/user-project/${cm.projectId}`,
-          projectName: cm.projectName,
-        });
-      }
-
-      return { cards };
+      return { cards: buildPickUpCards(lastChat[0], recentCommit[0]) };
     },
 
     /**
@@ -758,40 +1003,7 @@ export function createProjectService() {
         .from(projectTables)
         .where(eq(projectTables.ownerId, userId));
 
-      // Aggregate byte-sizes across all projects in JS (tiny cardinality)
-      const sizeByLang = new Map<
-        string,
-        { color: string | null; size: number }
-      >();
-
-      for (const row of rows) {
-        if (!row.languages) continue;
-        for (const lang of row.languages) {
-          const existing = sizeByLang.get(lang.name);
-          sizeByLang.set(lang.name, {
-            color: lang.color ?? existing?.color ?? null,
-            size: (existing?.size ?? 0) + lang.size,
-          });
-        }
-      }
-
-      if (sizeByLang.size === 0) return [];
-
-      const totalBytes = [...sizeByLang.values()].reduce(
-        (s, v) => s + v.size,
-        0,
-      );
-
-      return [...sizeByLang.entries()]
-        .sort((a, b) => b[1].size - a[1].size) // largest first
-        .slice(0, 10)
-        .map(([name, { color, size }]) => ({
-          name,
-          color,
-          size,
-          percentage:
-            totalBytes > 0 ? Math.round((size / totalBytes) * 1000) / 10 : 0,
-        }));
+      return aggregateLanguages(rows);
     },
 
     /**
