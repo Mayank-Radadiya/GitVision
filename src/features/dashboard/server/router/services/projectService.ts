@@ -660,9 +660,9 @@ export function createProjectService() {
           type: "chat",
           title: "Continue Conversation",
           description: c.title || "Your last chat session",
-          href: c.projectId
-            ? `/projects/${c.projectId}/chat/${c.id}`
-            : `/chat/${c.id}`,
+          // A chat lives at /chat/[chatId] whether or not it has a project —
+          // there is no /projects route in this app.
+          href: `/chat/${c.id}`,
           projectName: c.projectName ?? "General",
         });
       }
@@ -677,7 +677,7 @@ export function createProjectService() {
           type: "commit",
           title: "Recent Commit",
           description: msg,
-          href: `/projects/${cm.projectId}`,
+          href: `/dashboard/user-project/${cm.projectId}`,
           projectName: cm.projectName,
         });
       }
