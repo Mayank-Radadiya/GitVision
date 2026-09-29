@@ -6,7 +6,7 @@
  */
 
 import { memo, useEffect, useState } from "react";
-import { animate } from "framer-motion";
+import { animate, useReducedMotion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { COLOR_TOKENS } from "@/features/dashboard/constants/dashboard.constants";
 import type { StatColor } from "@/features/dashboard/types/dashboard.types";
@@ -20,18 +20,30 @@ interface StatCardProps {
   description: string;
 }
 
-/** Animated counter — counts from 0 to target over 1.2s */
+/**
+ * Animated counter — counts from 0 to target over 1.2s.
+ *
+ * The count-up is driven from JavaScript, so the app-wide
+ * `@media (prefers-reduced-motion: reduce)` rule in globals.css cannot suppress
+ * it; that rule only neutralises CSS transitions and animations. When the user
+ * has asked for reduced motion the value is simply rendered.
+ */
 function AnimatedValue({ target }: { target: number }) {
   const [display, setDisplay] = useState(0);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
+    if (reduced) {
+      setDisplay(target);
+      return;
+    }
     const ctrl = animate(0, target, {
       duration: 1.2,
       ease: "easeOut",
       onUpdate: (v) => setDisplay(Math.round(v)),
     });
     return () => ctrl.stop();
-  }, [target]);
+  }, [target, reduced]);
 
   return <>{display.toLocaleString()}</>;
 }
