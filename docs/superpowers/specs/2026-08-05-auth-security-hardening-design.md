@@ -34,8 +34,8 @@ requests fast.
 
 | File | Fix |
 |---|---|
-| `/api/project/getProjectCommits` | `auth()` + ownership; `count(*)` replaces full-row count |
-| `/api/project/getProjectDetails` | `auth()` + ownership |
+| `/api/project/getProjectCommits` | `auth()` + ownership; `count(*)` replaces full-row count. Route later deleted as dead attack surface — use the `getProjectCommits` tRPC procedure. |
+| `/api/project/getProjectDetails` | `auth()` + ownership. Route later deleted as dead attack surface — use the tRPC project procedures. |
 | `/api/project/getProjectFiles` | `auth()` + ownership (full-source leak closed) |
 | `/api/project/createProject` | `projectCreateSchema.safeParse` (github.com-only); rate limit 10/hr |
 | `/api/chat` | project ownership; rate limit 20/min; credit spend (atomic, 402); prompt-injection delimiter |
