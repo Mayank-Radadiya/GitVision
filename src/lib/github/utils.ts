@@ -57,11 +57,36 @@ export function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
 }
 
 /**
+ * The subset of a GitHub REST commit payload that `createCommitData` reads.
+ *
+ * Octokit's `RepositoryCommit` is accurate but enormously wider, and typing the
+ * parameter as that would let a field be renamed upstream with nothing to catch
+ * it: every field read below falls back to `DEFAULTS` on `undefined`, so a
+ * rename degrades to "Unknown" instead of failing to compile. Naming the fields
+ * here means the rename is a type error at the boundary.
+ *
+ * Optional because GitHub genuinely omits them — a commit authored through the
+ * API has no `author`, and a commit can have no message body. That is the
+ * difference between "absent" and "renamed", and only one of them is a bug.
+ */
+interface GitHubCommitPayload {
+  sha: string;
+  author?: { avatar_url?: string | null } | null;
+  commit: {
+    message?: string | null;
+    author?: { name?: string | null; email?: string | null; date?: string | null } | null;
+    committer?: { name?: string | null; email?: string | null; date?: string | null } | null;
+  };
+}
+
+/**
  * Transform raw GitHub REST API commit data into our database shape.
  * Falls back to DEFAULTS for missing author metadata.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createCommitData(commit: any, projectId: string): CommitData {
+export function createCommitData(
+  commit: GitHubCommitPayload,
+  projectId: string,
+): CommitData {
   return {
     commitHash: commit.sha,
     commitMessage: commit.commit.message || "",

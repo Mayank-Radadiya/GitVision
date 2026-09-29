@@ -90,7 +90,13 @@ export const projectRouter = createTRPCRouter({
     }),
 
   getFileContent: protectedProcedure
-    .input(z.object({ projectId: z.string(), fileId: z.string() }))
+    // `.uuid()` to match getProjectDetails and getCommits, as the task asks.
+    // Both columns are `uuid` in Postgres, so a bare string reached the query as
+    // a value that can match nothing — and the caller could not tell that from a
+    // file that genuinely does not exist. The notes/risks said to check the call
+    // sites first: `code-viewer` and the project view both pass a row's `id`,
+    // which is a uuid, so nothing legitimate is rejected.
+    .input(z.object({ projectId: z.string().uuid(), fileId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
       return projectService.getFileContent(
         input.projectId,
