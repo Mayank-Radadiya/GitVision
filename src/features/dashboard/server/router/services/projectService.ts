@@ -10,7 +10,7 @@ import {
   usersTable,
   type LanguageEntry,
 } from "@/db/schema";
-import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
+import { eq, desc, asc, and, count, sum, sql, gte } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
 import {
@@ -34,6 +34,31 @@ interface PickUpCard {
   description: string;
   href: string;
   projectName: string;
+}
+
+/**
+ * Turns an over-fetched page into `{ items, hasMore, nextCursor }`.
+ *
+ * Every paged query reads `limit + 1` rows; the overflow row is the only
+ * honest proof that another page exists, and it is sliced back off. The cursor
+ * is derived from the last row actually returned so the next page resumes
+ * exactly where this one stopped — including when several rows share the same
+ * timestamp, which is why the caller supplies both sort keys.
+ */
+function pageOf<T extends { id: string }, C>(
+  page: T[],
+  limit: number,
+  cursorOf: (row: T) => C,
+): { items: T[]; hasMore: boolean; nextCursor: C | null } {
+  const hasMore = page.length > limit;
+  const items = hasMore ? page.slice(0, limit) : page;
+  const last = items[items.length - 1];
+
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last ? cursorOf(last) : null,
+  };
 }
 
 export function createProjectService() {
@@ -773,20 +798,29 @@ export function createProjectService() {
     // ── Issue Queries ─────────────────────────────────────────────────────────
 
     /**
-     * Fetches paginated issues/PRs for a single project.
-     * Now includes AI triage fields so issue list views can display badges.
+     * Fetches one page of issues/PRs for a single project.
+     *
+     * Paging is a keyset over `(github_updated_at, id)`, not an offset.
+     * `github_updated_at` is not unique, so a single-column cursor skips or
+     * repeats every row that shares a timestamp — the id has to ride along.
+     * One row past the limit is read purely as the "a next page exists" proof
+     * and then sliced off; `items` never contains that sentinel.
+     *
+     * Ownership is asserted before the query, so a foreign project id fails
+     * with the same NOT_FOUND as a missing one.
      */
     async getProjectIssues(
       projectId: string,
       userId: string,
       isPullRequest: boolean,
       limit = 50,
+      cursor?: { githubUpdatedAt: Date; id: string },
     ) {
       await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
 
-      return db
+      const page = await db
         .select({
           id: issuesTable.id,
           title: issuesTable.title,
@@ -806,17 +840,30 @@ export function createProjectService() {
           and(
             eq(issuesTable.projectId, projectId),
             eq(issuesTable.isPullRequest, isPullRequest),
+            cursor
+              ? sql`(${issuesTable.githubUpdatedAt}, ${issuesTable.id}) < (${cursor.githubUpdatedAt}, ${cursor.id})`
+              : undefined,
           ),
         )
-        .orderBy(desc(issuesTable.githubUpdatedAt))
-        .limit(safeLimit);
+        .orderBy(desc(issuesTable.githubUpdatedAt), desc(issuesTable.id))
+        .limit(safeLimit + 1);
+
+      return pageOf(page, safeLimit, (row) => ({
+        githubUpdatedAt: row.githubUpdatedAt,
+        id: row.id,
+      }));
     },
 
     /**
-     * Fetches comments for a specific issue.
+     * Fetches one page of comments for a specific issue, oldest first.
      * Ownership verified through the issue → project chain.
      */
-    async getIssueComments(issueId: string, userId: string) {
+    async getIssueComments(
+      issueId: string,
+      userId: string,
+      limit = 50,
+      cursor?: { githubCreatedAt: Date; id: string },
+    ) {
       // Ownership is part of the lookup, not a second step. Splitting it out
       // made "no such issue" and "someone else's issue" two distinguishable
       // failures, which is an existence oracle for cross-tenant issue ids.
@@ -836,7 +883,9 @@ export function createProjectService() {
         throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
       }
 
-      return db
+      const safeLimit = Math.min(limit, 100);
+
+      const page = await db
         .select({
           id: issueCommentsTable.id,
           body: issueCommentsTable.body,
@@ -845,9 +894,21 @@ export function createProjectService() {
           githubCreatedAt: issueCommentsTable.githubCreatedAt,
         })
         .from(issueCommentsTable)
-        .where(eq(issueCommentsTable.issueId, issueId))
-        .orderBy(issueCommentsTable.githubCreatedAt)
-        .limit(50);
+        .where(
+          and(
+            eq(issueCommentsTable.issueId, issueId),
+            cursor
+              ? sql`(${issueCommentsTable.githubCreatedAt}, ${issueCommentsTable.id}) > (${cursor.githubCreatedAt}, ${cursor.id})`
+              : undefined,
+          ),
+        )
+        .orderBy(asc(issueCommentsTable.githubCreatedAt), asc(issueCommentsTable.id))
+        .limit(safeLimit + 1);
+
+      return pageOf(page, safeLimit, (row) => ({
+        githubCreatedAt: row.githubCreatedAt,
+        id: row.id,
+      }));
     },
   };
 }

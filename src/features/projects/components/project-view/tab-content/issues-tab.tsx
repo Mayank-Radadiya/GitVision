@@ -37,7 +37,8 @@ type FilterType = (typeof FILTERS)[number];
 // ─── Comment Section ──────────────────────────────────────────────────────────
 
 function IssueComments({ issueId }: { issueId: string }) {
-  const { data: comments = [], isLoading } = useIssueComments(issueId);
+  const { data, isLoading } = useIssueComments(issueId);
+  const comments = data?.items ?? [];
 
   if (isLoading) {
     return (
@@ -289,7 +290,8 @@ interface IssuesTabProps {
 }
 
 function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
-  const { data: issues = [], isLoading } = useProjectIssues(projectId, false);
+  const { data, isLoading } = useProjectIssues(projectId, false);
+  const issues = data?.items ?? [];
   const { mutate: syncIssues, isPending: isSyncing } = useSyncIssues(projectId);
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const [searchQuery, setSearchQuery] = useState("");

@@ -159,8 +159,8 @@ describe("getIssueComments error parity", () => {
     projectRows = [{ ownerId: "user_1" }];
     commentRows = [{ id: "c1", body: "hi" }];
 
-    const comments = await service.getIssueComments(ISSUE_ID, "user_1");
+    const result = await service.getIssueComments(ISSUE_ID, "user_1");
 
-    expect(comments).toHaveLength(1);
+    expect(result.items).toHaveLength(1);
   });
 });

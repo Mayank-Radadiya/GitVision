@@ -146,6 +146,12 @@ export const projectRouter = createTRPCRouter({
         projectId: z.string().uuid(),
         isPullRequest: z.boolean(),
         limit: z.number().min(1).max(100).optional().default(50),
+        cursor: z
+          .object({
+            githubUpdatedAt: z.coerce.date(),
+            id: z.string().uuid(),
+          })
+          .optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
@@ -154,13 +160,30 @@ export const projectRouter = createTRPCRouter({
         ctx.userId,
         input.isPullRequest,
         input.limit,
+        input.cursor,
       );
     }),
 
   getIssueComments: protectedProcedure
-    .input(z.object({ issueId: z.string().uuid() }))
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        limit: z.number().min(1).max(100).optional().default(50),
+        cursor: z
+          .object({
+            githubCreatedAt: z.coerce.date(),
+            id: z.string().uuid(),
+          })
+          .optional(),
+      }),
+    )
     .query(async ({ input, ctx }) => {
-      return projectService.getIssueComments(input.issueId, ctx.userId);
+      return projectService.getIssueComments(
+        input.issueId,
+        ctx.userId,
+        input.limit,
+        input.cursor,
+      );
     }),
 
   syncIssues: protectedProcedure
