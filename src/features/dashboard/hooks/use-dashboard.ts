@@ -27,19 +27,9 @@ export const useUserProjects = () => {
   return { data: data?.projects, ...rest };
 };
 
-export const useRecentActivity = () => {
-  const { data, ...rest } = useDashboardData();
-  return { data: data?.recentActivity, ...rest };
-};
-
 export const useCommitChart = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.commitChart, ...rest };
-};
-
-export const usePickUpWhereYouLeftOff = () => {
-  const { data, ...rest } = useDashboardData();
-  return { data: data?.pickUp, ...rest };
 };
 
 export const useLanguageBreakdown = () => {

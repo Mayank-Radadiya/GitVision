@@ -120,20 +120,3 @@ export const PRIMARY_NAVIGATION: NavItem[] = [
     icon: Code2Icon,
   },
 ];
-
-/**
- * Secondary navigation items displayed in the "Settings" section
- * Typically contains user-specific settings and account options
- */
-export const SECONDARY_NAVIGATION: NavItem[] = [
-  // {
-  //   name: "Account",
-  //   href: "/account",
-  //   icon: UserCircle,
-  // },
-  // {
-  //   name: "Settings",
-  //   href: "/settings",
-  //   icon: Settings,
-  // },
-];

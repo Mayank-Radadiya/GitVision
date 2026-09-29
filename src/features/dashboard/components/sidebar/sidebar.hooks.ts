@@ -54,18 +54,3 @@ export function useMobileSidebar() {
     closeMobile: () => setIsMobileOpen(false),
   };
 }
-
-// =============================================================================
-// CURRENT PATH HOOK
-// =============================================================================
-
-/**
- * Returns the current pathname for route matching
- *
- * Thin wrapper around Next.js usePathname for consistency.
- *
- * @returns Current URL pathname
- */
-export function useCurrentPath(): string {
-  return usePathname();
-}

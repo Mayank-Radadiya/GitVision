@@ -76,8 +76,6 @@ const PRIVATE = [
   "/api/chat",
   "/api/embeddings",
   "/api/trpc/project.getAll",
-  "/api/project/getProjectCommits",
-  "/api/project/getProjectDetails",
 ];
 
 beforeEach(() => {

@@ -13,24 +13,10 @@ import { projectCreateSchema } from "@/src/lib/validation/schemas";
 /** Form input shape — inferred from the tRPC validation schema */
 export type CreateProjectInput = z.infer<typeof projectCreateSchema>;
 
-export interface Step {
-  id: number;
-  /** Mono, uppercase, tracked-out label — e.g. "01 DETAILS" */
-  label: string;
-}
-
 export interface RepoInfo {
   owner: string;
   repo: string;
 }
-
-// ─── Steps — drawn as commit nodes on the branch timeline (brief §5.2) ──────
-
-export const FORM_STEPS: Step[] = [
-  { id: 1, label: "01 DETAILS" },
-  { id: 2, label: "02 VALIDATION" },
-  { id: 3, label: "03 ANALYSIS" },
-];
 
 export const PRESETS = [
   {

@@ -8,14 +8,6 @@ import { chatMessages } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 
-export interface Message {
-  id?: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  relatedFiles?: string[];
-  createdAt?: Date;
-}
-
 /**
  * Get recent messages for LLM context (last N messages)
  * Formatted for the system prompt
