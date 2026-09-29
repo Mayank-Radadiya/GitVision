@@ -17,6 +17,13 @@ import {
   MAX_CONTEXT_TOKENS,
   MODEL_CONTEXT_WINDOWS,
 } from "@/src/lib/llm/budget";
+import { LLM_SETTINGS } from "@/src/lib/llm/config";
+
+const configuredModels = [
+  LLM_SETTINGS.chat.model,
+  LLM_SETTINGS.queryRewrite.model,
+  LLM_SETTINGS.commitSummary.model,
+];
 
 describe("Budget Manager Primitive", () => {
   it("should estimate tokens based on character count ratio", () => {
@@ -25,11 +32,24 @@ describe("Budget Manager Primitive", () => {
     expect(estimateTokens("12345678")).toBe(2);
   });
 
-  it("should compute dynamic budget allocation for gemini-flash-latest", () => {
-    const budget = computeBudget("gemini-flash-latest");
-    expect(budget.contextWindow).toBe(
-      MODEL_CONTEXT_WINDOWS["gemini-flash-latest"],
-    );
+  it("never configures a floating -latest model alias", () => {
+    // A -latest alias can change behaviour with no deploy, commit or changelog.
+    for (const model of configuredModels) {
+      expect(model).not.toMatch(/-latest$/);
+    }
+  });
+
+  it("has a context window for every model the LLM settings configure", () => {
+    // Otherwise computeBudget silently falls back to the 128k default window.
+    for (const model of configuredModels) {
+      expect(MODEL_CONTEXT_WINDOWS[model]).toBeTypeOf("number");
+    }
+  });
+
+  it("should compute dynamic budget allocation for the pinned flash model", () => {
+    const model = LLM_SETTINGS.chat.model;
+    const budget = computeBudget(model);
+    expect(budget.contextWindow).toBe(MODEL_CONTEXT_WINDOWS[model]);
     expect(budget.output).toBe(2048);
     expect(budget.instructions).toBe(1500);
     const expectedRemaining = budget.contextWindow - 2048 - 1500;
@@ -43,7 +63,9 @@ describe("Budget Manager Primitive", () => {
     // 1M-token window minus output/instructions leaves ~783k of "context",
     // which fitToBudget never trims against. The ceiling is what makes the
     // budget real.
-    expect(computeBudget("gemini-flash-latest").context).toBe(MAX_CONTEXT_TOKENS);
+    expect(computeBudget(LLM_SETTINGS.chat.model).context).toBe(
+      MAX_CONTEXT_TOKENS,
+    );
     expect(computeBudget("gpt-4o").context).toBe(MAX_CONTEXT_TOKENS);
   });
 
