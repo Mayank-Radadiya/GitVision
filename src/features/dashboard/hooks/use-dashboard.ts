@@ -1,6 +1,4 @@
 import { trpc } from "@/src/lib/trpc/client";
-import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
 
 const DASHBOARD_STALE_TIME = 60_000; // 60s — hydrated data stays fresh
 const DASHBOARD_GC_TIME = 5 * 60_000; // 5min — keep in cache for quick revisits
@@ -52,26 +50,4 @@ export const useLanguageBreakdown = () => {
 export const useNeedsAttention = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.attention, ...rest };
-};
-
-// ─── Mutations (unchanged) ──────────────────────────────────────────────────
-
-export const useCreateProject = () => {
-  const router = useRouter();
-  const utils = trpc.useUtils();
-
-  return trpc.project.create.useMutation({
-    onSuccess: () => {
-      toast.success("Project created successfully");
-
-      // Invalidate the consolidated query — refreshes everything
-      utils.project.getDashboardData.invalidate();
-      utils.project.getAll.invalidate();
-
-      router.push("/dashboard");
-    },
-    onError: (error) => {
-      toast.error(`Error creating project: ${error.message}`);
-    },
-  });
 };

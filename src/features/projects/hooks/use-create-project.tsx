@@ -25,11 +25,13 @@ export function useCreateProject() {
         icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
       });
 
-      // Invalidate dashboard and project list caches
+      // Invalidate the queries the dashboard actually reads. Every dashboard
+      // hook (useUserProjects, useRecentActivity, useCommitChart,
+      // useDashboardInfo, usePickUpWhereYouLeftOff, ...) is a projection of
+      // the single getDashboardData query, so invalidating the individual
+      // procedures below left the dashboard showing stale data.
+      utils.project.getDashboardData.invalidate();
       utils.project.getAll.invalidate();
-      utils.project.getDashboardInfo.invalidate();
-      utils.project.getRecentActivity.invalidate();
-      utils.project.getCommitChart.invalidate();
 
       // Redirect to dashboard
       setTimeout(() => router.push("/dashboard"), 400);
