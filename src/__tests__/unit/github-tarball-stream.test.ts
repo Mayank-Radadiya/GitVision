@@ -73,6 +73,29 @@ function validTarball(): Promise<Buffer> {
   });
 }
 
+/** A .tar.gz built from arbitrary entries, so entry-name handling can be probed. */
+function tarballWith(
+  entries: { name: string; type?: string; body?: string; linkname?: string }[],
+): Promise<Buffer> {
+  const pack = tar.pack();
+  for (const e of entries) {
+    pack.entry(
+      {
+        name: e.name,
+        type: (e.type ?? "file") as "file",
+        linkname: e.linkname,
+      },
+      e.body ?? "",
+    );
+  }
+  pack.finalize();
+  const chunks: Buffer[] = [];
+  return new Promise<Buffer>((resolve) => {
+    pack.on("data", (c: Buffer) => chunks.push(c));
+    pack.on("end", () => resolve(gzipSync(Buffer.concat(chunks))));
+  });
+}
+
 /** A gzip stream whose deflate body has been overwritten with garbage. */
 function corruptDeflate(): Buffer {
   const buf = gzipSync(Buffer.alloc(64 * 1024, 7));
@@ -159,5 +182,76 @@ describe("tarball ingestion", () => {
     expect(inserted.flat()).toEqual([
       expect.objectContaining({ fileName: "src/index.ts" }),
     ]);
+  });
+});
+
+/**
+ * T-015. GitHub puts every entry under a single `<repo>-<sha>/` prefix, and
+ * the parser strips exactly that one segment. Stripping a segment is not
+ * sanitisation: a `..` that follows it survives into `fileName`, which is
+ * persisted, rendered in the file tree, and re-emitted as a RAG citation —
+ * attacker-controlled text from a hostile repository, landing in the model's
+ * context. Nothing here is written to a filesystem, so this was never a
+ * traversal *write*; it is attacker-controlled path text we refuse to store.
+ */
+describe("tar entry names", () => {
+  const names = () => inserted.flat().map((r) => r.fileName as string);
+
+  it("drops an entry that climbs out of the repo with `..`", async () => {
+    responseBody = await tarballWith([
+      { name: "owner-repo-abc123/src/index.ts", body: "export const a = 1;\n" },
+      { name: "owner-repo-abc123/../../../etc/passwd", body: "root:x:0:0\n" },
+    ]);
+
+    // The good file still lands — one poisoned entry must not abort the run.
+    await expect(
+      getRepositoryFiles("owner", "repo", "proj_1"),
+    ).resolves.toBe(1);
+
+    expect(names()).toEqual(["src/index.ts"]);
+  });
+
+  it("drops a `..` that is buried mid-path, not just at the front", async () => {
+    responseBody = await tarballWith([
+      { name: "owner-repo-abc123/src/../../secrets.txt", body: "hunter2\n" },
+    ]);
+
+    await expect(
+      getRepositoryFiles("owner", "repo", "proj_1"),
+    ).resolves.toBe(0);
+
+    expect(names()).toEqual([]);
+  });
+
+  it("never stores a fileName containing a `..` segment", async () => {
+    responseBody = await tarballWith([
+      { name: "owner-repo-abc123/src/index.ts", body: "export const a = 1;\n" },
+      { name: "owner-repo-abc123/a/../../b/passwd", body: "root:x:0:0\n" },
+      { name: "owner-repo-abc123/../outside.ts", body: "export const b = 2;\n" },
+    ]);
+
+    await getRepositoryFiles("owner", "repo", "proj_1");
+
+    expect(names().join("\n")).not.toContain("..");
+  });
+
+  it("does not store a symlink entry even when its path is clean", async () => {
+    // The parser exposes `type`, and the guard is on `type !== "file"`, so
+    // links are already dropped. Pinned so tightening the name check cannot
+    // quietly start storing them.
+    responseBody = await tarballWith([
+      { name: "owner-repo-abc123/src/index.ts", body: "export const a = 1;\n" },
+      {
+        name: "owner-repo-abc123/shadow",
+        type: "symlink",
+        linkname: "/etc/shadow",
+      },
+    ]);
+
+    await expect(
+      getRepositoryFiles("owner", "repo", "proj_1"),
+    ).resolves.toBe(1);
+
+    expect(names()).toEqual(["src/index.ts"]);
   });
 });

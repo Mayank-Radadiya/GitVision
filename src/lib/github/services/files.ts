@@ -137,11 +137,30 @@ async function streamAndStoreTarball(
     let totalStored = 0;
     let storedCount = 0;
     let skippedCount = 0;
+    let unsafePathCount = 0;
+    let firstUnsafePath: string | null = null;
 
     extract.on("entry", (header, entryStream, next) => {
+      // GitHub puts every entry under a single `<repo>-<sha>/` prefix.
+      // Dropping that one segment is not sanitisation: a `..` that follows
+      // it survives into `fileName`, which is persisted, rendered in the
+      // file tree, and re-emitted as a RAG citation — attacker-controlled
+      // text from a hostile repository, straight into the model's context.
+      // Nothing here is written to a filesystem, so this was never a
+      // traversal *write*, but a traversal-looking name is not a name we
+      // should be storing either. Dropping the entry is the whole fix: the
+      // run continues, and the count is reported at the end.
       const cleanPath = header.name.split("/").slice(1).join("/");
+      if (cleanPath.split("/").includes("..")) {
+        unsafePathCount++;
+        firstUnsafePath ??= header.name;
+        entryStream.resume();
+        return next();
+      }
 
-      // Skip directories, empty paths, and ignored patterns immediately
+      // Skip directories, empty paths, and ignored patterns immediately.
+      // The `type` guard is what drops symlinks and hardlinks — the parser
+      // exposes `type`, and only `file` entries carry content we want.
       if (header.type !== "file" || !cleanPath || isIgnoredPath(cleanPath)) {
         entryStream.resume();
         return next();
@@ -220,6 +239,17 @@ async function streamAndStoreTarball(
             "warn",
             `Skipped ${skippedCount} entries over ${GITHUB_CONFIG.MAX_FILE_BYTES} bytes`,
             { projectId, totalStored },
+          );
+        }
+        if (unsafePathCount > 0) {
+          // An error, not a warning: a well-formed GitHub tarball has no
+          // `..` segments. One appearing means the archive is hostile or
+          // hand-crafted, and every dropped entry is a name that was about
+          // to be cited back to the model.
+          log(
+            "error",
+            `Dropped ${unsafePathCount} tar entries whose path escaped the repo`,
+            { projectId, totalStored, firstUnsafePath },
           );
         }
         resolve(totalStored);
