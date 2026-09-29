@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { isIgnoredPath } from "@/src/lib/github/utils";
+import { isIgnoredPath, parseGitHubUrl } from "@/src/lib/github/utils";
 
 const chain = (rows: unknown[] = []) => {
   const builder: Record<string, unknown> = {
@@ -110,5 +112,75 @@ describe("isIgnoredPath", () => {
 
   it.each(STILL_INDEXED)("still indexes %s", (path) => {
     expect(isIgnoredPath(path)).toBe(false);
+  });
+});
+
+describe("parseGitHubUrl", () => {
+  // D-9 chose the docstring fix over SSH/Enterprise support, so the contract is
+  // exactly the two HTTPS forms below. Everything else is either rejected or
+  // unvalidated — the docstring says so, and these tests are what stops it
+  // drifting back into a claim the code cannot honour.
+  const HTTPS_FORMS = [
+    ["https://github.com/octocat/Hello-World", "octocat", "Hello-World"],
+    ["https://github.com/octocat/Hello-World.git", "octocat", "Hello-World"],
+  ] as const;
+
+  it.each(HTTPS_FORMS)("parses %s", (url, owner, repo) => {
+    expect(parseGitHubUrl(url)).toEqual({ owner, repo });
+  });
+
+  it.each(["", "not-a-url", "https://github.com/"])(
+    "rejects %p",
+    (url) => {
+      expect(() => parseGitHubUrl(url)).toThrow();
+    },
+  );
+
+  it("does not check the host, and the docstring says so", () => {
+    // Deliberate: `validators.githubUrl` is the thing that enforces
+    // github.com + HTTPS, and it runs on the create-project input, not here.
+    // parseGitHubUrl only ever looks at the last two path segments, so
+    // whatever reaches it is trusted. If the docstring stops admitting that,
+    // someone will rely on it not being true.
+    expect(parseGitHubUrl("https://gitlab.com/octocat/Hello-World")).toEqual({
+      owner: "octocat",
+      repo: "Hello-World",
+    });
+    // A one-segment URL is not rejected either — the owner slot falls back to
+    // the host segment. This is the shape an SSH remote produces.
+    expect(parseGitHubUrl("https://github.com/only-owner")).toEqual({
+      owner: "github.com",
+      repo: "only-owner",
+    });
+  });
+
+  it("claims no format support its parser does not have", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/github/utils.ts"),
+      "utf8",
+    );
+    // The docstring is the only thing a user pasting an SSH remote ever sees,
+    // so it has to describe the parser that actually exists.
+    expect(source).not.toMatch(/supports[^.]*\bSSH\b/i);
+    expect(source).not.toMatch(/supports[^.]*shorthand/i);
+    expect(source).toMatch(/https:\/\/github\.com\/owner\/repo/);
+  });
+
+  it("makes no atomicity claim createNewProject cannot honour", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/github/services/project.ts"),
+      "utf8",
+    );
+    // neon-http has no db.transaction(), and the function body already says
+    // so at length. Only the header claimed atomicity, and a header is what
+    // people read — so the guard is scoped to the header, not the file: the
+    // header may name the missing transaction, it may not promise atomicity.
+    const header = source.slice(
+      source.indexOf("/**"),
+      source.indexOf("export async function createNewProject"),
+    );
+    expect(header).not.toMatch(/atomicity/i);
+    expect(header).not.toMatch(/wrapped in a database transaction/i);
+    expect(header).toMatch(/not atomic|no db\.transaction/i);
   });
 });

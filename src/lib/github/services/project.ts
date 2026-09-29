@@ -26,8 +26,12 @@ import { logger } from "@/src/lib/logger";
  *
  * ── OPTIMISED (GraphQL) ──
  * Single GraphQL query returns stars, forks, branch count, contributor
- * count, and the latest 100 commits. Project row + commits are wrapped
- * in a database transaction for atomicity.
+ * count, and the latest 100 commits.
+ *
+ * NOT ATOMIC. The neon-http driver has no `db.transaction()`, so the
+ * project row and its commits are inserted sequentially. A failure partway
+ * through leaves the project row behind with partial history; a background
+ * re-sync fills the gap. Callers that need to know must re-read the project.
  *
  * @param url - GitHub repository URL
  * @param projectName - Name for the project

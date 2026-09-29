@@ -20,8 +20,18 @@ export function removeGitSuffix(url: string): string {
 
 /**
  * Parse a GitHub URL into its owner/repo pair.
- * Supports HTTPS, SSH, and shorthand formats.
- * @throws {GitHubValidationError} if the URL cannot be parsed
+ *
+ * HTTPS only, and only the two forms `validators.githubUrl` accepts:
+ * `https://github.com/owner/repo` and the same with a `.git` suffix. It takes
+ * the last two `/`-separated segments and trusts whatever it is given — the
+ * host and the number of segments are NOT checked, so an SSH remote
+ * (`git@github.com:owner/repo.git`), an Enterprise host, or a deep link all
+ * parse into a plausible-looking wrong answer rather than an error. D-9 chose
+ * the docstring fix over parsing them; `validators.githubUrl` is what rejects
+ * them, and it runs before this on the create-project path.
+ *
+ * @throws {GitHubValidationError} if the URL is not a string, or has no
+ *   non-empty segment in the owner or repo position
  */
 export function parseGitHubUrl(githubUrl: string): GitHubRepoInfo {
   if (!githubUrl || typeof githubUrl !== "string") {
