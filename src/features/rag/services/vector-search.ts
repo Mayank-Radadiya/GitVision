@@ -206,14 +206,25 @@ export function reRankResults(
 
   const fileCounts: Record<string, number> = {};
   const diverse: SearchResult[] = [];
+  const capped: SearchResult[] = [];
 
   for (const r of scored) {
+    if (diverse.length >= limit) break;
     const count = fileCounts[r.filePath] ?? 0;
     if (count < 3) {
       fileCounts[r.filePath] = count + 1;
       diverse.push(r);
-      if (diverse.length >= limit) break;
+    } else {
+      capped.push(r);
     }
+  }
+
+  // The cap is a preference, not a quota. If it left us short of `limit`, fill the
+  // remaining slots from the over-represented files in score order — a narrower
+  // answer helps nobody, and 2 files x 3 chunks must not shrink an 8-result page to 6.
+  for (const r of capped) {
+    if (diverse.length >= limit) break;
+    diverse.push(r);
   }
 
   return diverse;

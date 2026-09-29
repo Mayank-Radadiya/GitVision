@@ -14,7 +14,8 @@ vi.mock("@/db", async () => {
   };
 });
 
-import { searchSimilarCode } from "@/src/features/rag/services/vector-search";
+import { reRankResults, searchSimilarCode } from "@/src/features/rag/services/vector-search";
+import type { SearchResult } from "@/src/features/rag/services/vector-search";
 
 const embedding = [0.1, 0.2, 0.3];
 
@@ -58,5 +59,41 @@ describe("searchSimilarCode", () => {
     const results = await searchSimilarCode("project-1", embedding, 8, 0.7);
 
     expect(results.map((r) => r.filePath)).toEqual(["a.ts", "b.ts"]);
+  });
+});
+
+describe("reRankResults", () => {
+  function makeResult(id: string, filePath: string, similarity: number): SearchResult {
+    return {
+      id,
+      filePath,
+      chunkContent: `chunk ${id}`,
+      chunkIndex: Number(id),
+      tokenCount: 4,
+      similarity,
+    };
+  }
+
+  it("still returns `limit` results when only two files hold every candidate", () => {
+    // The 3-per-file diversity cap would stop at 6, but the caller asked for 8.
+    const results = [
+      ...Array.from({ length: 8 }, (_, i) => makeResult(`${i}`, "a.ts", 0.9 - i * 0.01)),
+      ...Array.from({ length: 8 }, (_, i) => makeResult(`b${i}`, "b.ts", 0.8 - i * 0.01)),
+    ];
+
+    expect(reRankResults(results, "auth", 8)).toHaveLength(8);
+  });
+
+  it("keeps the 3-per-file cap while other files can still fill the limit", () => {
+    const results = [
+      ...Array.from({ length: 5 }, (_, i) => makeResult(`a${i}`, "a.ts", 0.99 - i * 0.01)),
+      ...Array.from({ length: 3 }, (_, i) => makeResult(`b${i}`, "b.ts", 0.5 - i * 0.01)),
+      ...Array.from({ length: 2 }, (_, i) => makeResult(`c${i}`, "c.ts", 0.4 - i * 0.01)),
+    ];
+
+    const ranked = reRankResults(results, "auth", 6);
+
+    expect(ranked).toHaveLength(6);
+    expect(ranked.filter((r) => r.filePath === "a.ts")).toHaveLength(3);
   });
 });
