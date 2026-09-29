@@ -113,6 +113,14 @@ export const projectFiles = pgTable(
     return {
       projectIdIdx: index("project_files_project_id_idx").on(table.projectId),
       hashIdx: index("project_files_hash_idx").on(table.hash),
+      // getProjectContext asks for SELECT DISTINCT language for one project
+      // (vector-search.ts:91). projectId leads because that is the only
+      // predicate; language follows so the DISTINCT can be answered from the
+      // index in order, with no re-sort and no heap visit per file. A bare
+      // language index would not help: it has to filter the whole table anyway.
+      projectIdLanguageIdx: index(
+        "project_files_project_id_language_idx",
+      ).on(table.projectId, table.language),
       projectIdFileNameUnique: unique(
         "project_files_project_id_file_name_unique",
       ).on(table.projectId, table.fileName),
@@ -224,6 +232,15 @@ export const projectChats = pgTable(
     return {
       projectIdIdx: index("chats_project_id_idx").on(table.projectId),
       userIdIdx: index("chats_user_id_idx").on(table.userId),
+      // chat.getAll pages one user's chats by updated_at DESC with a keyset
+      // cursor (chat.ts:60-104). On its own the user_id index matches every
+      // chat the user has and then sorts the page; with updated_at in the key
+      // the page comes back already in order and the cursor is a range
+      // condition on the same index.
+      userIdUpdatedAtIdx: index("chats_user_id_updated_at_idx").on(
+        table.userId,
+        table.updatedAt,
+      ),
       typeIdx: index("chats_type_idx").on(table.type),
     };
   },
