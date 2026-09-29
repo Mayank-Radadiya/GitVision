@@ -14,6 +14,7 @@ import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   spendCredits,
+  refundCredits,
   PROJECT_CREATION_COST,
   COMMIT_SUMMARY_COST,
 } from "@/src/lib/credits";
@@ -133,6 +134,41 @@ export function createProjectService() {
         const owner = parts[parts.length - 2]!;
         const repo = parts[parts.length - 1]!;
 
+        // Charge before the enqueue. A worker must never be handed a project the
+        // user cannot pay for, and D-11 settled on the non-transactional neon-http
+        // driver, so there is no transaction to lean on: every failure after the
+        // INSERT has to compensate by hand.
+        // Atomic, concurrency-safe deduction. The read above is only a fast-fail
+        // for the common case; this guarded UPDATE is the real authority, so two
+        // concurrent requests can never drive the balance negative.
+        let chargedBalance: number | null = null;
+        try {
+          chargedBalance = await spendCredits(userId, PROJECT_CREATION_COST);
+        } catch (chargeError) {
+          // The charge never went through, so there is nothing to give back —
+          // but the project row is already in the database, so drop it.
+          await db
+            .delete(projectTables)
+            .where(eq(projectTables.id, projectId));
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create project. Please try again.",
+            cause: chargeError,
+          });
+        }
+
+        if (chargedBalance === null) {
+          // Lost the race against a concurrent request that drained the balance.
+          await db
+            .delete(projectTables)
+            .where(eq(projectTables.id, projectId));
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Insufficient AI credits. You need 10 credits to create a project.",
+          });
+        }
+
         try {
           await inngest.send({
             name: "project/created",
@@ -145,31 +181,17 @@ export function createProjectService() {
             },
           });
         } catch (inngestError) {
-          // Rollback the orphaned project row if the job queue is unavailable
-          await db.delete(projectTables).where(eq(projectTables.id, projectId));
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message:
-              "Failed to queue background sync. The project has been removed. Please ensure the background worker is running and try again.",
-            cause: inngestError,
-          });
-        }
-
-        // Atomic, concurrency-safe deduction. The read above is only a fast-fail
-        // for the common case; this guarded UPDATE is the real authority, so two
-        // concurrent requests can never drive the balance negative.
-        const chargedBalance = await spendCredits(userId, PROJECT_CREATION_COST);
-        const charged = chargedBalance === null ? [] : [{ credits: chargedBalance }];
-
-        if (charged.length === 0) {
-          // Lost the race against a concurrent request that drained the balance.
+          // Compensate in both directions: the charge landed but the user gets
+          // no project, so the row goes and the credits come back.
           await db
             .delete(projectTables)
             .where(eq(projectTables.id, projectId));
+          await refundCredits(userId, PROJECT_CREATION_COST);
           throw new TRPCError({
-            code: "FORBIDDEN",
+            code: "INTERNAL_SERVER_ERROR",
             message:
-              "Insufficient AI credits. You need 10 credits to create a project.",
+              "Failed to queue background sync. The project has been removed and your credits have been refunded. Please ensure the background worker is running and try again.",
+            cause: inngestError,
           });
         }
 
