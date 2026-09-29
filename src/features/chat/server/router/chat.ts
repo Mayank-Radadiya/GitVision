@@ -6,8 +6,13 @@ import {
 } from "../../../../lib/trpc/init";
 import { db } from "@/db";
 import { projectChats, chatMessages } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
+
+const DEFAULT_CHAT_LIMIT = 30;
+const MAX_CHAT_LIMIT = 100;
+const DEFAULT_MESSAGE_LIMIT = 100;
+const MAX_MESSAGE_LIMIT = 300;
 
 export const chatRouter = createTRPCRouter({
   create: protectedProcedure
@@ -57,11 +62,15 @@ export const chatRouter = createTRPCRouter({
       z
         .object({
           type: z.enum(["project", "general", "all"]).optional().default("all"),
+          limit: z.number().int().min(1).max(MAX_CHAT_LIMIT).default(DEFAULT_CHAT_LIMIT),
+          // Keyset cursor: the updatedAt of the last row from the previous page.
+          cursor: z.iso.datetime().optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       const type = input?.type ?? "all";
+      const limit = input?.limit ?? DEFAULT_CHAT_LIMIT;
       const conditions = [eq(projectChats.userId, ctx.userId)];
 
       if (type === "project") {
@@ -70,15 +79,42 @@ export const chatRouter = createTRPCRouter({
         conditions.push(eq(projectChats.type, "general"));
       }
 
-      return db
+      if (input?.cursor) {
+        conditions.push(lt(projectChats.updatedAt, new Date(input.cursor)));
+      }
+
+      // Fetch one extra row to tell "there is another page" from "this was the
+      // last page" without a second COUNT query.
+      const rows = await db
         .select()
         .from(projectChats)
         .where(and(...conditions))
-        .orderBy(desc(projectChats.updatedAt));
+        .orderBy(desc(projectChats.updatedAt))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      const items = hasMore ? rows.slice(0, limit) : rows;
+      const last = items[items.length - 1];
+
+      return {
+        items,
+        nextCursor:
+          hasMore && last ? last.updatedAt.toISOString() : null,
+      };
     }),
 
   getById: protectedProcedure
-    .input(z.object({ chatId: z.string().uuid() }))
+    .input(
+      z.object({
+        chatId: z.string().uuid(),
+        messageLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(MAX_MESSAGE_LIMIT)
+          .default(DEFAULT_MESSAGE_LIMIT),
+      }),
+    )
     .query(async ({ input, ctx }) => {
       const [chat] = await db
         .select()
@@ -93,13 +129,21 @@ export const chatRouter = createTRPCRouter({
 
       if (!chat) throw new Error("Chat not found");
 
-      const messages = await db
+      // Take the newest N messages, then flip them back to chronological order
+      // so the AI SDK still sees the conversation in the order it happened.
+      const newest = await db
         .select()
         .from(chatMessages)
         .where(eq(chatMessages.chatId, input.chatId))
-        .orderBy(chatMessages.createdAt);
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(input.messageLimit + 1);
 
-      return { ...chat, messages };
+      const hasMoreMessages = newest.length > input.messageLimit;
+      const messages = hasMoreMessages
+        ? newest.slice(0, input.messageLimit)
+        : newest;
+
+      return { ...chat, messages: messages.reverse(), hasMoreMessages };
     }),
 
   delete: protectedProcedure

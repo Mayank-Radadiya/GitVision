@@ -7,7 +7,7 @@ export default async function ChatPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const [projects, chats] = await Promise.all([
+  const [projects, chatPage] = await Promise.all([
     caller.project.getAll(),
     caller.chat.getAll(),
   ]);
@@ -19,7 +19,7 @@ export default async function ChatPage() {
         name: p.projectName,
         embeddingStatus: p.embeddingStatus ?? "pending",
       }))}
-      chats={chats.map((c) => ({
+      chats={chatPage.items.map((c) => ({
         id: c.id,
         title: c.title,
         type: c.type,

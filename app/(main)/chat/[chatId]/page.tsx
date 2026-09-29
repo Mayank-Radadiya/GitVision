@@ -42,6 +42,9 @@ export default async function ChatDetailPage({ params }: ChatPageProps) {
         projectName={projectName}
         type={chatData.type as "project" | "general"}
         title={chatData.title}
+        // ponytail: only the newest 300 messages load. Longer chats start
+        // mid-conversation for the model. Add a "load earlier" control that
+        // pages getById by cursor if that ever matters.
         initialMessages={chatData.messages.map((m) => ({
           id: m.id,
           role: m.role as "user" | "assistant" | "system",
