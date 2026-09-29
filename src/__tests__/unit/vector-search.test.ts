@@ -14,7 +14,11 @@ vi.mock("@/db", async () => {
   };
 });
 
-import { reRankResults, searchSimilarCode } from "@/src/features/rag/services/vector-search";
+import {
+  getAllProjectFilesForContext,
+  reRankResults,
+  searchSimilarCode,
+} from "@/src/features/rag/services/vector-search";
 import type { SearchResult } from "@/src/features/rag/services/vector-search";
 
 const embedding = [0.1, 0.2, 0.3];
@@ -95,5 +99,29 @@ describe("reRankResults", () => {
 
     expect(ranked).toHaveLength(6);
     expect(ranked.filter((r) => r.filePath === "a.ts")).toHaveLength(3);
+  });
+});
+
+describe("getAllProjectFilesForContext", () => {
+  const small = "x".repeat(100);
+
+  it("caps how many files the SQL query can return", async () => {
+    rows = [["a.ts", small, "typescript"]];
+
+    await getAllProjectFilesForContext("project-1");
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].query).toMatch(/order by length\("project_files"\."code"\)/i);
+    expect(captured[0].params.at(-1)).toBe(500);
+  });
+
+  it("truncates a single oversized file instead of handing back its whole body", async () => {
+    rows = [["bundle.min.js", "y".repeat(200_000), "javascript"]];
+
+    const context = await getAllProjectFilesForContext("project-1");
+
+    expect(context).toContain("bundle.min.js");
+    expect(context).toContain("truncated");
+    expect(context).not.toContain("y".repeat(50_001));
   });
 });

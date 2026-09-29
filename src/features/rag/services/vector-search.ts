@@ -289,6 +289,14 @@ export async function searchSimilarCodeInFile(
 
 const SMALL_PROJECT_TOKEN_THRESHOLD = 150_000;
 
+// Ceilings for the full-dump path. The SQL LIMIT bounds how much of the repo we
+// pull into memory; the per-file cap bounds what one row can do to the prompt,
+// because fitToBudget cuts on file boundaries and so never trims an oversized
+// file on its own. 50k chars is ~12.5k tokens at the 4 chars/token estimate —
+// two such files already fill a 32k budget, so this is generous but not fatal.
+const MAX_CONTEXT_FILES = 500;
+const MAX_FILE_CHARS = 50_000;
+
 /**
  * Returns true when the project qualifies for the fast "full dump" path.
  * A null estimatedTokens means the project hasn't been embedded yet — treat
@@ -319,18 +327,21 @@ export async function getAllProjectFilesForContext(
         language: projectFiles.language,
       })
       .from(projectFiles)
-      .where(eq(projectFiles.projectId, projectId));
+      .where(eq(projectFiles.projectId, projectId))
+      .orderBy(asc(sql<number>`length(${projectFiles.code})`))
+      .limit(MAX_CONTEXT_FILES);
 
     if (files.length === 0) {
       return "No files found for this project.";
     }
 
-    // Sort by file size ascending so important small config/type files appear first
-    files.sort((a, b) => a.code.length - b.code.length);
-
     let items = files.map((f) => {
       const lang = f.language ?? f.fileName.split(".").pop() ?? "text";
-      const text = `\`\`\`${lang}\n// File: ${f.fileName}\n${f.code}\n\`\`\``;
+      const code =
+        f.code.length > MAX_FILE_CHARS
+          ? `${f.code.slice(0, MAX_FILE_CHARS)}\n// ... truncated`
+          : f.code;
+      const text = `\`\`\`${lang}\n// File: ${f.fileName}\n${code}\n\`\`\``;
       return { text, approxTokens: estimateTokens(text) };
     });
 
