@@ -5,6 +5,10 @@ import HeroSection from "@/features/landing/components/hero-section";
 import LandingHeader from "@/features/landing/components/landing-header";
 import PricingSection from "@/features/landing/components/pricing-section";
 
+// The nonce-based CSP in src/lib/csp.ts is per-request, so this route
+// cannot be prerendered at build time.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">

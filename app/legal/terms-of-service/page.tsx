@@ -3,6 +3,10 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import ModeToggle from "@/shared/components/theme/mode-toggle";
 
+// The nonce-based CSP in src/lib/csp.ts is per-request, so this route
+// cannot be prerendered at build time.
+export const dynamic = "force-dynamic";
+
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-muted/30 pt-16 pb-12 relative overflow-hidden">
