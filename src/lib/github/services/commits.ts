@@ -16,7 +16,7 @@ import {
   GitHubAPIError,
   GitHubNotFoundError,
 } from "../errors";
-import { octokit, fetchWithRetry } from "../client";
+import { getOctokit, fetchWithRetry } from "../client";
 import {
   parseGitHubUrl,
   createCommitData,
@@ -47,6 +47,7 @@ export const getCommitHashes = async (
       projectId,
     });
 
+    const octokit = getOctokit();
     const commits = await octokit.paginate(octokit.rest.repos.listCommits, {
       owner,
       repo,
@@ -171,6 +172,7 @@ export async function getAiSummaryOfCommit(
     };
 
     // ── Method 2: JSON API with smart diff filtering (preferred) ──
+    const octokit = getOctokit();
     const fetchJsonDiff = async (): Promise<string> => {
       try {
         const response = await octokit.request(

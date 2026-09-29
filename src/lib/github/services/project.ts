@@ -17,7 +17,7 @@ import {
   GitHubAPIError,
   GitHubRateLimitError,
 } from "../errors";
-import { octokit } from "../client";
+import { getOctokit } from "../client";
 import { parseGitHubUrl } from "../utils";
 import { logger } from "@/src/lib/logger";
 
@@ -70,6 +70,7 @@ export async function createNewProject(
     });
 
     // ── Single GraphQL call for ALL metadata + recent commits ──
+    const octokit = getOctokit();
     const gqlResponse = await octokit.graphql<GraphQLRepoData>(
       REPO_METADATA_QUERY,
       {

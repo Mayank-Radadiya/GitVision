@@ -34,7 +34,8 @@ This document outlines the backup strategy, data retention schedules, and disast
   than a failed one, because the failure never reaches anyone.
 - **Known gap**: a GitHub Actions artifact is a copy, not D-12's durable home.
   Past 14 days, PITR remains the only protection, and no restore drill has been
-  run yet. A backup that has never been restored is a hypothesis.
+  run yet. A backup that has never been restored is a   hypothesis.
+
 
 ---
 
@@ -52,10 +53,10 @@ This document outlines the backup strategy, data retention schedules, and disast
 
 1. **In Case of Database Corruption**:
    - Restore to a specific timestamp using Neon console PITR branching.
-   - Alternatively, download the `db-backup` artifact from the most recent green
-     `Backup` run in GitHub Actions, then restore from it:
+   - Alternatively, restore using the most recent green `Backup` run's
+     `db-backup` artifact, or the newest file in the local output directory:
      ```bash
-     psql "$DATABASE_URL" -f gitvision_backup_<TIMESTAMP>.sql
+     psql "$DATABASE_URL" -f ../gitvision-backups/gitvision_backup_<TIMESTAMP>.sql
      ```
 2. **Verification Post-Restoration**:
    - Run `bun run db:studio` to check project tables and code embeddings integrity.

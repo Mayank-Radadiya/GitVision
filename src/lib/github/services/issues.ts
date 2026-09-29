@@ -12,7 +12,7 @@ import { issuesTable, issueCommentsTable } from "@/db/schema";
 import type { GraphQLIssuesData, IssueOrPrNode } from "../types";
 import { GITHUB_CONFIG, DEFAULTS, ISSUES_AND_PRS_QUERY } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
-import { octokit } from "../client";
+import { getOctokit } from "../client";
 import { parseGitHubUrl } from "../utils";
 import { logger } from "@/src/lib/logger";
 
@@ -164,6 +164,7 @@ export const syncIssuesAndComments = async (
     ) {
       pages++;
 
+      const octokit = getOctokit();
       const gqlResponse: GraphQLIssuesData =
         await octokit.graphql<GraphQLIssuesData>(ISSUES_AND_PRS_QUERY, {
           owner,

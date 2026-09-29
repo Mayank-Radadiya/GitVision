@@ -98,7 +98,7 @@ const makePage = (nodeCount: number) => ({
 });
 
 vi.mock("@/src/lib/github/client", () => ({
-  octokit: {
+  getOctokit: () => ({
     graphql: vi.fn(async () => {
       const page = pagesRemaining;
       events.push("graphql");
@@ -108,7 +108,7 @@ vi.mock("@/src/lib/github/client", () => ({
       pagesRemaining = Math.max(0, pagesRemaining - 1);
       return makePage(2);
     }),
-  },
+  }),
 }));
 
 import { syncIssuesAndComments } from "@/src/lib/github/services/issues";

@@ -1,20 +1,21 @@
-# Customer source code lives in this database and nothing else takes a copy of
-# it: `syncIssues` deletes before it re-pulls, `user.deleted` is a hard cascade,
-# and Neon's point-in-time recovery is not something this repo can verify. So the
-# dump runs on a schedule rather than when someone remembers.
 name: Backup
 
+# The database holds every customer's source code and embeddings. `syncIssues`
+# DELETEs before it re-pulls and `user.deleted` is a hard cascade, so a lost
+# database is unrecoverable data. Neon's PITR is not verifiable from here; this
+# dump is the half of the plan that is.
 on:
-  # 03:17, not 03:00. Scheduled workflows all fire on the hour and GitHub drops
-  # the queue when runners saturate; an off-hour slot is still picked up.
   schedule:
+    # 03:17 UTC, not 03:00. Every scheduled workflow on GitHub fires on the
+    # hour, and the platform drops the queue when the runners are saturated.
     - cron: "17 3 * * *"
-  # The cron only fires from the default branch, and this is the only way to take
-  # a dump until the file is merged.
+  # The cron only fires if the workflow file is on the default branch. Until it
+  # is merged, this is the only way to take a dump.
   workflow_dispatch:
 
-# A manual run should queue behind the scheduled one, not cancel it.
 concurrency:
+  # A manual run that starts while the scheduled one is in flight queues
+  # instead of racing it, so two dumps never land in the same window.
   group: backup
   cancel-in-progress: false
 
@@ -22,33 +23,43 @@ jobs:
   dump:
     name: pg_dump and verify
     runs-on: ubuntu-latest
+
     env:
-      # The real database. ci.yml's placeholder would give a green run that backs
-      # up nothing.
+      # A repository secret, not the CI workflow's placeholder. This is the
+      # production database — a dump of the placeholder is a green run that
+      # backs up nothing.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # scripts/db-backup.ts refuses to write inside the checkout, so point it at
-      # the runner's scratch directory.
+      # Outside the checkout, which is what db-backup.ts insists on. The script
+      # refuses to write inside the repo, so this also has to be true.
       BACKUP_DIR: ${{ runner.temp }}/backups
+
     steps:
       - uses: actions/checkout@v4
 
+      # No `bun-version`: setup-bun reads `packageManager` from package.json.
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
-      - run: bun install --frozen-lockfile
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Dump and verify
-        # pg_dump ships in postgresql-client, which ubuntu-latest already carries.
-        # If a future image drops it this step fails and the job goes red, which is
-        # the intended behaviour — not a silent no-op. Do not wrap it in `|| true`.
+      # pg_dump comes from the postgresql-client package already present on the
+      # ubuntu-latest image. If a future image drops it, this step fails and the
+      # job goes red — which is the intended behaviour, not a silent no-op.
+      #
+      # The script exits non-zero if pg_dump is missing, if the dump is under
+      # 1 KB, or if it lacks CREATE TABLE / projects / project_files / commits.
+      # A run step propagates that as a failed step and a red job. Do not wrap
+      # this in `|| true`: a backup that skips quietly is worse than one that
+      # fails loudly, because nothing pages anyone.
+      - name: Take the dump
         run: bun run db:backup
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload the dump
+        uses: actions/upload-artifact@v4
         with:
           name: db-backup
           path: ${{ runner.temp }}/backups/*.sql
-          # D-12: 14 days, matching the S3 bucket's lifecycle rule.
+          # D-12: 14-day retention. Matches the S3 lifecycle rule once the
+          # bucket exists; see docs/operations/backup-retention.md.
           retention-days: 14
-          # An empty upload means the dump went somewhere we did not expect. Fail.
           if-no-files-found: error
