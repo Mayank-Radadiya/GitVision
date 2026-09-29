@@ -48,3 +48,9 @@ next-env.d.ts
 audit.md
 plan.md
 
+# testing artifacts
+/playwright-report
+/test-results
+
+# database backups — dumps must never reach the repo
+/backups
