@@ -15,24 +15,28 @@ import { trpc, prefetch } from "@/src/lib/trpc/server";
  * Prefetches project data for the detail page.
  * Runs on the server before the client component mounts.
  */
-export function prefetchProject(projectId: string) {
-  // Prefetch project details (standard query)
-  prefetch(trpc.project.getDetails.queryOptions({ projectId }));
+export async function prefetchProject(projectId: string) {
+  // The caller must await this before `HydrateClient` dehydrates, or the
+  // page ships an empty cache and refetches everything on the client.
+  await Promise.all([
+    // Project details (standard query)
+    prefetch(trpc.project.getDetails.queryOptions({ projectId })),
 
-  // Prefetch first page of commits (standard query — initial load)
-  prefetch(trpc.project.getCommits.queryOptions({ projectId, limit: 10 }));
+    // First page of commits (initial load)
+    prefetch(trpc.project.getCommits.queryOptions({ projectId, limit: 10 })),
 
-  // Prefetch issues + pull requests so tabs render instantly (no loading flash)
-  prefetch(
-    trpc.project.getIssues.queryOptions({
-      projectId,
-      isPullRequest: false,
-    }),
-  );
-  prefetch(
-    trpc.project.getIssues.queryOptions({
-      projectId,
-      isPullRequest: true,
-    }),
-  );
+    // Issues + pull requests so tabs render instantly (no loading flash)
+    prefetch(
+      trpc.project.getIssues.queryOptions({
+        projectId,
+        isPullRequest: false,
+      }),
+    ),
+    prefetch(
+      trpc.project.getIssues.queryOptions({
+        projectId,
+        isPullRequest: true,
+      }),
+    ),
+  ]);
 }

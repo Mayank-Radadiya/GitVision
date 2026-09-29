@@ -17,8 +17,9 @@ interface PageProps {
 export default async function UserProjectPage({ params }: PageProps) {
   const { projectId } = await params;
 
-  // Prefetch project data on the server (details + initial commits)
-  prefetchProject(projectId);
+  // Prefetch project data on the server (details + initial commits).
+  // Must settle before `HydrateClient` dehydrates, or the client refetches it all.
+  await prefetchProject(projectId);
 
   return (
     <HydrateClient>
