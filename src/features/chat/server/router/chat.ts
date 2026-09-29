@@ -19,7 +19,7 @@ export const chatRouter = createTRPCRouter({
     .input(
       z.object({
         type: z.enum(["project", "general"]),
-        projectId: z.string().uuid().optional(),
+        projectId: z.uuid().optional(),
         title: z.string().max(255).optional(),
       }),
     )
@@ -113,7 +113,7 @@ export const chatRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(
       z.object({
-        chatId: z.string().uuid(),
+        chatId: z.uuid(),
         messageLimit: z
           .number()
           .int()
@@ -172,7 +172,7 @@ export const chatRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ chatId: z.string().uuid() }))
+    .input(z.object({ chatId: z.uuid() }))
     .mutation(async ({ input, ctx }) => {
       // `.returning()` is what makes the answer honest. Without it the DELETE
       // is fire-and-forget, and `{ success: true }` claimed a chat was gone

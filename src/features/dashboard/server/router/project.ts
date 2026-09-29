@@ -96,7 +96,7 @@ export const projectRouter = createTRPCRouter({
     // file that genuinely does not exist. The notes/risks said to check the call
     // sites first: `code-viewer` and the project view both pass a row's `id`,
     // which is a uuid, so nothing legitimate is rejected.
-    .input(z.object({ projectId: z.string().uuid(), fileId: z.string().uuid() }))
+    .input(z.object({ projectId: z.uuid(), fileId: z.uuid() }))
     .query(async ({ input, ctx }) => {
       return projectService.getFileContent(
         input.projectId,
@@ -162,7 +162,7 @@ export const projectRouter = createTRPCRouter({
   getIssues: protectedProcedure
     .input(
       z.object({
-        projectId: z.string().uuid(),
+        projectId: z.uuid(),
         isPullRequest: z.boolean(),
         limit: z.number().min(1).max(100).optional().default(50),
         // `<ISO timestamp>|<uuid>`, the keyset position of the last row served.
@@ -184,7 +184,7 @@ export const projectRouter = createTRPCRouter({
   getIssueComments: protectedProcedure
     .input(
       z.object({
-        issueId: z.string().uuid(),
+        issueId: z.uuid(),
         limit: z.number().min(1).max(100).optional().default(50),
         cursor: cursorSchema.optional(),
       }),

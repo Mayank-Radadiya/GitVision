@@ -5,11 +5,11 @@ import { extractMessageText } from "@/src/shared/lib/message-extractor";
  * Primitive validators for common data types
  */
 export const validators = {
-  uuid: z.string().uuid("Invalid UUID format"),
+  uuid: z.uuid("Invalid UUID format"),
 
-  email: z.string().email("Invalid email format"),
+  email: z.email("Invalid email format"),
 
-  url: z.string().url("Invalid URL format"),
+  url: z.url("Invalid URL format"),
 
   /**
    * GitHub repository URL validator
@@ -42,7 +42,7 @@ export const paginationSchema = z.object({
     .min(1, "Limit must be at least 1")
     .max(100, "Limit cannot exceed 100")
     .default(20),
-  cursor: z.string().uuid("Invalid cursor").optional(),
+  cursor: z.uuid("Invalid cursor").optional(),
 });
 
 /**
@@ -119,7 +119,7 @@ export const chatRequestSchema = z
       .array(chatMessageSchema)
       .min(1, "At least one message is required")
       .max(MAX_CHAT_MESSAGES, "Too many messages"),
-    chatId: z.string().uuid("Invalid chat id").optional(),
+    chatId: z.uuid("Invalid chat id").optional(),
     projectId: validators.uuid.optional(),
     mode: z.enum(["general", "project"]).default("general"),
   })
