@@ -12,8 +12,10 @@ import {
 } from "@/db/schema";
 import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
+import { logger } from "@/src/lib/logger";
 import {
   spendCredits,
+  refundCredits,
   PROJECT_CREATION_COST,
   COMMIT_SUMMARY_COST,
 } from "@/src/lib/credits";
@@ -607,12 +609,24 @@ export function createProjectService() {
         });
       }
 
-      return getAiSummaryOfCommit(
-        project.githubUrl,
-        commitRecord[0].commitHash,
-        projectId,
-        commitId,
-      );
+      try {
+        return await getAiSummaryOfCommit(
+          project.githubUrl,
+          commitRecord[0].commitHash,
+          projectId,
+          commitId,
+        );
+      } catch (error) {
+        // The credit is spent above, before the work. A summary that was never
+        // produced has to be paid back, or a provider outage silently charges
+        // every user for a failure.
+        try {
+          await refundCredits(userId, COMMIT_SUMMARY_COST);
+        } catch (refundError) {
+          logger.error("Commit summary credit refund failed", refundError);
+        }
+        throw error;
+      }
     },
 
     async getPickUpWhereYouLeftOff(
