@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { projectChats, chatMessages, projectTables, usersTable } from "@/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
-import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { enforceLimits } from "@/src/lib/rate-limit";
 import { logger } from "@/src/lib/logger";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
@@ -298,8 +298,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Per-user cap on LLM-backed chat messages (20/min)
-    const rl = await rateLimit(keys.chat(userId), 20, 60);
+    // Per-user cap on LLM-backed chat messages (20/min), plus an IP ceiling
+    // and the global daily backstop — see rate-limit.ts. A new Clerk account
+    // resets the user budget, so the per-user cap alone is not a budget.
+    const rl = await enforceLimits("chat", userId, req);
     if (!rl.allowed) {
       return new Response(
         JSON.stringify({

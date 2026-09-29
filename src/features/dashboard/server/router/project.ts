@@ -10,7 +10,7 @@ import {
   projectCommitsSchema,
   generateAiSummarySchema,
 } from "@/src/lib/validation/schemas";
-import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { enforceLimits } from "@/src/lib/rate-limit";
 import { createProjectService } from "./services/projectService";
 
 // Instantiate the service once, saving memory and CPU cycles
@@ -49,8 +49,11 @@ export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(projectCreateSchema)
     .mutation(async ({ input, ctx }) => {
-      // Per-user cap on heavy GitHub-backed project creation (10/hour)
-      const rl = await rateLimit(keys.projectCreate(ctx.userId), 10, 3600);
+      // Per-user cap on heavy GitHub-backed project creation (10/hour), plus
+      // an IP ceiling and the global daily backstop — see rate-limit.ts. A new
+      // Clerk account resets the user budget, so the per-user cap alone is not
+      // a budget.
+      const rl = await enforceLimits("projectCreate", ctx.userId, ctx.req);
       if (!rl.allowed) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -140,7 +143,7 @@ export const projectRouter = createTRPCRouter({
       // This procedure already spends a credit and a full LLM call per commit
       // (see COMMIT_SUMMARY_COST), so it is metered at the same order as chat:
       // generous enough to skim a project's commit list, not enough to loop.
-      const rl = await rateLimit(keys.summary(ctx.userId), 20, 3600);
+      const rl = await enforceLimits("summary", ctx.userId, ctx.req);
       if (!rl.allowed) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -211,7 +214,7 @@ export const projectRouter = createTRPCRouter({
       // Delete-and-re-pull of every issue and PR in the repo. Cheap per call,
       // but the GitHub quota behind it is shared, so it gets the same hourly
       // shape as projectCreate with a tighter ceiling.
-      const rl = await rateLimit(keys.issuesSync(ctx.userId), 5, 3600);
+      const rl = await enforceLimits("issuesSync", ctx.userId, ctx.req);
       if (!rl.allowed) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",

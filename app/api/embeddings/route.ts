@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { projectTables, codeEmbeddings } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
-import { rateLimit, keys } from "@/src/lib/rate-limit";
+import { enforceLimits } from "@/src/lib/rate-limit";
 import { inngest } from "@/src/lib/inngest/client";
 import { projectIdSchema } from "@/src/lib/validation/schemas";
 import { logger } from "@/src/lib/logger";
@@ -17,8 +17,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Per-user cap on Gemini-backed embedding generation (5/10min)
-    const rl = await rateLimit(keys.embeddings(userId), 5, 600);
+    // Per-user cap on Gemini-backed embedding generation (5/10min), plus an
+    // IP ceiling and the global daily backstop — see rate-limit.ts.
+    const rl = await enforceLimits("embeddings", userId, req);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Embedding generation limit reached. Please wait." },

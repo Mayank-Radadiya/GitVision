@@ -130,10 +130,9 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 vi.mock("@/src/lib/rate-limit", () => ({
-  // Real shape is { allowed, limit, remaining } — returning `allowed: true`
-  // is what lets the request past the 429 gate.
-  rateLimit: async () => ({ allowed: true, limit: 20, remaining: 19 }),
-  keys: new Proxy({}, { get: () => () => "test-key" }),
+  // Real shape is { allowed, limit, remaining, scope } — returning
+  // `allowed: true` is what lets the request past the 429 gate.
+  enforceLimits: async () => ({ allowed: true, limit: 20, remaining: 19, scope: "user" }),
 }));
 
 // The provider must never be reached: these assertions are about what happens

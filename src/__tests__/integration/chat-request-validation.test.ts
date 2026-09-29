@@ -66,8 +66,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 vi.mock("@/src/lib/rate-limit", () => ({
-  rateLimit: async () => ({ allowed: true, limit: 20, remaining: 19 }),
-  keys: new Proxy({}, { get: () => () => "test-key" }),
+  enforceLimits: async () => ({ allowed: true, limit: 20, remaining: 19, scope: "user" }),
 }));
 
 vi.mock("@/src/features/rag/services/embeddings", () => ({
