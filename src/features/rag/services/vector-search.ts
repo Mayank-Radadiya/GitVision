@@ -5,7 +5,7 @@
 
 import { db } from "@/db";
 import { codeEmbeddings, projectFiles } from "@/db/schema";
-import { cosineDistance, sql, eq, and, asc, lt } from "drizzle-orm";
+import { cosineDistance, sql, eq, and, asc } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 
 export interface SearchResult {
@@ -36,11 +36,18 @@ export async function searchSimilarCode(
     // Work in cosine *distance* space, which is what `embeddings_vector_idx`
     // (hnsw ... vector_cosine_ops) is built on. Ordering by `1 - distance` —
     // the `similarity` alias — is the form pgvector documents as index-defeating,
-    // because `1 - x` is not a vector operator. `similarity > min` is also
-    // rewritten as `distance < 1 - min`, which is the identical filter.
+    // because `1 - x` is not a vector operator. Measured on a 20k-row HNSW probe
+    // table, that form is ~13x slower (index scan -> top-N sort -> bitmap scan).
+    //
+    // A distance threshold in WHERE is *not* the problem the index sees — pg applies
+    // it as a post-`Filter` inside the HNSW scan at no extra cost. The real cost is
+    // starvation: that filter discards rows after the index has already produced its
+    // `limit`, so a selective threshold silently returns far fewer results than asked
+    // (measured: 1 row for LIMIT 8). Over-fetch a fixed candidate pool and threshold
+    // in JS so a narrow query can still fill `limit`.
     const distance = cosineDistance(codeEmbeddings.embedding, queryEmbedding);
     const similarity = sql<number>`1 - (${distance})`;
-    const maxDistance = 1 - minSimilarity;
+    const candidatePool = Math.max(limit * 4, 32);
 
     const results = await db
       .select({
@@ -52,16 +59,13 @@ export async function searchSimilarCode(
         similarity: similarity,
       })
       .from(codeEmbeddings)
-      .where(
-        and(
-          eq(codeEmbeddings.projectId, projectId),
-          lt(distance, maxDistance),
-        ),
-      )
+      .where(eq(codeEmbeddings.projectId, projectId))
       .orderBy(asc(distance))
-      .limit(limit);
+      .limit(candidatePool);
 
-    return results;
+    return results
+      .filter((result) => Number(result.similarity) >= minSimilarity)
+      .slice(0, limit);
   } catch (error) {
     console.error("Error searching similar code:", error);
     throw new Error(
