@@ -409,8 +409,21 @@ export function createProjectService() {
     // ── Commit Queries ────────────────────────────────────────────────────────
 
     /**
-     * Cursor-based paginated commits. Cursor is a commit ID; we use its
-     * `authorDate` so the DB can use the existing `commits_author_date_idx`.
+     * Cursor-based paginated commits, keyset-paged on `(authorDate, id)`.
+     *
+     * The cursor used to be a bare commit id, which this method resolved to a
+     * date with a second query. That was wrong twice over. `authorDate` is not
+     * unique — a rebase lands a dozen commits on one timestamp — so
+     * `authorDate < cursorDate` skipped every remaining row of a tied run,
+     * silently, from the middle of the history. And a cursor naming a commit
+     * that no longer exists resolved to nothing, which fell through to the
+     * first page and looked like a working pager looping.
+     *
+     * The cursor now carries the whole sort key, so there is no lookup to do
+     * and no position it can fail to resolve. `id` is the tiebreak that makes
+     * the comparison strict: `lte` on the timestamp alone would loop forever on
+     * a run of equal timestamps, and an `or` on the two halves is exactly the
+     * row-value comparison `(authorDate, id) < (cursorDate, cursorId)`.
      */
     async getProjectCommits(
       projectId: string,
@@ -421,42 +434,48 @@ export function createProjectService() {
       await this.verifyOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [eq(commitsTable.projectId, projectId)];
 
-      let cursorDate: Date | undefined;
-      if (cursor) {
-        const cursorCommit = await db
-          .select({ authorDate: commitsTable.authorDate })
-          .from(commitsTable)
-          .where(
+      if (cursorFilter) {
+        // Descending order, so "after" is "older", and the predicate rides in
+        // the same statement as the project filter — a second query for the
+        // cursor's page would let a caller walk another tenant's commits.
+        filters.push(
+          or(
+            lt(commitsTable.authorDate, cursorFilter.at),
             and(
-              eq(commitsTable.id, cursor),
-              eq(commitsTable.projectId, projectId), // tenant safety
+              eq(commitsTable.authorDate, cursorFilter.at),
+              lt(commitsTable.id, cursorFilter.id),
             ),
-          )
-          .limit(1);
-        cursorDate = cursorCommit[0]?.authorDate;
+          )!,
+        );
       }
-
-      const whereClause = cursorDate
-        ? and(
-            eq(commitsTable.projectId, projectId),
-            sql`${commitsTable.authorDate} < ${cursorDate}`,
-          )
-        : eq(commitsTable.projectId, projectId);
 
       const commits = await db
         .select()
         .from(commitsTable)
-        .where(whereClause)
-        .orderBy(desc(commitsTable.authorDate))
+        .where(and(...filters))
+        // The id tiebreak is load-bearing, not cosmetic: without it the order
+        // of equal timestamps is the planner's choice, so the cursor cannot
+        // name a position inside a tied run.
+        .orderBy(desc(commitsTable.authorDate), desc(commitsTable.id))
         .limit(safeLimit + 1); // +1 to detect if next page exists
 
-      let nextCursor: string | undefined;
-      if (commits.length > safeLimit) {
-        nextCursor = commits.pop()!.id;
-      }
+      // One row past the page, purely to learn whether more exist — the same
+      // slice that `getProjectIssues` uses, so the two pagers cannot drift.
+      const hasMore = commits.length > safeLimit;
+      const items = hasMore ? commits.slice(0, safeLimit) : commits;
 
-      return { commits, nextCursor };
+      // The cursor names the last row this page *returned*, not the overflow
+      // row that was dropped — pointing it at c005 would skip c005 on the
+      // next page.
+      const last = items[items.length - 1];
+      const nextCursor = hasMore
+        ? encodeCursor(last!.authorDate, last!.id)
+        : undefined;
+
+      return { commits: items, nextCursor };
     },
 
     // ── File Queries ──────────────────────────────────────────────────────────

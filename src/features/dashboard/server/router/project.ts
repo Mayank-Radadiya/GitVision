@@ -79,7 +79,14 @@ export const projectRouter = createTRPCRouter({
     }),
 
   getCommits: protectedProcedure
-    .input(projectCommitsSchema)
+    // Commits are keyset-paged on `(author_date, id)`, so their cursor is the
+    // same `<ISO timestamp>|<uuid>` position the issue and comment cursors
+    // use. `projectCommitsSchema` defaulted to a bare uuid, which is the token
+    // the *previous* cursor carried — accepting it would have let a stale
+    // client through the gate and then failed deeper in with a different
+    // error, or worse, produced the first page again. One cursor vocabulary in
+    // this file, enforced at the same gate as the others.
+    .input(projectCommitsSchema.extend({ cursor: cursorSchema.optional() }))
     .query(async ({ input, ctx }) => {
       return projectService.getProjectCommits(
         input.projectId,
