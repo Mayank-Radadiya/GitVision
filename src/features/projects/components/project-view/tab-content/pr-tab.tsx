@@ -76,7 +76,8 @@ interface PullRequestsTabProps {
 }
 
 function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
-  const { data: prs = [], isLoading } = useProjectIssues(projectId, true);
+  const { data, isLoading } = useProjectIssues(projectId, true);
+  const prs = data?.items ?? [];
   const { mutate: syncIssues, isPending: isSyncing } = useSyncIssues(projectId);
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const [searchQuery, setSearchQuery] = useState("");

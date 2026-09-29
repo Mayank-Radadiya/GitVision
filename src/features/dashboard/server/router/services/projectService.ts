@@ -10,7 +10,7 @@ import {
   usersTable,
   type LanguageEntry,
 } from "@/db/schema";
-import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
+import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   spendCredits,
@@ -90,6 +90,47 @@ function buildPickUpCards(
   }
 
   return cards;
+}
+
+/** A decoded keyset position: the last row served, by timestamp and id. */
+interface CursorPosition {
+  at: Date;
+  id: string;
+}
+
+/**
+ * Packs a keyset position into the opaque string the client echoes back.
+ *
+ * Plain `<ISO timestamp>|<uuid>` rather than a signed blob: the cursor names a
+ * row, and reading someone else's rows is prevented by the ownership predicate
+ * in the same statement, not by hiding the position. Encoding the sort key and
+ * not an offset is what makes paging stable when rows are inserted mid-walk —
+ * an offset would shift the window and skip or repeat rows.
+ */
+function encodeCursor(at: Date, id: string): string {
+  return `${at.toISOString()}|${id}`;
+}
+
+/**
+ * Reads a cursor back into its timestamp and id, or `null` when absent.
+ *
+ * Anything unparseable is rejected here rather than handed to Postgres. A bare
+ * `new Date("nonsense")` becomes `Invalid Date`, which drizzle sends as a
+ * parameter the database rejects with a 500 — an opaque server error for what
+ * is a bad request. The router's zod schema is the first gate; this is the
+ * second, because the service is also reachable without one.
+ */
+function decodeCursor(cursor?: string): CursorPosition | null {
+  if (!cursor) return null;
+  const [at, id] = cursor.split("|");
+  if (!at || !id) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cursor" });
+  }
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cursor" });
+  }
+  return { at: parsed, id };
 }
 
 /**
@@ -1051,18 +1092,53 @@ export function createProjectService() {
     /**
      * Fetches paginated issues/PRs for a single project.
      * Now includes AI triage fields so issue list views can display badges.
+     *
+     * Keyset paging on `(githubUpdatedAt, id)`. The previous limit-only paging
+     * was not pagination: a project with 300 issues could never show issue 101,
+     * and nothing in the response said 100 of 300 had come back, so the list
+     * read as complete. `id` is in the key because `githubUpdatedAt` is not
+     * unique — `syncIssues` upserts many rows in the same transaction and they
+     * land on the same timestamp — and a timestamp-only key silently drops
+     * every row that ties with the last one served.
      */
     async getProjectIssues(
       projectId: string,
       userId: string,
       isPullRequest: boolean,
       limit = 50,
+      cursor?: string,
     ) {
       await this.verifyOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
+      // One row past the page, purely to learn whether more exist. Counting is
+      // a second query against the same rows for an answer this already has.
+      const fetchLimit = safeLimit + 1;
 
-      return db
+      // The cursor rides in the same `where` as the ownership and issue/PR
+      // filters. A second statement for the cursor's page would let a caller
+      // page through another tenant's issues with a guessed cursor.
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [
+        eq(issuesTable.projectId, projectId),
+        eq(issuesTable.isPullRequest, isPullRequest),
+      ];
+      if (cursorFilter) {
+        // Descending order, so "after" is "older", and the id tiebreak keeps the
+        // predicate strict — `lte` on the timestamp alone would loop forever on
+        // a run of equal timestamps.
+        filters.push(
+          or(
+            lt(issuesTable.githubUpdatedAt, cursorFilter.at),
+            and(
+              eq(issuesTable.githubUpdatedAt, cursorFilter.at),
+              lt(issuesTable.id, cursorFilter.id),
+            ),
+          )!,
+        );
+      }
+
+      const rows = await db
         .select({
           id: issuesTable.id,
           title: issuesTable.title,
@@ -1078,21 +1154,34 @@ export function createProjectService() {
           aiSummary: issuesTable.aiSummary,
         })
         .from(issuesTable)
-        .where(
-          and(
-            eq(issuesTable.projectId, projectId),
-            eq(issuesTable.isPullRequest, isPullRequest),
-          ),
-        )
-        .orderBy(desc(issuesTable.githubUpdatedAt))
-        .limit(safeLimit);
+        .where(and(...filters))
+        .orderBy(desc(issuesTable.githubUpdatedAt), desc(issuesTable.id))
+        .limit(fetchLimit);
+
+      const hasMore = rows.length > safeLimit;
+      const items = hasMore ? rows.slice(0, safeLimit) : rows;
+      const last = items[items.length - 1];
+
+      return {
+        items,
+        hasMore,
+        nextCursor: hasMore && last ? encodeCursor(last.githubUpdatedAt, last.id) : null,
+      };
     },
 
     /**
      * Fetches comments for a specific issue.
      * Ownership verified through the issue → project chain.
+     *
+     * Keyset paging on `(githubCreatedAt, id)`, ascending — a thread is read
+     * top to bottom, so "after" is "newer", the opposite of the issue list.
      */
-    async getIssueComments(issueId: string, userId: string) {
+    async getIssueComments(
+      issueId: string,
+      userId: string,
+      limit = 50,
+      cursor?: string,
+    ) {
       // Ownership is part of the lookup, not a second step. Splitting it out
       // made "no such issue" and "someone else's issue" two distinguishable
       // failures, which is an existence oracle for cross-tenant issue ids.
@@ -1112,7 +1201,22 @@ export function createProjectService() {
         throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
       }
 
-      return db
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+      const cursorFilter = decodeCursor(cursor);
+      const filters = [eq(issueCommentsTable.issueId, issueId)];
+      if (cursorFilter) {
+        filters.push(
+          or(
+            gt(issueCommentsTable.githubCreatedAt, cursorFilter.at),
+            and(
+              eq(issueCommentsTable.githubCreatedAt, cursorFilter.at),
+              gt(issueCommentsTable.id, cursorFilter.id),
+            ),
+          )!,
+        );
+      }
+
+      const rows = await db
         .select({
           id: issueCommentsTable.id,
           body: issueCommentsTable.body,
@@ -1121,9 +1225,23 @@ export function createProjectService() {
           githubCreatedAt: issueCommentsTable.githubCreatedAt,
         })
         .from(issueCommentsTable)
-        .where(eq(issueCommentsTable.issueId, issueId))
-        .orderBy(issueCommentsTable.githubCreatedAt)
-        .limit(50);
+        .where(and(...filters))
+        .orderBy(
+          issueCommentsTable.githubCreatedAt,
+          issueCommentsTable.id,
+        )
+        .limit(safeLimit + 1);
+
+      const hasMore = rows.length > safeLimit;
+      const comments = hasMore ? rows.slice(0, safeLimit) : rows;
+      const last = comments[comments.length - 1];
+
+      return {
+        comments,
+        hasMore,
+        nextCursor:
+          hasMore && last ? encodeCursor(last.githubCreatedAt, last.id) : null,
+      };
     },
   };
 }

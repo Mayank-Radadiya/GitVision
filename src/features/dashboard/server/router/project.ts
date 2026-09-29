@@ -16,6 +16,19 @@ import { createProjectService } from "./services/projectService";
 // Instantiate the service once, saving memory and CPU cycles
 const projectService = createProjectService();
 
+/**
+ * A keyset position: `<ISO timestamp>|<uuid>`, the sort key of the last row a
+ * page served. The service packs and unpacks it; this only rejects shapes it
+ * would otherwise hand to Postgres as a parameter the database refuses,
+ * turning a bad request into a 500.
+ */
+const cursorSchema = z
+  .string()
+  .regex(
+    /^\d{4}-\d{2}-\d{2}T[\d:.]+Z\|[0-9a-fA-F-]{36}$/,
+    "Invalid cursor",
+  );
+
 export const projectRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     return projectService.getAllProjects(ctx.userId);
@@ -146,6 +159,10 @@ export const projectRouter = createTRPCRouter({
         projectId: z.string().uuid(),
         isPullRequest: z.boolean(),
         limit: z.number().min(1).max(100).optional().default(50),
+        // `<ISO timestamp>|<uuid>`, the keyset position of the last row served.
+        // Validated here so a malformed cursor is a BAD_REQUEST from tRPC
+        // rather than a database error surfacing as a 500.
+        cursor: cursorSchema.optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
@@ -154,13 +171,25 @@ export const projectRouter = createTRPCRouter({
         ctx.userId,
         input.isPullRequest,
         input.limit,
+        input.cursor,
       );
     }),
 
   getIssueComments: protectedProcedure
-    .input(z.object({ issueId: z.string().uuid() }))
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        limit: z.number().min(1).max(100).optional().default(50),
+        cursor: cursorSchema.optional(),
+      }),
+    )
     .query(async ({ input, ctx }) => {
-      return projectService.getIssueComments(input.issueId, ctx.userId);
+      return projectService.getIssueComments(
+        input.issueId,
+        ctx.userId,
+        input.limit,
+        input.cursor,
+      );
     }),
 
   syncIssues: protectedProcedure
