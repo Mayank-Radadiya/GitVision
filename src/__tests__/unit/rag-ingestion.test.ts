@@ -27,6 +27,7 @@ vi.mock("@/src/features/rag/services/embeddings", () => ({
 }));
 
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
+import { isIgnoredPath } from "@/src/lib/github/utils";
 
 beforeEach(() => {
   embeddings = [];
@@ -48,5 +49,58 @@ describe("processFileForRag", () => {
 
     expect(result.embeddingsGenerated).toBe(result.chunksProcessed);
     expect(result.error).toBeUndefined();
+  });
+});
+
+// A committed secret that gets ingested lands in Postgres *and* in the vector
+// store, where it is retrievable through RAG and reproducible as a citation.
+describe("isIgnoredPath secret files", () => {
+  const SECRETS = [
+    "certs/server.pem",
+    "config/app.key",
+    "certs/keystore.p12",
+    "certs/keystore.pfx",
+    ".ssh/id_rsa",
+    ".ssh/id_dsa",
+    ".ssh/id_ecdsa",
+    ".ssh/id_ed25519",
+    ".npmrc",
+    "home/.netrc",
+    ".aws/credentials",
+    "infra/prod.tfvars",
+    "sub/.git/config",
+  ];
+
+  it.each(SECRETS)("ignores %s", (filePath) => {
+    expect(isIgnoredPath(filePath)).toBe(true);
+  });
+
+  it("still ignores everything the list already covered", () => {
+    for (const filePath of [
+      "node_modules/react/index.js",
+      "dist/main.js",
+      ".env",
+      ".env.production",
+      "app.pyc",
+      "assets/Inter-Regular.woff2",
+      "debug.log",
+    ]) {
+      expect(isIgnoredPath(filePath)).toBe(true);
+    }
+  });
+
+  it("does not over-broaden into ordinary source files", () => {
+    for (const filePath of [
+      "src/something.keyboard.ts",
+      "src/keyboard.ts",
+      "src/credentials.test.ts",
+      "src/npmrc-parser.ts",
+      "src/id_rsa_utils.go",
+      "src/pem.ts",
+      "src/index.ts",
+      "docs/terraform.md",
+    ]) {
+      expect(isIgnoredPath(filePath)).toBe(false);
+    }
   });
 });

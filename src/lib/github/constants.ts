@@ -113,6 +113,20 @@ export const IGNORED_FILE_PATTERNS = [
   /\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i,
   /\.(woff2?|ttf|eot|otf)$/i,
   /\.pyc$/,
+  // Secrets and key material. A committed private key that gets ingested is
+  // retrievable through RAG and reproducible as a citation, so these never
+  // enter Postgres or the vector store. Anchored to a path segment or an
+  // extension so ordinary source files survive: `something.keyboard.ts`,
+  // `src/credentials.test.ts` and `src/pem.ts` are not secrets.
+  /\.pem$/i,
+  /\.key$/i,
+  /\.(p12|pfx)$/i,
+  /(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/,
+  /\.npmrc$/i,
+  /\.netrc$/i,
+  /(^|\/)credentials$/i,
+  /\.tfvars(\.json)?$/i,
+  /(^|\/)\.git\//,
 ] as const;
 
 /**
