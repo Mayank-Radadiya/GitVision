@@ -123,7 +123,7 @@ async function fetchFolderContext(
     })
     .from(projectFiles)
     .where(and(eq(projectFiles.projectId, projectId), or(...conditions)))
-    .limit(30); // Limit to avoid token overflow
+    .limit(15); // Limit to avoid token overflow
 
   // Extract unique folders
   results.forEach((r) => {
@@ -133,23 +133,9 @@ async function fetchFolderContext(
     }
   });
 
-  // If results > 15, return summaries only
-  if (results.length > 15) {
-    return {
-      type: "folder",
-      files: results.map((r) => ({
-        path: r.fileName,
-        content: "", // Empty for large lists
-        summary: `File: ${r.fileName} (${r.code.split("\n").length} lines)`,
-      })),
-      metadata: {
-        totalFiles: results.length,
-        folders: Array.from(folders),
-      },
-    };
-  }
-
-  // Otherwise return full content
+  // Full content for the 15 we kept. This used to hand back 30 rows, and above
+  // 15 swap every body for a `File: x (N lines)` summary — which is strictly
+  // worse to answer from than 15 real files, and now unreachable anyway.
   return {
     type: "folder",
     files: results.map((r) => ({

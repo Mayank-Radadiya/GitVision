@@ -83,3 +83,31 @@ describe("fetchContext → file-specific", () => {
     expect(formatted).not.toContain("src/file-1.ts");
   });
 });
+
+describe("fetchContext → folder-based", () => {
+  beforeEach(() => {
+    captured.length = 0;
+    rows = [];
+  });
+
+  it("caps a folder match at 15 files and keeps their content", async () => {
+    rows = Array.from({ length: 40 }, (_, i) => [
+      `src/comp/file-${i}.tsx`,
+      "x".repeat(500),
+    ]);
+
+    const ctx = await fetchContext("project-1", {
+      intent: "folder-based",
+      targets: ["components"],
+      keywords: [],
+      originalQuery: "how do the components work",
+      confidence: 0.9,
+    });
+
+    expect(captured[0].params.at(-1)).toBe(15);
+    // Full bodies, not `File: x (N lines)` summaries — summaries carry no code
+    // for the model to answer from.
+    expect(ctx.files.every((f) => f.content.length > 0)).toBe(true);
+    expect(ctx.metadata.folders).toContain("src");
+  });
+});
