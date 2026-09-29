@@ -11,6 +11,7 @@ import {
   type LanguageEntry,
 } from "@/db/schema";
 import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
+import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   spendCredits,
@@ -37,34 +38,6 @@ interface PickUpCard {
 
 export function createProjectService() {
   return {
-    // ── Utility ──────────────────────────────────────────────────────────────
-
-    /**
-     * Single point of ownership verification — used before every project
-     * mutation or sensitive read. Filters strictly by ownerId to prevent
-     * cross-tenant data leaks.
-     */
-    async verifyOwnership(projectId: string, userId: string): Promise<void> {
-      const project = await db
-        .select({ ownerId: projectTables.ownerId })
-        .from(projectTables)
-        .where(
-          and(
-            eq(projectTables.id, projectId),
-            eq(projectTables.ownerId, userId), // ← tenant isolation in one query
-          ),
-        )
-        .limit(1);
-
-      if (!project || project.length === 0) {
-        // Intentionally vague — don't leak project existence to non-owners
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found or you do not have permission",
-        });
-      }
-    },
-
     // ── Project CRUD ─────────────────────────────────────────────────────────
 
     /**
@@ -210,7 +183,7 @@ export function createProjectService() {
     },
 
     async getProjectById(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await db
         .select()
@@ -229,7 +202,7 @@ export function createProjectService() {
     },
 
     async deleteProject(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
       // ON DELETE CASCADE handles commits, files, embeddings, issues, chats
       await db.delete(projectTables).where(eq(projectTables.id, projectId));
       return { success: true, message: "Project deleted successfully" };
@@ -240,7 +213,7 @@ export function createProjectService() {
      * Deletes stale records first to prevent duplicates.
      */
     async syncIssues(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await db
         .select({ githubUrl: projectTables.githubUrl })
@@ -281,7 +254,7 @@ export function createProjectService() {
       limit: number,
       cursor?: string,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
 
@@ -329,7 +302,7 @@ export function createProjectService() {
      * Prevents 10MB+ payloads that crash browser tabs.
      */
     async getProjectFiles(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const files = await db
         .select({ id: projectFiles.id, fileName: projectFiles.fileName })
@@ -378,7 +351,7 @@ export function createProjectService() {
 
     /** Fetches a single file's code content on-demand (never in bulk). */
     async getFileContent(projectId: string, fileId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const file = await db
         .select({ code: projectFiles.code })
@@ -577,7 +550,7 @@ export function createProjectService() {
       commitId: string,
       userId: string,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await this.getProjectById(projectId, userId);
 
@@ -808,7 +781,7 @@ export function createProjectService() {
       isPullRequest: boolean,
       limit = 50,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
 
