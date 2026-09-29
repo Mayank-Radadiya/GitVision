@@ -230,6 +230,25 @@ async function streamAndStoreTarball(
 
     extract.on("error", reject);
 
-    stream.pipe(createGunzip()).pipe(extract);
+    // A truncated or corrupt response — a proxy that cut the body, a 5xx with
+    // an HTML body, a dropped connection — makes the gunzip stream emit
+    // `error`. Created inline in the pipe chain it had no listener, and an
+    // `error` on a stream with no listener is an *uncaught exception* in
+    // Node: the process died mid-ingestion, so the Inngest run neither
+    // failed nor retried and the project just stopped at some fraction of
+    // its files. It is now handled like `extract` above.
+    const gunzip = createGunzip();
+    gunzip.on("error", (err) =>
+      reject(
+        new GitHubAPIError(
+          `Corrupt tarball response: gzip stream failed — ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+          502,
+        ),
+      ),
+    );
+
+    stream.pipe(gunzip).pipe(extract);
   });
 }
