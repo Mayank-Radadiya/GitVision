@@ -4,6 +4,7 @@
  */
 
 import { logger } from "@/src/lib/logger";
+import { PINNED_GEMINI_FLASH } from "./config";
 
 export interface BudgetAllocation {
   model: string;
@@ -19,7 +20,7 @@ export interface BudgetableItem {
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  "gemini-flash-latest": 1_048_576,
+  [PINNED_GEMINI_FLASH]: 1_048_576,
   "gemini-1.5-flash": 1_048_576,
   "claude-3-5-sonnet": 200_000,
   "gpt-4o": 128_000,
@@ -47,7 +48,7 @@ export function estimateTokens(text: string): number {
  * Computes token allocation budgets for a given model.
  */
 export function computeBudget(
-  modelId: string = "gemini-flash-latest",
+  modelId: string = PINNED_GEMINI_FLASH,
   customMaxOutput?: number,
 ): BudgetAllocation {
   const contextWindow = MODEL_CONTEXT_WINDOWS[modelId];

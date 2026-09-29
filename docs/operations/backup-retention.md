@@ -43,7 +43,7 @@ This document outlines the backup strategy, data retention schedules, and disast
 | Category | Retention Window | Purge Mechanism | Action |
 | :--- | :--- | :--- | :--- |
 | **Rate Limit Logs** | 24 Hours | Inngest Cron (`cleanup-stale-data`) | Automatic purge of expired rate limit windows |
-| **Orphan Code Embeddings** | 30 Days | Inngest RAG Pipeline | Deleted upon project re-indexing or manual project deletion |
+| **Orphan Code Embeddings** | No time-based retention | Deleted on re-index or on project deletion | Embeddings for a file are deleted before it is re-embedded; everything belonging to a project is removed by `ON DELETE CASCADE` when the project is deleted. There is no scheduled orphan sweep, so an embedding row survives exactly as long as its project does |
 | **Project Files & Commits** | Lifetime of Project | Cascade Delete | Purged on user project removal (`ON DELETE CASCADE`) |
 
 ---

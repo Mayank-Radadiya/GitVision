@@ -16,7 +16,6 @@ import {
   GitFork,
   Code,
   MessageSquare,
-  Wifi,
   ShieldCheck,
   MoreVertical,
   Trash2,
@@ -32,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { trpc } from "@/src/lib/trpc/client";
+
+import { IndexingStatusBadge } from "./indexing-status-badge";
 
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -195,6 +196,9 @@ interface ProjectHeaderProps {
   isLoading: boolean;
   projectId: string;
   onOpenCodeViewer: () => void;
+  embeddingStatus: string | null | undefined;
+  totalFiles: number | null | undefined;
+  embeddingError: string | null | undefined;
 }
 
 function extractOwnerRepo(url: string) {
@@ -220,6 +224,9 @@ function ProjectHeader({
   isLoading,
   projectId,
   onOpenCodeViewer,
+  embeddingStatus,
+  totalFiles,
+  embeddingError,
 }: ProjectHeaderProps) {
   const router = useRouter();
   const cleanUrl = githubUrl?.replace(/\.git$/, "") || "";
@@ -274,17 +281,11 @@ function ProjectHeader({
               ) : (
                 <>
                   {/* Status badge */}
-                  <Badge
-                    variant="outline"
-                    className="h-6 w-fit gap-1.5 border-emerald-500/30 bg-emerald-500/10 px-2 text-[11px] text-emerald-400"
-                  >
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    </span>
-                    <Wifi className="h-3 w-3" />
-                    AI Synced
-                  </Badge>
+                  <IndexingStatusBadge
+                    embeddingStatus={embeddingStatus}
+                    totalFiles={totalFiles}
+                    embeddingError={embeddingError}
+                  />
 
                   {/* Project Name */}
                   <div>

@@ -11,6 +11,7 @@ import {
   type LanguageEntry,
 } from "@/db/schema";
 import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
+import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   spendCredits,
@@ -174,34 +175,6 @@ function aggregateLanguages(
 
 export function createProjectService() {
   return {
-    // ── Utility ──────────────────────────────────────────────────────────────
-
-    /**
-     * Single point of ownership verification — used before every project
-     * mutation or sensitive read. Filters strictly by ownerId to prevent
-     * cross-tenant data leaks.
-     */
-    async verifyOwnership(projectId: string, userId: string): Promise<void> {
-      const project = await db
-        .select({ ownerId: projectTables.ownerId })
-        .from(projectTables)
-        .where(
-          and(
-            eq(projectTables.id, projectId),
-            eq(projectTables.ownerId, userId), // ← tenant isolation in one query
-          ),
-        )
-        .limit(1);
-
-      if (!project || project.length === 0) {
-        // Intentionally vague — don't leak project existence to non-owners
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found or you do not have permission",
-        });
-      }
-    },
-
     // ── Project CRUD ─────────────────────────────────────────────────────────
 
     /**
@@ -347,7 +320,7 @@ export function createProjectService() {
     },
 
     async getProjectById(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await db
         .select()
@@ -366,7 +339,7 @@ export function createProjectService() {
     },
 
     async deleteProject(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
       // ON DELETE CASCADE handles commits, files, embeddings, issues, chats
       await db.delete(projectTables).where(eq(projectTables.id, projectId));
       return { success: true, message: "Project deleted successfully" };
@@ -379,7 +352,7 @@ export function createProjectService() {
      * upserts, so a GitHub failure leaves the existing issues intact.
      */
     async syncIssues(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await db
         .select({ githubUrl: projectTables.githubUrl })
@@ -432,7 +405,7 @@ export function createProjectService() {
       limit: number,
       cursor?: string,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
       const cursorFilter = decodeCursor(cursor);
@@ -486,7 +459,7 @@ export function createProjectService() {
      * Prevents 10MB+ payloads that crash browser tabs.
      */
     async getProjectFiles(projectId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const files = await db
         .select({ id: projectFiles.id, fileName: projectFiles.fileName })
@@ -535,7 +508,7 @@ export function createProjectService() {
 
     /** Fetches a single file's code content on-demand (never in bulk). */
     async getFileContent(projectId: string, fileId: string, userId: string) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const file = await db
         .select({ code: projectFiles.code })
@@ -951,7 +924,7 @@ export function createProjectService() {
       commitId: string,
       userId: string,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const project = await this.getProjectById(projectId, userId);
 
@@ -1050,9 +1023,7 @@ export function createProjectService() {
     },
 
     /**
-     * "Needs Attention" widget — open issues/PRs with AI complexity signal.
-     * Now surfaces `aiComplexity` and `aiTags` so the frontend can show
-     * severity badges without an extra round-trip.
+     * "Needs Attention" widget — open issues/PRs across every owned project.
      */
     async getNeedsAttention(userId: string) {
       const [counts, items] = await Promise.all([
@@ -1071,7 +1042,7 @@ export function createProjectService() {
             ),
           ),
 
-        // Fetch items with AI triage columns included
+        // Fetch the items themselves
         db
           .select({
             id: issuesTable.id,
@@ -1083,8 +1054,6 @@ export function createProjectService() {
             projectId: issuesTable.projectId,
             projectName: projectTables.projectName,
             githubUpdatedAt: issuesTable.githubUpdatedAt,
-            aiComplexity: issuesTable.aiComplexity, // ← new: severity badge
-            aiTags: issuesTable.aiTags, // ← new: chip labels
           })
           .from(issuesTable)
           .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
@@ -1111,7 +1080,6 @@ export function createProjectService() {
 
     /**
      * Fetches paginated issues/PRs for a single project.
-     * Now includes AI triage fields so issue list views can display badges.
      *
      * Keyset paging on `(githubUpdatedAt, id)`. The previous limit-only paging
      * was not pagination: a project with 300 issues could never show issue 101,
@@ -1120,6 +1088,10 @@ export function createProjectService() {
      * unique — `syncIssues` upserts many rows in the same transaction and they
      * land on the same timestamp — and a timestamp-only key silently drops
      * every row that ties with the last one served.
+     *
+     * The AI-triage columns are deliberately absent from the projection (T-028):
+     * nothing ever fills them, so selecting them only shipped three guaranteed-
+     * null fields to the client. The columns stay in db/schema.ts.
      */
     async getProjectIssues(
       projectId: string,
@@ -1128,7 +1100,7 @@ export function createProjectService() {
       limit = 50,
       cursor?: string,
     ) {
-      await this.verifyOwnership(projectId, userId);
+      await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
       // One row past the page, purely to learn whether more exist. Counting is
@@ -1169,9 +1141,6 @@ export function createProjectService() {
           authorAvatar: issuesTable.authorAvatar,
           githubUpdatedAt: issuesTable.githubUpdatedAt,
           githubCreatedAt: issuesTable.githubCreatedAt,
-          aiComplexity: issuesTable.aiComplexity,
-          aiTags: issuesTable.aiTags,
-          aiSummary: issuesTable.aiSummary,
         })
         .from(issuesTable)
         .where(and(...filters))

@@ -87,7 +87,10 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
   const currentStatus = selectedProject
     ? getProjectStatus(selectedProject)
     : null;
-  const isEmbeddingReady = currentStatus === "completed";
+  // "partial" is a working index that covers only the capped file set, so the
+  // project is ready for codebase chat — just not over every file.
+  const isEmbeddingReady =
+    currentStatus === "completed" || currentStatus === "partial";
   const isProcessing = currentStatus === "processing";
 
   // Verify actual embedding status when a project is selected

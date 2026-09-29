@@ -1,5 +1,5 @@
 /**
- * T50 — `getProjectIssues` must stop pretending it is paginated.
+ * T-050 — `getProjectIssues` must stop pretending it is paginated.
  *
  * It took a `limit`, capped it at 100, ordered by `githubUpdatedAt DESC` and
  * returned whatever came back. A project with 300 issues could therefore never
@@ -11,18 +11,35 @@
  * one row, so `hasMore` is measured rather than guessed. `id` is in the key
  * because `githubUpdatedAt` is not unique — many issues are synced in the same
  * second — and a timestamp-only key silently drops every row that ties.
+ *
+ * T-028 — the same projections must not carry AI-triage fields.
+ *
+ * `aiSummary` / `aiComplexity` / `aiTags` exist as nullable columns but nothing
+ * ever writes them: the issue sync inserted `null as` under a comment describing
+ * a Gemini background job that does not exist. Selecting them only shipped three
+ * guaranteed-null columns to the client, so every consumer that rendered a
+ * severity badge or chip label rendered an empty affordance. The selects are
+ * gone; the columns stay, because dropping them costs a migration and buys
+ * nothing.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const PROJECT_ID = "22222222-2222-4222-8222-222222222222";
 
+/** The three columns the selects must never ask for (T-028). */
+const AI_FIELDS = ["aiSummary", "aiComplexity", "aiTags"];
+
 /** Issues the mocked lookup returns. */
 let issueRows: unknown[] = [];
 /** Projects the caller owns, per the mocked `projects` table. */
 let projectRows: unknown[] = [];
+/** Rows the mocked "needs attention" count aggregate returns. */
+let countRows: unknown[] = [];
 /** Every `limit(n)` the mocked builder was asked for, in call order. */
 let limits: number[] = [];
+/** Every projection the code under test asked for, in order. */
+let projections: Record<string, unknown>[] = [];
 
 /**
  * The predicates each query was asked to apply, flattened to strings.
@@ -62,19 +79,33 @@ function describeCondition(condition: unknown): string {
     .join(" ");
 }
 
-/** Chainable no-op query builder; `then` resolves to `rows`.
+/** Applies a Drizzle projection to a raw row, the way postgres would. */
+function project(row: Record<string, unknown>, fields: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.keys(fields).map((key) => [key, row[key] ?? null]),
+  );
+}
+
+/** Chainable no-op query builder; `then` resolves to the projected rows.
  *
  * `limit` is honoured — over-fetching by one is the mechanism `hasMore` is
  * derived from, and a mock that ignored it would make the assertion pass for a
  * service that never over-fetched.
+ *
+ * A `select()` with no fields (the ownership guard's `db.select()`) means "the
+ * whole row", so the rows pass through unprojected.
  */
-function chain(rows: unknown[] = []) {
+function chain(rows: unknown[] = [], fields?: Record<string, unknown>) {
   const builder: Record<string, unknown> = {
     capped: Number.POSITIVE_INFINITY,
-    then: (resolve: (v: unknown) => unknown) =>
-      Promise.resolve(rows.slice(0, builder.capped as number) as unknown[]).then(
-        resolve,
-      ),
+    then: (resolve: (v: unknown) => unknown) => {
+      const visible = rows
+        .slice(0, builder.capped as number)
+        .map((row) =>
+          fields ? project(row as Record<string, unknown>, fields) : row,
+        );
+      return Promise.resolve(visible as unknown[]).then(resolve);
+    },
   };
   for (const method of [
     "select",
@@ -107,13 +138,20 @@ vi.mock("@/db", async () => {
   const schema = await import("@/db/schema");
   return {
     db: {
-      select: () => ({
-        from: (table: unknown) => {
-          if (table === schema.projectTables) return chain(projectRows);
-          if (table === schema.issuesTable) return chain(issueRows);
-          return chain([]);
-        },
-      }),
+      select: (fields?: Record<string, unknown>) => {
+        if (fields) projections.push(fields);
+        return {
+          from: (table: unknown) => {
+            // The "needs attention" widget issues its count aggregate first, and
+            // it selects from `issues` too, so the projection — not the table —
+            // is what tells the two queries apart.
+            if (fields && "openIssues" in fields) return chain(countRows, fields);
+            if (table === schema.projectTables) return chain(projectRows, fields);
+            if (table === schema.issuesTable) return chain(issueRows, fields);
+            return chain([], fields);
+          },
+        };
+      },
     },
   };
 });
@@ -137,8 +175,10 @@ const service = createProjectService();
 beforeEach(() => {
   issueRows = [];
   projectRows = [{ ownerId: "user_1" }];
+  countRows = [];
   limits = [];
   predicates = [];
+  projections = [];
 });
 
 /** `count` issues, newest first, one hour apart. */
@@ -252,5 +292,83 @@ describe("getProjectIssues shape", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     // The issue query never runs, so no cursor can be used to probe one.
     expect(limits).toEqual([1]);
+  });
+});
+
+/**
+ * T-028. A row whose AI columns are populated, so an assertion that the payload
+ * lacks them can only pass because the *projection* dropped them — not because
+ * the values happened to be null.
+ */
+describe("issue payloads carry no AI-triage fields", () => {
+  /** One fully-populated open issue. */
+  const populatedIssue = {
+    id: "i1",
+    title: "Login button misaligned on Safari",
+    issueNumber: 42,
+    isPullRequest: false,
+    state: "open",
+    authorLogin: "octocat",
+    authorAvatar: "https://example.invalid/a.png",
+    projectId: PROJECT_ID,
+    projectName: "octo/hello",
+    githubCreatedAt: new Date("2026-01-01T00:00:00Z"),
+    githubUpdatedAt: new Date("2026-01-02T00:00:00Z"),
+    aiSummary: "Cosmetic regression in Safari only.",
+    aiComplexity: "high",
+    aiTags: ["ui", "safari"],
+  };
+
+  it("getProjectIssues returns no AI fields", async () => {
+    issueRows = [populatedIssue];
+
+    const page = await service.getProjectIssues(PROJECT_ID, "user_1", false, 50);
+
+    expect(page.items).toHaveLength(1);
+    for (const field of AI_FIELDS) {
+      expect(page.items[0]).not.toHaveProperty(field);
+    }
+  });
+
+  it("getProjectIssues still returns the issue itself", async () => {
+    issueRows = [populatedIssue];
+
+    const page = await service.getProjectIssues(PROJECT_ID, "user_1", false, 50);
+
+    expect(page.items[0]).toMatchObject({
+      issueNumber: 42,
+      title: "Login button misaligned on Safari",
+      state: "open",
+    });
+  });
+
+  it("getNeedsAttention returns no AI fields", async () => {
+    issueRows = [populatedIssue];
+    countRows = [{ openIssues: 3, openPRs: 1 }];
+
+    const { items, openIssuesCount, openPRsCount } =
+      await service.getNeedsAttention("user_1");
+
+    expect(openIssuesCount).toBe(3);
+    expect(openPRsCount).toBe(1);
+    expect(items).toHaveLength(1);
+    for (const field of AI_FIELDS) {
+      expect(items[0]).not.toHaveProperty(field);
+    }
+  });
+
+  it("no query projects an AI-triage column", async () => {
+    issueRows = [populatedIssue];
+    countRows = [{ openIssues: 3, openPRs: 1 }];
+
+    await service.getProjectIssues(PROJECT_ID, "user_1", false, 50);
+    await service.getNeedsAttention("user_1");
+
+    expect(projections.length).toBeGreaterThan(0);
+    for (const fields of projections) {
+      for (const field of AI_FIELDS) {
+        expect(fields).not.toHaveProperty(field);
+      }
+    }
   });
 });

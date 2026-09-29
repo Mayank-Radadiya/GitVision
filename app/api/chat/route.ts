@@ -490,7 +490,12 @@ export async function POST(req: Request) {
 
         if (mode === "project" && projectId && projectInfo) {
           try {
-            if (projectInfo.embeddingStatus !== "completed") {
+            // "partial" means the cap cut the file set short, not that the index
+            // is missing — retrieval over the indexed files still works.
+            if (
+              projectInfo.embeddingStatus !== "completed" &&
+              projectInfo.embeddingStatus !== "partial"
+            ) {
               activeRetrievalPath = "not-indexed";
               systemPrompt = `You are GitVision AI. The project "${
                 projectInfo.projectName
