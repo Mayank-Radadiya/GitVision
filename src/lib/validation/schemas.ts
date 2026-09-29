@@ -69,7 +69,17 @@ export const projectIdSchema = z.object({
  */
 export const projectCommitsSchema = projectIdSchema.extend({
   limit: paginationSchema.shape.limit,
-  cursor: paginationSchema.shape.cursor,
+  // Compound cursor. `authorDate` is not unique, so the old bare-id cursor
+  // resumed from the wrong place whenever a page boundary landed inside a
+  // tie. Zod rejecting the old shape gives the client a BAD_REQUEST instead
+  // of silently wrong pages — a stored cursor resets on deploy, which the
+  // task calls acceptable.
+  cursor: z
+    .object({
+      authorDate: z.coerce.date("Invalid cursor"),
+      id: validators.uuid,
+    })
+    .optional(),
 });
 
 /**

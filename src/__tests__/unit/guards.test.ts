@@ -1,11 +1,13 @@
 /**
  * Tenant-isolation guards.
  *
- * `assertProjectOwnership` is the single choke point in front of every
- * project-scoped read and mutation, and `verifyOwnership` is its tRPC
- * counterpart. Both encode the same rule: the query itself is scoped by
- * ownerId, so a non-owner gets the same "not found" result as a genuinely
- * missing project — no existence oracle.
+ * `assertProjectOwnership` is the *only* choke point in front of every
+ * project-scoped read and mutation. It encodes one rule: the query itself is
+ * scoped by ownerId, so a non-owner gets the same "not found" result as a
+ * genuinely missing project — no existence oracle. The same error must also
+ * satisfy two audiences: tRPC routers need a `TRPCError` with `NOT_FOUND`
+ * (anything else becomes a 500), and the Next.js route handlers need
+ * `ProjectAccessError` to keep returning 404.
  *
  * These tests assert the *shape* of the query (that ownerId is part of the
  * WHERE clause) as well as the behaviour, because a future refactor that
@@ -14,6 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { TRPCError } from "@trpc/server";
 
 /** Every `eq(column, value)` pair the guard built, in order. */
 let eqCalls: { column: unknown; value: unknown }[] = [];
@@ -131,5 +134,23 @@ describe("assertProjectOwnership", () => {
     expect(error).toBeInstanceOf(ProjectAccessError);
     expect(error.message).not.toContain("proj_1");
     expect(error.message).not.toContain("user_attacker");
+  });
+});
+
+describe("one error shape for two audiences", () => {
+  it("carries a tRPC NOT_FOUND code, so a foreign project is a 404 not a 500", async () => {
+    lookupResult = [];
+
+    const error = (await assertProjectOwnership(
+      "proj_1",
+      "user_attacker",
+    ).catch((e: unknown) => e)) as TRPCError;
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error.code).toBe("NOT_FOUND");
+  });
+
+  it("is still catchable as ProjectAccessError by the route handlers", () => {
+    expect(new ProjectAccessError()).toBeInstanceOf(TRPCError);
   });
 });
