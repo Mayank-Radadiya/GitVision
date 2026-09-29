@@ -271,54 +271,45 @@ export function createProjectService() {
     // ── Commit Queries ────────────────────────────────────────────────────────
 
     /**
-     * Cursor-based paginated commits. Cursor is a commit ID; we use its
-     * `authorDate` so the DB can use the existing `commits_author_date_idx`.
+     * Cursor-based paginated commits.
+     *
+     * The cursor carries both sort keys. `authorDate` alone is not unique — a
+     * batch pushed at once shares a timestamp to the second — so keying on it
+     * skipped or duplicated commits depending on which side of the tie the
+     * page boundary fell. `id` breaks the tie, and the pair is compared with
+     * Postgres row-value syntax so the ordering is lexicographic in a single
+     * scan, which still lets `commits_author_date_idx` serve the sort.
      */
     async getProjectCommits(
       projectId: string,
       userId: string,
       limit: number,
-      cursor?: string,
+      cursor?: { authorDate: Date; id: string },
     ) {
       await assertProjectOwnership(projectId, userId);
 
       const safeLimit = Math.min(limit, 100);
 
-      let cursorDate: Date | undefined;
-      if (cursor) {
-        const cursorCommit = await db
-          .select({ authorDate: commitsTable.authorDate })
-          .from(commitsTable)
-          .where(
-            and(
-              eq(commitsTable.id, cursor),
-              eq(commitsTable.projectId, projectId), // tenant safety
-            ),
-          )
-          .limit(1);
-        cursorDate = cursorCommit[0]?.authorDate;
-      }
-
-      const whereClause = cursorDate
-        ? and(
-            eq(commitsTable.projectId, projectId),
-            sql`${commitsTable.authorDate} < ${cursorDate}`,
-          )
-        : eq(commitsTable.projectId, projectId);
-
       const commits = await db
         .select()
         .from(commitsTable)
-        .where(whereClause)
-        .orderBy(desc(commitsTable.authorDate))
+        .where(
+          and(
+            eq(commitsTable.projectId, projectId), // tenant safety
+            cursor
+              ? sql`(${commitsTable.authorDate}, ${commitsTable.id}) < (${cursor.authorDate}, ${cursor.id})`
+              : undefined,
+          ),
+        )
+        .orderBy(desc(commitsTable.authorDate), desc(commitsTable.id))
         .limit(safeLimit + 1); // +1 to detect if next page exists
 
-      let nextCursor: string | undefined;
-      if (commits.length > safeLimit) {
-        nextCursor = commits.pop()!.id;
-      }
+      const page = pageOf(commits, safeLimit, (row) => ({
+        authorDate: row.authorDate,
+        id: row.id,
+      }));
 
-      return { commits, nextCursor };
+      return { commits: page.items, nextCursor: page.nextCursor };
     },
 
     // ── File Queries ──────────────────────────────────────────────────────────

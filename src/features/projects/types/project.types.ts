@@ -42,7 +42,8 @@ export interface Commit {
 /** Response shape from tRPC getCommits (cursor-based) */
 export interface CommitPage {
   commits: Commit[];
-  nextCursor: string | undefined;
+  /** Both sort keys, or null on the last page. `authorDate` alone is not unique. */
+  nextCursor: { authorDate: Date; id: string } | null;
 }
 
 // ─── Stat Card Config ────────────────────────────────────────────────────────
