@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { projectTables, projectFiles } from "@/db/schema";
 import { eq, like, or, and } from "drizzle-orm";
 import type { ClassifiedQuery } from "./query-classifier";
+import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 
 // Initialize Octokit
 const octokit = new Octokit({
@@ -399,4 +400,73 @@ function extractFolderStructure(filePaths: string[]): string[] {
   });
 
   return Array.from(folders).sort();
+}
+
+// ---------------------------------------------------------------------------
+// CodeContext → prompt string
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a CodeContext (from the intent-based fetcher) into the string
+ * injected into the system prompt.
+ *
+ * Lives beside the type it consumes so the budget it enforces is testable
+ * without booting a route handler.
+ */
+export function formatCodeContext(
+  ctx: CodeContext,
+  maxTokens?: number,
+): string {
+  if (ctx.files.length === 0) return "";
+
+  if (ctx.type === "dependency") {
+    return `DEPENDENCY ANALYSIS:\n${JSON.stringify(ctx.metadata.dependencies, null, 2)}`;
+  }
+
+  if (ctx.type === "overview") {
+    const stats = ctx.metadata.stats ?? {};
+    const fileTypes = stats.fileTypes
+      ? Object.entries(stats.fileTypes as Record<string, number>)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 10)
+          .map(([ext, count]) => `  .${ext}: ${count} files`)
+          .join("\n")
+      : "";
+
+    const keyFiles = ctx.files
+      .map((f) => `### ${f.path}\n\`\`\`\n${f.content.slice(0, 3000)}\n\`\`\``)
+      .join("\n\n");
+
+    return `PROJECT OVERVIEW:
+- Total files: ${ctx.metadata.totalFiles}
+- Stars: ${stats.stars ?? "?"} | Forks: ${stats.forks ?? "?"} | Commits: ${stats.commits ?? "?"}
+- Folders: ${(ctx.metadata.folders ?? []).join(", ")}
+
+FILE TYPE BREAKDOWN:
+${fileTypes}
+
+KEY FILES:
+${keyFiles}`;
+  }
+
+  // file | folder
+  const parts = ctx.files.map((f) => {
+    if (f.summary && !f.content) {
+      return `File: ${f.path}\n${f.summary}`;
+    }
+    return `\`\`\`\n// File: ${f.path}\n${f.content}\n\`\`\``;
+  });
+
+  // Whole-file bodies are unbounded — a folder match can easily be hundreds of
+  // kB. Trim to the caller's context allowance instead of hoping the provider
+  // swallows the overflow. fitToBudget cuts on file boundaries, so a prompt
+  // never ends mid-fence.
+  if (maxTokens === undefined || maxTokens <= 0) return parts.join("\n\n");
+
+  const { included } = fitToBudget(
+    parts.map((text) => ({ text, approxTokens: estimateTokens(text) })),
+    maxTokens,
+  );
+
+  return included.map((item) => item.text).join("\n\n");
 }

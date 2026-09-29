@@ -28,6 +28,7 @@ import {
 import { classifyQuery } from "@/src/features/rag/services/rag/query-classifier";
 import {
   fetchContext,
+  formatCodeContext,
   type CodeContext,
 } from "@/src/features/rag/services/rag/context-fetcher";
 import { getRecentChatHistoryForContext } from "@/src/shared/lib/chat-history";
@@ -177,57 +178,6 @@ at the end.`,
 }
 
 // ---------------------------------------------------------------------------
-// Context-fetcher result → formatted string
-// ---------------------------------------------------------------------------
-
-/**
- * Format a CodeContext (from the intent-based fetcher) into the string
- * injected into the system prompt.
- */
-function formatCodeContext(ctx: CodeContext): string {
-  if (ctx.files.length === 0) return "";
-
-  if (ctx.type === "dependency") {
-    return `DEPENDENCY ANALYSIS:\n${JSON.stringify(ctx.metadata.dependencies, null, 2)}`;
-  }
-
-  if (ctx.type === "overview") {
-    const stats = ctx.metadata.stats ?? {};
-    const fileTypes = stats.fileTypes
-      ? Object.entries(stats.fileTypes as Record<string, number>)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 10)
-          .map(([ext, count]) => `  .${ext}: ${count} files`)
-          .join("\n")
-      : "";
-
-    const keyFiles = ctx.files
-      .map((f) => `### ${f.path}\n\`\`\`\n${f.content.slice(0, 3000)}\n\`\`\``)
-      .join("\n\n");
-
-    return `PROJECT OVERVIEW:
-- Total files: ${ctx.metadata.totalFiles}
-- Stars: ${stats.stars ?? "?"} | Forks: ${stats.forks ?? "?"} | Commits: ${stats.commits ?? "?"}
-- Folders: ${(ctx.metadata.folders ?? []).join(", ")}
-
-FILE TYPE BREAKDOWN:
-${fileTypes}
-
-KEY FILES:
-${keyFiles}`;
-  }
-
-  // file | folder
-  const parts = ctx.files.map((f) => {
-    if (f.summary && !f.content) {
-      return `File: ${f.path}\n${f.summary}`;
-    }
-    return `\`\`\`\n// File: ${f.path}\n${f.content}\n\`\`\``;
-  });
-
-  return parts.join("\n\n");
-}
-
 // ---------------------------------------------------------------------------
 // Main RAG orchestration for large projects
 // ---------------------------------------------------------------------------
@@ -286,7 +236,7 @@ async function retrieveContext(
 
       // If fetcher returned results, format and return
       if (ctx.files.length > 0) {
-        const formatted = formatCodeContext(ctx);
+        const formatted = formatCodeContext(ctx, maxContextTokens);
         if (formatted) {
           const relatedFiles = ctx.files.map((f) => f.path);
           return { context: formatted, relatedFiles };
