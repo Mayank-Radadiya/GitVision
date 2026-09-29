@@ -120,11 +120,19 @@ const VALID_UUID = "11111111-1111-4111-8111-111111111111";
 
 /** `overrides` replaces or adds top-level body fields. */
 function post(body: Record<string, unknown>) {
+  return postRaw(JSON.stringify(body));
+}
+
+/**
+ * The same request with the body bytes under the test's control, so a body
+ * that is not JSON at all can be sent. `JSON.stringify` can never produce one.
+ */
+function postRaw(body: string) {
   return POST(
     new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body,
     }) as never,
   ) as Promise<Response>;
 }
@@ -236,5 +244,37 @@ describe("POST /api/chat request validation", () => {
     });
 
     expect(response.status).toBe(400);
+  });
+
+  // A body that is not JSON at all never reaches `safeParse` — `req.json()`
+  // throws a SyntaxError first. That throw was caught by the route's generic
+  // catch, so a client's own bug surfaced as a 500 "Something went wrong".
+  it("returns 400 for a body that is not JSON", async () => {
+    const response = await postRaw('{"mode": "general", messages: [');
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 for an empty body", async () => {
+    const response = await postRaw("");
+
+    expect(response.status).toBe(400);
+  });
+
+  it("answers a malformed body with the same client-error shape", async () => {
+    const response = await postRaw("not json at all");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "invalid_request",
+      error: expect.any(String),
+    });
+  });
+
+  it("spends no credit on a malformed body", async () => {
+    await postRaw("{ oops");
+
+    // `update:users` is the credit spend, recorded by the db mock above.
+    expect(calls).not.toContain("update:users");
   });
 });

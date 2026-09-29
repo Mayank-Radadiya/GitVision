@@ -316,7 +316,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const parsed = chatRequestSchema.safeParse(await req.json());
+    // `req.json()` throws a SyntaxError on a malformed body, and that throw
+    // happened *before* `safeParse` could reject it — so the generic catch at
+    // the bottom of this handler turned a client's own bug into a 500 "Something
+    // went wrong". Read the body defensively and let both failure modes take
+    // the same 400 path, so the client renders one message either way.
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: "Request body must be valid JSON",
+          code: "invalid_request",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+        },
+      );
+    }
+
+    const parsed = chatRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
       return new Response(
         JSON.stringify({
