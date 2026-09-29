@@ -1,9 +1,9 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider, useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
-import { memo, useEffect, useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/src/lib/trpc/client";
@@ -15,37 +15,45 @@ interface ProviderProps {
   children: React.ReactNode;
 }
 
-// Memoized Toaster component to prevent unnecessary re-renders
-const MemoizedToaster = memo(() => (
-  <Toaster
-    position="bottom-right"
-    toastOptions={{
-      style: {
-        background: "var(--toast-bg, #fff)",
-        color: "var(--toast-text, #333)",
-        boxShadow: "0 3px 10px rgba(0, 0, 0, 0.2)",
-        borderRadius: "8px",
-        padding: "6px",
-        paddingLeft: "10px",
-        fontSize: "15px",
-        fontWeight: "500",
-        lineHeight: "1.5",
-        transition: "all 0.3s ease",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(20px)",
-        border: "0.5px solid rgba(255, 255, 255, 0.2)",
-        zIndex: 99,
-      },
-      success: {
-        duration: 4000,
-      },
-      error: {
-        duration: 6000,
-      },
-    }}
-  />
-));
-MemoizedToaster.displayName = "MemoizedToaster";
+const TOAST_STYLE: CSSProperties = {
+  background: "transparent",
+  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.2)",
+  borderRadius: "8px",
+  padding: "6px",
+  paddingLeft: "10px",
+  fontSize: "15px",
+  fontWeight: "500",
+  lineHeight: "1.5",
+  transition: "all 0.3s ease",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "0.5px solid rgba(255, 255, 255, 0.2)",
+  zIndex: 99,
+};
+
+/** Sits inside ThemeProvider so the toast follows the theme as a value rather
+ *  than through a CSS variable that a DOM observer had to keep in sync. */
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+
+  return (
+    <Toaster
+      position="bottom-right"
+      toastOptions={{
+        style: {
+          ...TOAST_STYLE,
+          color: resolvedTheme === "dark" ? "#fff" : "#333",
+        },
+        success: {
+          duration: 4000,
+        },
+        error: {
+          duration: 6000,
+        },
+      }}
+    />
+  );
+}
 
 const Provider = ({ children }: ProviderProps) => {
   // Create a client using the factory to ensure consistent configuration
@@ -66,27 +74,6 @@ const Provider = ({ children }: ProviderProps) => {
     }),
   );
 
-  // Keep the toast theme CSS vars in sync with the active theme class.
-  useEffect(() => {
-    const updateToastThemeVars = () => {
-      const isDark = document.documentElement.classList.contains("dark");
-      document.documentElement.style.setProperty("--toast-bg", "transparent");
-      document.documentElement.style.setProperty(
-        "--toast-text",
-        isDark ? "#fff" : "#333",
-      );
-    };
-
-    updateToastThemeVars();
-    const observer = new MutationObserver(updateToastThemeVars);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <ClerkProvider>
       <MotionConfig reducedMotion="user">
@@ -99,7 +86,7 @@ const Provider = ({ children }: ProviderProps) => {
               enableColorScheme
               disableTransitionOnChange={false}
             >
-              <MemoizedToaster />
+              <ThemedToaster />
               {children}
             </ThemeProvider>
           </trpc.Provider>
