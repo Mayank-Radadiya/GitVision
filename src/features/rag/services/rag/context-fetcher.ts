@@ -71,31 +71,27 @@ async function fetchFileContext(
   projectId: string,
   fileNames: string[],
 ): Promise<CodeContext> {
-  const files: FileContent[] = [];
+  // One query for every target. A per-target query gave each of N targets its
+  // own 5-file budget, so asking about 4 filenames pulled 20 files into the
+  // prompt. `limit` is the whole answer's budget, not a per-target allowance.
+  const results = await db
+    .select({
+      fileName: projectFiles.fileName,
+      code: projectFiles.code,
+    })
+    .from(projectFiles)
+    .where(
+      and(
+        eq(projectFiles.projectId, projectId),
+        or(...fileNames.map((fileName) => like(projectFiles.fileName, `%${fileName}%`))),
+      ),
+    )
+    .limit(5);
 
-  // Search database for files matching the names
-  for (const fileName of fileNames) {
-    const results = await db
-      .select({
-        fileName: projectFiles.fileName,
-        code: projectFiles.code,
-      })
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          like(projectFiles.fileName, `%${fileName}%`),
-        ),
-      )
-      .limit(5);
-
-    files.push(
-      ...results.map((r) => ({
-        path: r.fileName,
-        content: r.code,
-      })),
-    );
-  }
+  const files: FileContent[] = results.map((r) => ({
+    path: r.fileName,
+    content: r.code,
+  }));
 
   return {
     type: "file",
