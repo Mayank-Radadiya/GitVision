@@ -4,7 +4,7 @@ Branch: `lane/p1-d` (off `main`). Lane D owns the dashboard regions of `src/feat
 
 | Task | Status | Reason | Commit |
 |---|---|---|---|
-| T-018 | done | Charge before enqueue, with explicit compensation for each failure window | PENDING |
+| T-018 | done | Charge before enqueue, with explicit compensation for each failure window | `0f0415b` |
 | T-029 | todo | Measure the dashboard queries and record the numbers | |
 | T-030 | todo | depends on T-029's recorded measurements | |
 | T-031 | todo | Index work; needs `EXPLAIN` output recorded | |
