@@ -59,13 +59,35 @@ export const trpc = createTRPCOptionsProxy({
 /**
  * caller
  * -------
- * Creates a server-side TRPC caller.
+ * Creates a server-side TRPC caller, so procedures can be awaited *directly*
+ * from a server component or a server action -- no HTTP round-trip, same
+ * type-checked inputs and the same procedures as the client.
  *
- * This enables you to call TRPC procedures *directly* from server actions,
- * background jobs, or inside React Server Components -- without needing HTTP.
+ *   const chat = await caller.chat.getById({ chatId });
  *
- * Example:
- *   const user = await caller.user.getById({ id: "123" });
+ * REQUIRES A LIVE CLERK REQUEST CONTEXT. `createTRPCContext` builds the
+ * context from Clerk's `auth()`, which resolves the signed-in user out of
+ * the incoming request. There is no ambient user to fall back on, so this
+ * caller only works somewhere a request exists: a server component, a
+ * server action, anything inside the App Router's request scope.
+ *
+ * It does NOT work in a background job. An Inngest function runs long
+ * after the HTTP request that enqueued it has finished; there is no session
+ * to read, `auth()` has nothing to resolve, and every `protectedProcedure`
+ * fails. This docstring used to advertise background jobs, which was a trap
+ * for anyone who believed it.
+ *
+ * For background work, call the service layer directly and pass the user
+ * through explicitly -- which is what the Inngest functions already do
+ * (`src/lib/inngest/functions.ts` imports `getRepositoryFiles`,
+ * `syncIssuesAndComments` and `processFileForRag` rather than going through
+ * tRPC). The job knows which user it is running for; that has to come from
+ * the job's own payload, not from a request that no longer exists.
+ *
+ * Follow-up, not a promise: a job-safe caller would mean a `createTRPCContext`
+ * that accepts an explicit identity instead of reading one from a request, and
+ * a set of procedures that are deliberately safe to run without a session.
+ * Neither exists today.
  */
 export const caller = appRouter.createCaller(() => createTRPCContext());
 
