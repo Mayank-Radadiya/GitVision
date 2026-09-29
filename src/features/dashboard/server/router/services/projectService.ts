@@ -474,6 +474,25 @@ export function createProjectService() {
     },
 
     /**
+     * The credit balance on its own.
+     *
+     * The two credit readouts live outside the dashboard (the sidebar shows on
+     * every page, and the create-project gauge is the only dashboard read on
+     * that page), so asking for `getDashboardData` to see one integer meant
+     * shipping seven queries' worth of payload to render a number. One indexed
+     * column on the users primary key.
+     */
+    async getCredits(userId: string) {
+      const row = await db
+        .select({ credits: usersTable.credits })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      return row[0]?.credits ?? 0;
+    },
+
+    /**
      * CONSOLIDATED: Fetches ALL dashboard data in a single server call.
      * Runs 7 independent queries in parallel via Promise.all() to avoid
      * sequential HTTP waterfalls — maximum possible concurrency.

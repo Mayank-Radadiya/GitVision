@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
-import { useDashboardInfo } from "@/features/dashboard/hooks/use-dashboard";
+import { useCredits } from "@/features/dashboard/hooks/use-dashboard";
 import {
   Tooltip,
   TooltipContent,
@@ -44,11 +44,12 @@ interface SidebarCreditsProps {
  * - < 5%: Red (Critical)
  */
 export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
-  // Fetch credits. Using useDashboardInfo so it syncs with standard dashboard state.
-  const { data } = useDashboardInfo();
+  // The sidebar renders on every page, so this asks for the balance alone
+  // rather than dragging the whole dashboard payload along with it.
+  const { data } = useCredits();
 
   // Default parsing logic handling missing/loading state gracefully.
-  const credits = data?.userCredits ?? 0;
+  const credits = data ?? 0;
 
   // Determine baseline for the progress bar rendering.
   // We assume 100 as standard free-tier limit to establish 0-100% fill.

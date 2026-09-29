@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { cn } from "@/shared/lib/utils";
-import { useDashboardInfo } from "@/features/dashboard/hooks/use-dashboard";
+import { useCredits } from "@/features/dashboard/hooks/use-dashboard";
 import {
   Tooltip,
   TooltipContent,
@@ -20,8 +20,10 @@ const SQUARES = 10;
 const MAX_CREDITS = 100;
 
 export function CreditsGauge() {
-  const { data } = useDashboardInfo();
-  const credits = data?.userCredits ?? 50;
+  // The balance is the only dashboard read on the create-project page, so it
+  // gets its own procedure instead of the seven-query dashboard payload.
+  const { data } = useCredits();
+  const credits = data ?? 50;
   const filled = Math.min(
     Math.round((credits / MAX_CREDITS) * SQUARES),
     SQUARES,

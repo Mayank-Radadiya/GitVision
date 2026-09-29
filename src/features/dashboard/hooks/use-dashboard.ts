@@ -51,3 +51,16 @@ export const useNeedsAttention = () => {
   const { data, ...rest } = useDashboardData();
   return { data: data?.attention, ...rest };
 };
+
+// ─── Standalone query ────────────────────────────────────────────────────────
+
+/**
+ * The credit balance alone. Kept out of the consolidated query on purpose: the
+ * sidebar renders on every page and the create-project gauge is the only
+ * dashboard read on that page, so neither should pay for `getDashboardData`.
+ */
+export const useCredits = () =>
+  trpc.project.getCredits.useQuery(undefined, {
+    staleTime: DASHBOARD_STALE_TIME,
+    gcTime: DASHBOARD_GC_TIME,
+  });
