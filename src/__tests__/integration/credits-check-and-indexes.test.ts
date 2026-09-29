@@ -68,3 +68,49 @@ describe.skipIf(!hasTestDatabase)("hot-path indexes exist", () => {
     expect(indexExists(indexName)).toBe(true);
   });
 });
+
+/**
+ * The two indexes added in 0003. A migration that quietly creates them under a
+ * different name, or not at all, leaves the code correct and the database slow,
+ * so assert the exact index name and the exact column list — not just that
+ * "some" index exists.
+ */
+describe.skipIf(!hasTestDatabase)("chat and file-tree indexes exist", () => {
+  beforeAll(() => {
+    applyMigrations();
+  });
+
+  const indexDef = (name: string) =>
+    psql(`SELECT indexdef FROM pg_indexes WHERE indexname = '${name}';`);
+
+  it("chats_user_id_updated_at_idx covers both the filter and the sort", () => {
+    // getAll pages with a keyset cursor: WHERE user_id = ? ORDER BY updated_at
+    // DESC. A single-column user_id index cannot serve that sort, so each page
+    // paid for one before this index existed.
+    const def = indexDef("chats_user_id_updated_at_idx");
+
+    expect(def).not.toBe("");
+    expect(def).toContain("user_id");
+    expect(def).toContain("updated_at");
+  });
+
+  it("project_files_language_idx backs the selectDistinct in getLanguageBreakdown", () => {
+    const def = indexDef("project_files_language_idx");
+
+    expect(def).not.toBe("");
+    expect(def).toContain("language");
+  });
+
+  it("did not collide with the chat indexes that already existed", () => {
+    // The task flagged the naming risk explicitly: a duplicate index under a
+    // second name is pure write overhead and easy to ship by accident.
+    const chatIndexes = psql(`
+      SELECT count(*)
+      FROM pg_indexes
+      WHERE tablename = 'project_chats' AND indexname LIKE 'chats_%';
+    `);
+
+    // 3 from 0000 (project_id, user_id, type) + 1 added in 0003.
+    expect(chatIndexes).toBe("4");
+  });
+});

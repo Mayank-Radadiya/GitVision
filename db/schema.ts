@@ -113,6 +113,10 @@ export const projectFiles = pgTable(
     return {
       projectIdIdx: index("project_files_project_id_idx").on(table.projectId),
       hashIdx: index("project_files_hash_idx").on(table.hash),
+      // getLanguageBreakdown runs selectDistinct(language) over the whole
+      // table; without this it is a full scan of the largest text-carrying
+      // table in the schema.
+      languageIdx: index("project_files_language_idx").on(table.language),
       projectIdFileNameUnique: unique(
         "project_files_project_id_file_name_unique",
       ).on(table.projectId, table.fileName),
@@ -216,6 +220,13 @@ export const projectChats = pgTable(
       projectIdIdx: index("chats_project_id_idx").on(table.projectId),
       userIdIdx: index("chats_user_id_idx").on(table.userId),
       typeIdx: index("chats_type_idx").on(table.type),
+      // getAll pages with a keyset cursor: where user_id = ? order by
+      // updated_at desc. The single-column user_id index cannot serve the
+      // sort, so every page paid for one. This covers both halves.
+      userIdUpdatedAtIdx: index("chats_user_id_updated_at_idx").on(
+        table.userId,
+        table.updatedAt,
+      ),
     };
   },
 );
