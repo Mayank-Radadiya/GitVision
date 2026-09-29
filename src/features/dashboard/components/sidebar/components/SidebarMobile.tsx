@@ -14,6 +14,7 @@
 "use client";
 
 import { Menu, X } from "lucide-react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/shared/components/ui/button";
 import { SIDEBAR_SPRING_CONFIG } from "../sidebar.constants";
@@ -96,30 +97,46 @@ interface MobileDrawerProps {
  */
 export function MobileDrawer({ isOpen, onClose, children }: MobileDrawerProps) {
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ x: "-100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "-100%" }}
-          transition={SIDEBAR_SPRING_CONFIG}
-          className="fixed inset-y-0 left-0 z-100 w-72 md:hidden"
-        >
-          <div className="bg-background/95 relative h-full shadow-2xl backdrop-blur-xl">
-            {/* Close Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              aria-label="Close navigation menu"
-              className="absolute top-3 right-3 h-8 w-8 rounded-lg"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            {children}
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <DialogPrimitive.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <AnimatePresence>
+        {isOpen && (
+          // forceMount keeps the drawer mounted through its exit animation,
+          // which Radix would otherwise unmount as soon as `open` goes false.
+          <DialogPrimitive.Portal forceMount>
+            <DialogPrimitive.Content forceMount asChild>
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={SIDEBAR_SPRING_CONFIG}
+                className="fixed inset-y-0 left-0 z-100 w-72 outline-none md:hidden"
+              >
+                <DialogPrimitive.Title className="sr-only">
+                  Navigation menu
+                </DialogPrimitive.Title>
+                <div className="bg-background/95 relative h-full shadow-2xl backdrop-blur-xl">
+                  {/* Close Button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onClose}
+                    aria-label="Close navigation menu"
+                    className="absolute top-3 right-3 h-8 w-8 rounded-lg"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  {children}
+                </div>
+              </motion.div>
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        )}
+      </AnimatePresence>
+    </DialogPrimitive.Root>
   );
 }
