@@ -34,8 +34,8 @@ requests fast.
 
 | File | Fix |
 |---|---|
-| `/api/project/getProjectCommits` | `auth()` + ownership; `count(*)` replaces full-row count |
-| `/api/project/getProjectDetails` | `auth()` + ownership |
+| `/api/project/getProjectCommits` | `auth()` + ownership; `count(*)` replaces full-row count — **removed later, see [T-009]** |
+| `/api/project/getProjectDetails` | `auth()` + ownership — **removed later, see [T-009]** |
 | `/api/project/getProjectFiles` | `auth()` + ownership (full-source leak closed) |
 | `/api/project/createProject` | `projectCreateSchema.safeParse` (github.com-only); rate limit 10/hr |
 | `/api/chat` | project ownership; rate limit 20/min; credit spend (atomic, 402); prompt-injection delimiter |
@@ -44,6 +44,11 @@ requests fast.
 | tRPC `project.create` | rate limit 10/hr |
 | tRPC `chat.create` | verifies project ownership before insert |
 | `/api/webhooks/clerk` | `user.deleted` → cascade delete; DB ops in try/catch; returns 200 |
+
+[T-009]: `/api/project/getProjectCommits` and `/api/project/getProjectDetails`
+were deleted outright — they had no production callers, no rate limit, and
+duplicated tRPC procedures. The rows above are kept as written so this spec
+still reads as what was decided at the time.
 
 ### Prompt-injection hardening
 
