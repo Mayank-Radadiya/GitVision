@@ -24,9 +24,17 @@ const TABS: { id: ProjectTab; label: string; icon: React.ElementType }[] = [
   { id: "issues", label: "Issues", icon: CircleDot },
 ];
 
+/** One source of truth so a tab and the panel it controls cannot drift apart. */
+export const tabId = (tab: ProjectTab) => `project-tab-${tab}`;
+export const tabPanelId = (tab: ProjectTab) => `project-tab-panel-${tab}`;
+
 function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
   return (
-    <div className="border-border/40 relative flex scrollbar-none items-center gap-0 overflow-x-auto border-b">
+    <div
+      role="tablist"
+      aria-label="Project sections"
+      className="border-border/40 relative flex scrollbar-none items-center gap-0 overflow-x-auto border-b"
+    >
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -34,6 +42,8 @@ function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
         return (
           <button
             key={tab.id}
+            id={tabId(tab.id)}
+            aria-controls={tabPanelId(tab.id)}
             onClick={() => onTabChange(tab.id)}
             className={cn(
               "relative flex shrink-0 cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200",

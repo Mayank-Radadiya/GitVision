@@ -18,7 +18,7 @@ import {
   useProjectCommits,
 } from "@/features/projects/hooks/use-project";
 import ProjectHeader from "./project-header";
-import ProjectTabs from "./project-tabs";
+import ProjectTabs, { tabId, tabPanelId } from "./project-tabs";
 import CodeViewer from "./code-viewer";
 import ProjectError from "./project-error";
 import BentoGrid, { BentoCard } from "./bento-grid";
@@ -34,6 +34,26 @@ const TAB_VARIANTS = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -4 },
 };
+
+/** The panel a tab controls. `tabIndex` keeps it reachable by keyboard when a
+ *  panel holds nothing focusable, e.g. the overview grid. */
+function TabPanel({ tab, children }: { tab: ProjectTab; children: React.ReactNode }) {
+  return (
+    <motion.div
+      id={tabPanelId(tab)}
+      role="tabpanel"
+      aria-labelledby={tabId(tab)}
+      tabIndex={0}
+      variants={TAB_VARIANTS}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.22, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -127,14 +147,7 @@ export default function ProjectPage() {
           <AnimatePresence mode="wait">
             {/* ── Overview ── */}
             {activeTab === "overview" && (
-              <motion.div
-                key="overview"
-                variants={TAB_VARIANTS}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
+              <TabPanel tab="overview">
                 {isLoading ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <BentoCard className="h-64 animate-pulse" />
@@ -150,52 +163,31 @@ export default function ProjectPage() {
                     languages={project?.languages ?? []}
                   />
                 )}
-              </motion.div>
+              </TabPanel>
             )}
 
             {/* ── Commits ── */}
             {activeTab === "commits" && (
-              <motion.div
-                key="commits"
-                variants={TAB_VARIANTS}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
+              <TabPanel tab="commits">
                 <CommitsTab />
-              </motion.div>
+              </TabPanel>
             )}
 
             {/* ── Pull Requests ── */}
             {activeTab === "pull-requests" && (
-              <motion.div
-                key="pull-requests"
-                variants={TAB_VARIANTS}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
+              <TabPanel tab="pull-requests">
                 <PullRequestsTab
                   projectId={projectId}
                   repoUrl={project?.githubUrl}
                 />
-              </motion.div>
+              </TabPanel>
             )}
 
             {/* ── Issues ── */}
             {activeTab === "issues" && (
-              <motion.div
-                key="issues"
-                variants={TAB_VARIANTS}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
+              <TabPanel tab="issues">
                 <IssuesTab projectId={projectId} repoUrl={project?.githubUrl} />
-              </motion.div>
+              </TabPanel>
             )}
           </AnimatePresence>
         </motion.div>
