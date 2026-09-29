@@ -36,7 +36,25 @@ async function main() {
     process.exit(1);
   }
 
-  const backupDir = path.resolve(process.cwd(), "backups");
+  // A dump is every customer's source code. It must not be able to end up in
+  // the working tree, where a `git add -f`, a bad .gitignore edit, or a tarball
+  // of the repo would publish it. Default to a sibling of the repo, and let
+  // BACKUP_DIR override that.
+  const backupDir = process.env.BACKUP_DIR
+    ? path.resolve(process.env.BACKUP_DIR)
+    : path.resolve(process.cwd(), "..", "gitvision-backups");
+
+  // Belt and braces: refuse to write inside the repo even if BACKUP_DIR is set
+  // to a relative path that resolves there.
+  const repoRoot = path.resolve(process.cwd());
+  if (backupDir === repoRoot || backupDir.startsWith(repoRoot + path.sep)) {
+    console.error(
+      `❌ Refusing to write backups inside the repository (${backupDir}).` +
+        ` Set BACKUP_DIR to a path outside the project.`,
+    );
+    process.exit(1);
+  }
+
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
   }
@@ -86,9 +104,7 @@ async function main() {
   }
 
   console.log(`✅ Verified backup at ${outputFile} (${(size / 1024).toFixed(1)} KB)`);
-  console.log(
-    `   Restore with: psql "$DATABASE_URL" -f "${path.relative(process.cwd(), outputFile)}"`,
-  );
+  console.log(`   Restore with: psql "$DATABASE_URL" -f "${outputFile}"`);
 }
 
 main();
