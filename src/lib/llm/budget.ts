@@ -3,6 +3,8 @@
  * Single source of truth for context sizing, allocations, and fit-to-budget truncation.
  */
 
+import { logger } from "@/src/lib/logger";
+
 export interface BudgetAllocation {
   model: string;
   contextWindow: number;
@@ -25,6 +27,15 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 };
 
 /**
+ * The most retrieved context we will actually send, regardless of how large the
+ * provider's window is. A 1M-token Gemini window leaves ~783k of "context" after
+ * output and instructions, so nothing ever gets truncated and the budget stops
+ * describing anything real — cost, latency and prompt size all grow with the
+ * repo instead of staying bounded.
+ */
+export const MAX_CONTEXT_TOKENS = 32_768;
+
+/**
  * Fast token count estimator using ~4 characters per token ratio.
  */
 export function estimateTokens(text: string): number {
@@ -39,19 +50,24 @@ export function computeBudget(
   modelId: string = "gemini-flash-latest",
   customMaxOutput?: number,
 ): BudgetAllocation {
-  const contextWindow =
-    MODEL_CONTEXT_WINDOWS[modelId] ?? MODEL_CONTEXT_WINDOWS["default"];
+  const contextWindow = MODEL_CONTEXT_WINDOWS[modelId];
+  if (contextWindow === undefined) {
+    logger.warn(
+      `[Budget] Unknown model "${modelId}" — falling back to the default context window. Add it to MODEL_CONTEXT_WINDOWS.`,
+    );
+  }
+  const window = contextWindow ?? MODEL_CONTEXT_WINDOWS["default"];
   const output = customMaxOutput ?? 2048;
   const instructions = 1500;
-  const remaining = Math.max(0, contextWindow - output - instructions);
+  const remaining = Math.max(0, window - output - instructions);
 
   return {
     model: modelId,
-    contextWindow,
+    contextWindow: window,
     instructions,
     output,
     history: Math.floor(remaining * 0.25),
-    context: Math.floor(remaining * 0.75),
+    context: Math.min(Math.floor(remaining * 0.75), MAX_CONTEXT_TOKENS),
   };
 }
 

@@ -1,8 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+const warnings: string[] = [];
+vi.mock("@/src/lib/logger", () => ({
+  logger: {
+    warn: (message: string) => warnings.push(message),
+    info: () => undefined,
+    error: () => undefined,
+    debug: () => undefined,
+  },
+}));
+
 import {
   computeBudget,
   estimateTokens,
   fitToBudget,
+  MAX_CONTEXT_TOKENS,
   MODEL_CONTEXT_WINDOWS,
 } from "@/src/lib/llm/budget";
 
@@ -22,12 +34,24 @@ describe("Budget Manager Primitive", () => {
     expect(budget.instructions).toBe(1500);
     const expectedRemaining = budget.contextWindow - 2048 - 1500;
     expect(budget.history).toBe(Math.floor(expectedRemaining * 0.25));
-    expect(budget.context).toBe(Math.floor(expectedRemaining * 0.75));
+    expect(budget.context).toBe(
+      Math.min(Math.floor(expectedRemaining * 0.75), MAX_CONTEXT_TOKENS),
+    );
   });
 
-  it("should fall back to default window for unknown model ID", () => {
+  it("caps context at MAX_CONTEXT_TOKENS even when the window is huge", () => {
+    // 1M-token window minus output/instructions leaves ~783k of "context",
+    // which fitToBudget never trims against. The ceiling is what makes the
+    // budget real.
+    expect(computeBudget("gemini-flash-latest").context).toBe(MAX_CONTEXT_TOKENS);
+    expect(computeBudget("gpt-4o").context).toBe(MAX_CONTEXT_TOKENS);
+  });
+
+  it("falls back to the default window for an unknown model ID and says so", () => {
+    warnings.length = 0;
     const budget = computeBudget("unknown-model");
     expect(budget.contextWindow).toBe(MODEL_CONTEXT_WINDOWS["default"]);
+    expect(warnings.join("\n")).toContain("unknown-model");
   });
 
   it("should fit items into budget and truncate when limit is exceeded", () => {
