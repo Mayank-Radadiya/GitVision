@@ -6,8 +6,8 @@ Spec: `TASKS.md` Phase P2 · Decision honoured: D-11 (stay on neon-http)
 | Task | Status | Reason | Commit |
 | --- | --- | --- | --- |
 | T-037 | done | One ownership check repo-wide. `ProjectAccessError extends TRPCError` with `NOT_FOUND`, so a foreign project id answers 404 (not 500) out of a tRPC router while every `instanceof ProjectAccessError` catch in the route handlers keeps working unchanged. `verifyOwnership` deleted, 8 internal call sites repointed at the guard. | `9907918` |
-| T-045 | todo | — | — |
-| T-050 | todo | — | — |
+| T-045 | done | **Deviation from the task text, deliberate.** The risk note said to add a `syncedAt` marker because D-11 stays on neon-http. Found `issues_project_id_issue_number_unique` on `(project_id, issue_number)` already in `db/schema.ts:292`, which allows a strictly better fix: upsert-then-prune instead of delete-then-repull. An interrupted sync can then only leave *extra* rows, never a wiped project — so the window the marker guards ("issues exist but are incomplete and unmarked") is unreachable, and no marker, no second project-level column, no reader changes. Also: `batch.find()` → one `Map` per batch, and the 2,000 cap now returns an explicit `truncated: boolean`. | `1c74f99` |
+| T-050 | done | Compound keyset `(github_updated_at, id)` for issues, `(github_created_at, id)` for comments, both with over-fetch-one → slice → `{ items, hasMore, nextCursor }`. Ownership left folded in, proven by the three error-parity tests in `issue-comments-ownership.test.ts` passing untouched. **Path in the task is a typo:** it names `src/__tests__/integration/issue-comments-ownership.test.ts`; the real file is `src/__tests__/unit/issue-comments-ownership.test.ts` (a pure-mock unit test). The end-to-end "60 comments reachable" proof needs a real database, which this environment does not have — the 11 new tests prove the contract, not the SQL. | `a092b7e` |
 | T-051 | todo | — | — |
 | T-055 | todo | Must rebase and re-check `db/migrations/` before `db:generate`. | — |
 | T-056 | todo | — | — |
@@ -58,3 +58,7 @@ specified to add tests to exactly those files: they will be written but
 Baseline after T-037 in this worktree: `bun run typecheck` clean,
 `bun run lint` clean, `bun run test` 34 files passed / 2 skipped,
 184 tests passed / 11 skipped, 66.7s.
+
+After T-045: 36 files passed / 2 skipped, 190 tests passed / 14 skipped.
+After T-050: `bun run typecheck` clean, `bun run lint` clean, `bun run test`
+**37 files passed / 2 skipped, 201 tests passed / 14 skipped, 57.2s.**
