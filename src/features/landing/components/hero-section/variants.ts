@@ -1,7 +1,11 @@
 import type { Variants } from "framer-motion";
 
 export const fadeInUpVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
+  // No `opacity: 0` here on purpose. The `initial="hidden"` state is shipped
+  // to the browser as inline CSS, so starting at zero opacity leaves the
+  // hero — including the LCP <h1> — invisible until hydration finishes.
+  // The slide still reads as an entrance; it just never starts invisible.
+  hidden: { y: 20 },
   visible: (delay = 0) => ({
     opacity: 1,
     y: 0,
