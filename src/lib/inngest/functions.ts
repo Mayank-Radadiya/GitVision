@@ -5,11 +5,17 @@ import {
   codeEmbeddings,
   rateLimitsTable,
 } from "@/db/schema";
-import { eq, and, ne, sql, sum, lt } from "drizzle-orm";
+import { eq, and, ne, sql, sum, lt, asc } from "drizzle-orm";
 import { getRepositoryFiles, syncIssuesAndComments } from "../github";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 import { logger } from "@/src/lib/logger";
+
+// Ceilings for the embedding pipeline's file load. The SQL LIMIT bounds how much
+// of the repo enters memory (and the Inngest step payload); the per-file cap
+// bounds what one minified bundle can do to a single ingestion call.
+const MAX_EMBEDDING_FILES = 500;
+const MAX_EMBEDDING_FILE_CHARS = 50_000;
 
 // ---------------------------------------------------------------------------
 // 1. Project Created — imports files, syncs issues, auto-triggers embeddings
@@ -137,15 +143,27 @@ export const generateEmbeddings = inngest.createFunction(
         return { claimed: false, files: [] };
       }
 
-      // We own the pipeline — load all files
-      const allFiles = await db
+      // We own the pipeline — load the files, bounded. This result is
+      // serialized into the Inngest step payload, so an unbounded read of a
+      // large repo can exceed the step-output limit and lose the whole run.
+      // Order by shortest first so the cap keeps the small, high-signal files
+      // and slice any single body that is still oversized.
+      const rows = await db
         .select({
           id: projectFiles.id,
           fileName: projectFiles.fileName,
           code: projectFiles.code,
         })
         .from(projectFiles)
-        .where(eq(projectFiles.projectId, projectId));
+        .where(eq(projectFiles.projectId, projectId))
+        .orderBy(asc(sql<number>`length(${projectFiles.code})`))
+        .limit(MAX_EMBEDDING_FILES);
+
+      const allFiles = rows.map((f) =>
+        f.code.length > MAX_EMBEDDING_FILE_CHARS
+          ? { ...f, code: `${f.code.slice(0, MAX_EMBEDDING_FILE_CHARS)}\n// ... truncated` }
+          : f,
+      );
 
       logger.info(
         `[Inngest] Found ${allFiles.length} files for embedding in project ${projectId}`,

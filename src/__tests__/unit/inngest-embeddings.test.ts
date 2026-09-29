@@ -5,6 +5,8 @@ type Row = unknown[];
 // Terminal results for every awaited query, in the order functions.ts issues them.
 let results: Row[] = [];
 let updates: Record<string, unknown>[] = [];
+// Every `.limit(n)` the code under test issues, in order.
+let limits: number[] = [];
 
 function chain() {
   // Selects always yield rows. An update yields rows only when `.returning()` is
@@ -14,9 +16,13 @@ function chain() {
     then: (resolve: (value: unknown[]) => unknown) =>
       Promise.resolve(expectsRows ? (results.shift() ?? []) : []).then(resolve),
   };
-  for (const method of ["select", "from", "where", "limit", "orderBy", "values", "insert", "delete"]) {
+  for (const method of ["select", "from", "where", "orderBy", "values", "insert", "delete"]) {
     builder[method] = () => builder;
   }
+  builder.limit = (n: number) => {
+    limits.push(n);
+    return builder;
+  };
   builder.returning = () => {
     expectsRows = true;
     return builder;
@@ -60,6 +66,7 @@ vi.mock("@/src/features/rag/services/rag-ingestion", () => ({
 vi.mock("@/src/lib/github", () => ({ getRepositoryFiles: vi.fn(), syncIssuesAndComments: vi.fn() }));
 
 import { generateEmbeddings } from "@/src/lib/inngest/functions";
+import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 
 const step = {
   run: async (_name: string, fn: () => Promise<unknown>) => fn(),
@@ -77,6 +84,7 @@ async function run() {
 
 beforeEach(() => {
   updates = [];
+  limits = [];
   // claim, files, embedding count, token sum
   results = [
     [{ id: "project-1" }],
@@ -111,5 +119,21 @@ describe("generateEmbeddings finalize", () => {
     const final = updates.at(-1)!;
     expect(final.embeddingStatus).toBe("completed");
     expect(final.embeddingProgress).toBe(100);
+  });
+});
+
+describe("generateEmbeddings Prepare", () => {
+  it("bounds the projectFiles read in SQL and truncates each file body", async () => {
+    const big = "x".repeat(200_000);
+    results[1] = [{ id: "f1", fileName: "big.ts", code: big }];
+    fileResults = [{ fileId: "f1", filePath: "big.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false }];
+
+    await run();
+
+    // A LIMIT must be pushed into the query, not applied in JS.
+    expect(limits).toEqual([expect.any(Number)]);
+    // The body handed on to the Inngest step must be capped.
+    const call = vi.mocked(processFileForRag).mock.calls[0];
+    expect(call[2].length).toBeLessThan(big.length);
   });
 });
