@@ -99,11 +99,16 @@ export async function getRepositoryFiles(
       error: error instanceof Error ? error.message : "Unknown error",
     });
 
+    // Carry the underlying reason in the message: this error is what lands in
+    // the Inngest retry log, and "Failed to fetch repository files" on its own
+    // tells an operator nothing about which stage broke.
+    const reason = error instanceof Error ? error.message : String(error);
+
     throw new GitHubError(
-      "Failed to fetch repository files",
+      `Failed to fetch repository files: ${reason}`,
       "FILE_FETCH_ERROR",
       500,
-      { originalError: error instanceof Error ? error.message : String(error) },
+      { originalError: reason },
     );
   }
 }
