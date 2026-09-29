@@ -12,9 +12,9 @@ function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <>
       <div className="bg-background relative flex min-h-screen flex-col items-center justify-center overflow-hidden">
-        <div className="bg-grid-small-black/10 dark:bg-grid-small-white/5 absolute inset-0"></div>
+        <div className="bg-grid-small-black dark:bg-grid-small-white absolute inset-0"></div>
         <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_0%,black_80%)]"></div>
-        <div className="bg-grid-small-black/20 dark:bg-grid-small-white/5 absolute inset-0"></div>
+        <div className="bg-grid-small-black dark:bg-grid-small-white absolute inset-0"></div>
         <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
         <div className="bg-primary/5 dark:bg-primary/10 absolute top-0 -left-1/4 h-125 w-125 rounded-full blur-[120px]"></div>
         <div className="absolute -right-1/4 bottom-0 h-125 w-125 rounded-full bg-emerald-500/5 blur-[120px] dark:bg-emerald-500/10"></div>

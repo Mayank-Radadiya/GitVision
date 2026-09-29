@@ -12,7 +12,7 @@ function FeaturesSection() {
   return (
     <section id="features" ref={ref} className="relative overflow-hidden py-28">
       {/* Background */}
-      <div className="bg-grid-small-black/15 dark:bg-grid-small-white/3 absolute inset-0" />
+      <div className="bg-grid-small-black dark:bg-grid-small-white absolute inset-0" />
       <div className="bg-background absolute inset-0 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]" />
 
       {/* Ambient orbs */}

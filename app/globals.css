@@ -473,3 +473,33 @@ body {
   }
 }
 
+
+/* ── Utilities referenced by components but never defined ──────────────────
+ * `bg-grid-small-black` and `bg-grid-small-white` are used by the landing
+ * page, the auth layout and the dashboard hero to draw a faint grid backdrop.
+ * With no definition they resolved to nothing, so those backgrounds rendered
+ * as flat colour. Callers used an opacity modifier (`/10`..`/20`), which a
+ * `@utility` name cannot absorb, so the numeric suffix was dropped and the
+ * light/dark split is carried by the existing `dark:` variants instead. */
+
+@utility bg-grid-small-black {
+  background-image:
+    linear-gradient(to right, rgb(0 0 0 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@utility bg-grid-small-white {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

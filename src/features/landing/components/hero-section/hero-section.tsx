@@ -27,7 +27,7 @@ function HeroSection() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <section className="bg-grid-small-black/20 dark:bg-grid-small-white/5 relative flex min-h-screen flex-col justify-center overflow-hidden pt-32 pb-24">
+      <section className="bg-grid-small-black dark:bg-grid-small-white relative flex min-h-screen flex-col justify-center overflow-hidden pt-32 pb-24">
         <HeroBackground />
 
         <div className="relative z-10 container mx-auto px-4">
