@@ -13,7 +13,7 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { rateLimit, keys } from "@/src/lib/rate-limit";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
-import { spendCredits, CHAT_TURN_COST } from "@/src/lib/credits";
+import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
 import { categorizeModelError } from "@/src/shared/lib/chat-errors";
@@ -431,11 +431,29 @@ export async function POST(req: Request) {
 
     let activeRetrievalPath: "rag" | "small-dump" | "not-indexed" = "not-indexed";
 
+    // The credit is charged before the model runs, so a turn that never
+    // produces an answer — provider error, timeout, user navigating away —
+    // would otherwise cost the user money for nothing. An abort is reported by
+    // the AI SDK through more than one channel, so the refund is latched: it
+    // runs at most once per request no matter how many times it is signalled.
+    let refunded = false;
+    const refundOnce = async () => {
+      if (refunded) return;
+      refunded = true;
+      try {
+        await refundCredits(userId, CHAT_TURN_COST);
+      } catch (error) {
+        console.error("[Chat] Credit refund failed:", error);
+      }
+    };
+
     const stream = createUIMessageStream({
       onError: (error) => {
         if (req.signal.aborted) {
+          void refundOnce();
           return JSON.stringify({ code: "aborted", message: "" });
         }
+        void refundOnce();
         const { code, message } = categorizeModelError(error);
         console.error("[Chat] Stream error:", error);
         return JSON.stringify({ code, message });
@@ -568,8 +586,10 @@ export async function POST(req: Request) {
             // `onFinish` also fires when the stream aborts or errors, in which
             // case `text` holds a truncated fragment. Persisting that as a
             // complete answer makes the history permanently wrong, so only
-            // genuinely-completed generations are stored.
+            // genuinely-completed generations are stored — and only a completed
+            // generation keeps the credit it was charged.
             if (finishReason !== "stop" && finishReason !== "length") {
+              await refundOnce();
               return;
             }
             if (chatId) {

@@ -45,3 +45,28 @@ export async function spendCredits(
 
   return rows[0]?.credits ?? null;
 }
+
+/**
+ * Return `cost` credits to a user whose work did not complete.
+ *
+ * The counterpart to `spendCredits`, for the case where the charge succeeded but
+ * the thing being paid for did not happen — a model error, a timeout, the user
+ * navigating away mid-stream.
+ *
+ * @returns the new balance, or null if the user no longer exists.
+ */
+export async function refundCredits(
+  userId: string,
+  cost: number,
+): Promise<number | null> {
+  const rows = await db
+    .update(usersTable)
+    .set({
+      credits: sql`${usersTable.credits} + ${cost}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(usersTable.id, userId))
+    .returning({ credits: usersTable.credits });
+
+  return rows[0]?.credits ?? null;
+}
