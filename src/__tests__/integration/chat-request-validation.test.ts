@@ -218,4 +218,23 @@ describe("POST /api/chat request validation", () => {
 
     expect(response.status).not.toBe(400);
   });
+
+  // mode/projectId must agree. A project-mode request with no projectId used to
+  // skip authorization and fall through to the general prompt, so the caller
+  // got a generic answer to a question that was never asked of it.
+  it("rejects project mode without a projectId", async () => {
+    const response = await post({ ...VALID, mode: "project" });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a projectId supplied with general mode", async () => {
+    const response = await post({
+      ...VALID,
+      mode: "general",
+      projectId: VALID_UUID,
+    });
+
+    expect(response.status).toBe(400);
+  });
 });

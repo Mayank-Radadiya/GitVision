@@ -124,6 +124,25 @@ export const chatRequestSchema = z
     mode: z.enum(["general", "project"]).default("general"),
   })
   .superRefine((value, ctx) => {
+    // `mode` and `projectId` have to agree. The route gates every project
+    // branch on `mode === "project" && projectId`, so a project-mode request
+    // with no projectId used to skip authorization and then quietly answer from
+    // the general prompt — a generic reply to a question nobody asked.
+    if (value.mode === "project" && !value.projectId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["projectId"],
+        message: "A projectId is required in project mode",
+      });
+    }
+    if (value.mode === "general" && value.projectId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["projectId"],
+        message: "A projectId cannot be sent in general mode",
+      });
+    }
+
     let total = 0;
     for (const [index, message] of value.messages.entries()) {
       const text = extractMessageText(message);
