@@ -35,13 +35,17 @@ export function extractMessageText(msg: unknown): string {
 }
 
 export interface ModelMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
 }
 
 /**
  * Normalizes an array of incoming chat messages (whether UIMessage with parts or traditional message with content)
  * into standard ModelMessage objects with role & string content required by AI SDK streamText.
+ *
+ * SECURITY: this input is fully client-controlled. Only "assistant" is honoured from the
+ * client; every other role (including "system") is coerced to "user" so a client cannot
+ * inject instructions that reach the model with system authority.
  */
 export function normalizeMessagesForModel(messages: unknown[]): ModelMessage[] {
   if (!Array.isArray(messages)) return [];
@@ -52,12 +56,7 @@ export function normalizeMessagesForModel(messages: unknown[]): ModelMessage[] {
     if (!msg || typeof msg !== "object") continue;
     const m = msg as Record<string, unknown>;
 
-    const role: "user" | "assistant" | "system" =
-      m.role === "assistant"
-        ? "assistant"
-        : m.role === "system"
-          ? "system"
-          : "user";
+    const role: "user" | "assistant" = m.role === "assistant" ? "assistant" : "user";
 
     const content = extractMessageText(m);
     if (content) {

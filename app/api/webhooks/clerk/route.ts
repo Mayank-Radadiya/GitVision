@@ -56,6 +56,11 @@ export async function POST(req: Request) {
         [first_name, last_name].filter(Boolean).join(" ") || "unknown";
 
       if (email) {
+        // Conflict on the PRIMARY KEY (Clerk's user id), not on email.
+        // Email is mutable, so a user who changes their address would
+        // otherwise fail the unique-email constraint and be inserted twice.
+        // credits are set on insert only — a replayed webhook must never
+        // refill a balance.
         await db
           .insert(usersTable)
           .values({
@@ -66,7 +71,7 @@ export async function POST(req: Request) {
             isProUser: false,
           })
           .onConflictDoUpdate({
-            target: usersTable.email,
+            target: usersTable.id,
             set: {
               name,
               email,
@@ -82,8 +87,13 @@ export async function POST(req: Request) {
       }
     }
   } catch (err) {
-    // Log and swallow — a failed webhook must not poison the Svix retry queue.
+    // Surface the failure. Returning 200 here marks the delivery successful,
+    // so Clerk never retries and user provisioning fails silently.
     console.error("Error processing Clerk webhook:", err);
+    return NextResponse.json(
+      { message: "Error processing webhook" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ message: "Webhook received" }, { status: 200 });

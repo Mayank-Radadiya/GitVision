@@ -10,7 +10,7 @@ import {
   usersTable,
   type LanguageEntry,
 } from "@/db/schema";
-import { eq, desc, and, count, sum, sql, or } from "drizzle-orm";
+import { eq, desc, and, count, sum, sql, gte } from "drizzle-orm";
 import { inngest } from "@/src/lib/inngest/client";
 import {
   createNewProject as createGitHubProject,
@@ -150,10 +150,29 @@ export function createProjectService() {
           });
         }
 
-        await db
+        // Atomic, concurrency-safe deduction. The read above is only a fast-fail
+        // for the common case; this guarded UPDATE is the real authority, so two
+        // concurrent requests can never drive the balance negative.
+        const charged = await db
           .update(usersTable)
-          .set({ credits: sql`${usersTable.credits} - 10` })
-          .where(eq(usersTable.id, userId));
+          .set({
+            credits: sql`${usersTable.credits} - 10`,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(usersTable.id, userId), gte(usersTable.credits, 10)))
+          .returning({ credits: usersTable.credits });
+
+        if (charged.length === 0) {
+          // Lost the race against a concurrent request that drained the balance.
+          await db
+            .delete(projectTables)
+            .where(eq(projectTables.id, projectId));
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Insufficient AI credits. You need 10 credits to create a project.",
+          });
+        }
 
         return {
           projectId,
@@ -746,55 +765,6 @@ export function createProjectService() {
         openPRsCount: Number(countRow?.openPRs ?? 0),
         items,
       };
-    },
-
-    /**
-     * NEW — getRecentTriageIssues
-     * Fetches the top 5 open Issues/PRs across ALL of the user's projects
-     * that have been AI-triaged as 'high' or 'medium' complexity.
-     *
-     * Powers the "Needs Attention" triage widget on the dashboard.
-     * Returns `null` for aiComplexity when the background job hasn't run yet.
-     */
-    async getRecentTriageIssues(userId: string, limit = 5) {
-      const safeLimit = Math.min(limit, 20);
-
-      return db
-        .select({
-          id: issuesTable.id,
-          title: issuesTable.title,
-          issueNumber: issuesTable.issueNumber,
-          isPullRequest: issuesTable.isPullRequest,
-          state: issuesTable.state,
-          authorLogin: issuesTable.authorLogin,
-          authorAvatar: issuesTable.authorAvatar,
-          projectId: issuesTable.projectId,
-          projectName: projectTables.projectName,
-          githubUpdatedAt: issuesTable.githubUpdatedAt,
-          aiSummary: issuesTable.aiSummary, // ← one-line AI description
-          aiComplexity: issuesTable.aiComplexity, // ← 'high' | 'medium' | 'low'
-          aiTags: issuesTable.aiTags, // ← string[] e.g. ["Bug Fix", "Auth"]
-        })
-        .from(issuesTable)
-        .innerJoin(projectTables, eq(issuesTable.projectId, projectTables.id))
-        .where(
-          and(
-            eq(projectTables.ownerId, userId),
-            eq(issuesTable.state, "open"),
-            // Only return triaged items; null complexity = not yet processed
-            or(
-              eq(issuesTable.aiComplexity, "high"),
-              eq(issuesTable.aiComplexity, "medium"),
-            ),
-          ),
-        )
-        .orderBy(
-          // 'high' before 'medium' — use native sort order (h < m alphabetically doesn't work,
-          // so use a CASE expression for explicit priority)
-          sql`CASE ${issuesTable.aiComplexity} WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`,
-          desc(issuesTable.githubUpdatedAt),
-        )
-        .limit(safeLimit);
     },
 
     // ── Issue Queries ─────────────────────────────────────────────────────────

@@ -74,6 +74,36 @@ export const generateEmbeddings = inngest.createFunction(
       },
     ],
     triggers: [{ event: "embeddings/generate" }],
+    // The pipeline claims `embeddingStatus: "processing"` in its first step.
+    // Without this hook, any failure that escapes a step — an exhausted retry,
+    // a step timeout, or a hard crash — left the project stuck in "processing"
+    // forever with no way for the UI to explain why. `onFailure` is the single
+    // place every terminal failure routes through, so marking the row here
+    // covers all of them at once.
+    onFailure: async ({ event, error }) => {
+      const failedProjectId = event.data.event.data?.projectId;
+
+      if (!failedProjectId) {
+        logger.error(
+          `[Inngest] generateEmbeddings failed but no projectId on the event: ${error.message}`,
+        );
+        return;
+      }
+
+      logger.error(
+        `[Inngest] generateEmbeddings exhausted retries for ${failedProjectId}: ${error.message}`,
+      );
+
+      await db
+        .update(projectTables)
+        .set({
+          embeddingStatus: "failed",
+          embeddingError: `Embedding job failed after all retries: ${error.message}`,
+          lastEmbeddingAttempt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(projectTables.id, failedProjectId));
+    },
   },
   async ({ event, step }) => {
     const { projectId } = event.data;
@@ -283,15 +313,17 @@ export const cleanupStaleData = inngest.createFunction(
     triggers: [{ cron: "0 3 * * *" }],
   },
   async ({ step }) => {
-    // 1. Purge expired rate limit windows (> 24h old)
+    // 1. Purge expired rate limit windows (> 24h old).
+    // rate_limits has no createdAt/id column — windowStart is the only
+    // timestamp, and a rate limit row is dead once its window has elapsed.
     const rateLimitResult = await step.run(
       "Clean Expired Rate Limits",
       async () => {
         const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const deleted = await db
           .delete(rateLimitsTable)
-          .where(lt(rateLimitsTable.createdAt, dayAgo))
-          .returning({ id: rateLimitsTable.id });
+          .where(lt(rateLimitsTable.windowStart, dayAgo))
+          .returning({ limitKey: rateLimitsTable.limitKey });
 
         logger.info(
           `[Retention] Cleaned ${deleted.length} expired rate limit entries`,

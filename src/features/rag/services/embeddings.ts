@@ -22,6 +22,27 @@ export function getOpenRouterClient(): OpenRouter {
 const EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
 const EMBEDDING_DIMENSIONS = 768;
 
+// A hung provider connection would otherwise park the caller until Inngest's
+// step timeout expires, burning the whole budget on one request. Fail fast so
+// the retry policy below gets a chance to run.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+// The SDK only retries when a policy is passed explicitly (its default branch
+// is "no retry"), so an unsupplied policy meant a single transient 429 or
+// connection blip permanently failed one chunk with no backoff. The SDK's own
+// default backoff allows up to an hour of elapsed retrying, which is far too
+// long inside a batched ingestion loop — cap it well under the step timeout.
+const REQUEST_RETRIES = {
+  strategy: "backoff" as const,
+  retryConnectionErrors: true,
+  backoff: {
+    initialInterval: 500,
+    maxInterval: 10_000,
+    exponent: 1.5,
+    maxElapsedTime: 20_000,
+  },
+};
+
 // Rate limiting configuration (OpenRouter has higher limits than Gemini free tier)
 const RATE_LIMIT = {
   minDelayMs: 200, // 200ms between requests
@@ -67,14 +88,17 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   await applyRateLimit();
 
   const client = getOpenRouterClient();
-  const result = await client.embeddings.generate({
-    requestBody: {
-      model: EMBEDDING_MODEL,
-      input: text,
-      encodingFormat: "float",
-      dimensions: EMBEDDING_DIMENSIONS,
+  const result = await client.embeddings.generate(
+    {
+      requestBody: {
+        model: EMBEDDING_MODEL,
+        input: text,
+        encodingFormat: "float",
+        dimensions: EMBEDDING_DIMENSIONS,
+      },
     },
-  });
+    { timeoutMs: REQUEST_TIMEOUT_MS, retries: REQUEST_RETRIES },
+  );
 
   if (typeof result === "string") {
     throw new Error(`Unexpected string response from OpenRouter: ${result}`);

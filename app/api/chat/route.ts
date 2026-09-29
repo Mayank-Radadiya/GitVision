@@ -407,6 +407,14 @@ export async function POST(req: Request) {
       );
     }
 
+    // Authorize the project BEFORE any write or charge. Previously this ran
+    // after the user message was inserted and the credit spent, so an
+    // unauthorized request burned a credit and left an orphaned user turn.
+    // ProjectAccessError is converted to a 404 by the outer catch.
+    if (mode === "project" && projectId) {
+      await assertProjectOwnership(projectId, userId);
+    }
+
     // Verify chat ownership and store user message
     if (chatId) {
       const [chat] = await db
@@ -465,8 +473,6 @@ export async function POST(req: Request) {
     } | null = null;
 
     if (mode === "project" && projectId) {
-      await assertProjectOwnership(projectId, userId);
-
       const [project] = await db
         .select({
           projectName: projectTables.projectName,
@@ -615,7 +621,14 @@ export async function POST(req: Request) {
           abortSignal: req.signal,
           system: systemPrompt,
           messages: normalizeMessagesForModel(messages),
-          onFinish: async ({ text }) => {
+          onFinish: async ({ text, finishReason }) => {
+            // `onFinish` also fires when the stream aborts or errors, in which
+            // case `text` holds a truncated fragment. Persisting that as a
+            // complete answer makes the history permanently wrong, so only
+            // genuinely-completed generations are stored.
+            if (finishReason !== "stop" && finishReason !== "length") {
+              return;
+            }
             if (chatId) {
               await Promise.all([
                 db.insert(chatMessages).values({

@@ -5,7 +5,7 @@
 
 import { db } from "@/db";
 import { codeEmbeddings, projectFiles } from "@/db/schema";
-import { cosineDistance, desc, gt, sql, eq, and, inArray } from "drizzle-orm";
+import { cosineDistance, sql, eq, and, asc, lt } from "drizzle-orm";
 import { estimateTokens, fitToBudget } from "@/src/lib/llm/budget";
 
 export interface SearchResult {
@@ -33,8 +33,14 @@ export async function searchSimilarCode(
   minSimilarity: number = 0.7,
 ): Promise<SearchResult[]> {
   try {
-    // Calculate cosine similarity (1 - distance)
-    const similarity = sql<number>`1 - (${cosineDistance(codeEmbeddings.embedding, queryEmbedding)})`;
+    // Work in cosine *distance* space, which is what `embeddings_vector_idx`
+    // (hnsw ... vector_cosine_ops) is built on. Ordering by `1 - distance` —
+    // the `similarity` alias — is the form pgvector documents as index-defeating,
+    // because `1 - x` is not a vector operator. `similarity > min` is also
+    // rewritten as `distance < 1 - min`, which is the identical filter.
+    const distance = cosineDistance(codeEmbeddings.embedding, queryEmbedding);
+    const similarity = sql<number>`1 - (${distance})`;
+    const maxDistance = 1 - minSimilarity;
 
     const results = await db
       .select({
@@ -49,10 +55,10 @@ export async function searchSimilarCode(
       .where(
         and(
           eq(codeEmbeddings.projectId, projectId),
-          gt(similarity, minSimilarity),
+          lt(distance, maxDistance),
         ),
       )
-      .orderBy(desc(similarity))
+      .orderBy(asc(distance))
       .limit(limit);
 
     return results;
@@ -60,112 +66,6 @@ export async function searchSimilarCode(
     console.error("Error searching similar code:", error);
     throw new Error(
       `Failed to search similar code: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-/**
- * Get full file content for specific file paths
- * Used when user explicitly asks about a file
- *
- * @param projectId - Project ID
- * @param filePaths - Array of file paths to retrieve
- * @returns Array of file contents
- */
-export async function getFilesByPath(
-  projectId: string,
-  filePaths: string[],
-): Promise<
-  Array<{ filePath: string; content: string; language: string | null }>
-> {
-  try {
-    const results = await db
-      .select({
-        filePath: projectFiles.fileName,
-        content: projectFiles.code,
-        language: projectFiles.language,
-      })
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          inArray(projectFiles.fileName, filePaths),
-        ),
-      );
-
-    return results;
-  } catch (error) {
-    console.error("Error getting files by path:", error);
-    throw new Error(
-      `Failed to get files: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-/**
- * Search for a single file by path (fuzzy match)
- *
- * @param projectId - Project ID
- * @param filePath - File path or partial path
- * @returns Matching file or null
- */
-export async function searchFileByPath(
-  projectId: string,
-  filePath: string,
-): Promise<{
-  filePath: string;
-  content: string;
-  language: string | null;
-} | null> {
-  try {
-    // Try exact match first
-    const exactMatch = await db
-      .select({
-        filePath: projectFiles.fileName,
-        content: projectFiles.code,
-        language: projectFiles.language,
-      })
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          eq(projectFiles.fileName, filePath),
-        ),
-      )
-      .limit(1);
-
-    if (exactMatch.length > 0) {
-      return exactMatch[0];
-    }
-
-    // Try fuzzy match (file name only)
-    const fileName = filePath.split("/").pop();
-    if (fileName) {
-      const fuzzyMatch = await db
-        .select({
-          filePath: projectFiles.fileName,
-          content: projectFiles.code,
-          language: projectFiles.language,
-        })
-        .from(projectFiles)
-        .where(
-          and(
-            eq(projectFiles.projectId, projectId),
-            sql`${projectFiles.fileName} LIKE ${`%${fileName}%`}`,
-          ),
-        )
-        .limit(1);
-
-      if (fuzzyMatch.length > 0) {
-        return fuzzyMatch[0];
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error searching file by path:", error);
-    throw new Error(
-      `Failed to search file: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -335,7 +235,10 @@ export async function searchSimilarCodeInFile(
   limit: number = 6,
 ): Promise<SearchResult[]> {
   try {
-    const similarity = sql<number>`1 - (${cosineDistance(codeEmbeddings.embedding, queryEmbedding)})`;
+    // Same distance-space ordering as searchSimilarCode — see the note there
+    // on why `ORDER BY 1 - distance` would bypass the HNSW index.
+    const distance = cosineDistance(codeEmbeddings.embedding, queryEmbedding);
+    const similarity = sql<number>`1 - (${distance})`;
 
     const results = await db
       .select({
@@ -353,7 +256,7 @@ export async function searchSimilarCodeInFile(
           eq(codeEmbeddings.filePath, filePath),
         ),
       )
-      .orderBy(desc(similarity))
+      .orderBy(asc(distance))
       .limit(limit);
 
     return results;
