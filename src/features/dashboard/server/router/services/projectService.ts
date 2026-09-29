@@ -210,7 +210,9 @@ export function createProjectService() {
 
     /**
      * Re-syncs issues and PRs for an existing project.
-     * Deletes stale records first to prevent duplicates.
+     *
+     * No delete here: `syncIssuesAndComments` pulls from GitHub first and
+     * then upserts, so a GitHub failure leaves the existing issues intact.
      */
     async syncIssues(projectId: string, userId: string) {
       await assertProjectOwnership(projectId, userId);
@@ -228,8 +230,6 @@ export function createProjectService() {
         });
       }
 
-      await db.delete(issuesTable).where(eq(issuesTable.projectId, projectId));
-
       const result = await syncIssuesAndComments(
         project[0].githubUrl,
         projectId,
@@ -239,6 +239,7 @@ export function createProjectService() {
         success: true,
         issuesFetched: result.issuesFetched,
         commentsFetched: result.commentsFetched,
+        truncated: result.truncated,
       };
     },
 

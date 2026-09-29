@@ -6,6 +6,7 @@
 // Single GraphQL query fetches issues, PRs, and their nested comments.
 // Replaces the REST N+1 approach that triggered hundreds of round-trips.
 
+import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { issuesTable, issueCommentsTable } from "@/db/schema";
 import type { GraphQLIssuesData, IssueOrPrNode } from "../types";
@@ -21,14 +22,26 @@ import { parseGitHubUrl, log } from "../utils";
  * Fetches the INITIAL_ISSUE_COUNT most recently updated items.
  * Older issues can be synced via a "Sync Older Issues" UI button.
  *
+ * The sync is upsert-then-prune, never delete-then-repull: every row is
+ * read from GitHub into memory before the first write, and each write is
+ * an upsert on `issues_project_id_issue_number_unique`. An interrupted
+ * sync can therefore only ever leave EXTRA rows behind — it can never
+ * leave a project whose issues have been wiped, which is what a delete
+ * first made possible.
+ *
  * @param githubUrl - Full GitHub repository URL
  * @param projectId - UUID of the project
- * @returns Counts of issues and comments stored
+ * @returns Counts of issues and comments stored, plus whether the page cap
+ *   stopped the pull before GitHub was exhausted
  */
 export const syncIssuesAndComments = async (
   githubUrl: string,
   projectId: string,
-): Promise<{ issuesFetched: number; commentsFetched: number }> => {
+): Promise<{
+  issuesFetched: number;
+  commentsFetched: number;
+  truncated: boolean;
+}> => {
   try {
     const { owner, repo } = parseGitHubUrl(githubUrl);
     log("info", "Fetching issues + PRs via GraphQL", {
@@ -48,6 +61,9 @@ export const syncIssuesAndComments = async (
     ) => {
       for (let i = 0; i < nodes.length; i += batchSize) {
         const batch = nodes.slice(i, i + batchSize);
+        // Build the lookup once. The old code ran batch.find() per inserted
+        // row, which is O(n^2) inside every batch.
+        const nodesByNumber = new Map(batch.map((node) => [node.number, node]));
 
         const issueRows = batch.map((node) => ({
           issueNumber: node.number,
@@ -67,9 +83,26 @@ export const syncIssuesAndComments = async (
           aiTags: null as string[] | null,
         }));
 
+        // Upsert on the existing (projectId, issueNumber) unique constraint.
+        // `set` deliberately lists only the GitHub-derived columns: the
+        // ai* triage columns belong to the deferred Gemini job and must
+        // survive a re-sync.
         const inserted = await db
           .insert(issuesTable)
           .values(issueRows)
+          .onConflictDoUpdate({
+            target: [issuesTable.projectId, issuesTable.issueNumber],
+            set: {
+              title: sql`excluded.title`,
+              body: sql`excluded.body`,
+              state: sql`excluded.state`,
+              authorLogin: sql`excluded.author_login`,
+              authorAvatar: sql`excluded.author_avatar`,
+              githubCreatedAt: sql`excluded.github_created_at`,
+              githubUpdatedAt: sql`excluded.github_updated_at`,
+              githubClosedAt: sql`excluded.github_closed_at`,
+            },
+          })
           .returning({
             id: issuesTable.id,
             issueNumber: issuesTable.issueNumber,
@@ -77,11 +110,23 @@ export const syncIssuesAndComments = async (
 
         issuesStored += inserted.length;
 
+        // Comments hang off the issue id, which the upsert preserves. Replace
+        // this batch's comments so a re-sync does not double them up. Doing it
+        // per batch keeps a failure here scoped to the batch it hit.
+        if (inserted.length > 0) {
+          await db
+            .delete(issueCommentsTable)
+            .where(
+              inArray(
+                issueCommentsTable.issueId,
+                inserted.map((row) => row.id),
+              ),
+            );
+        }
+
         // ── Insert inline comments for each issue in this batch ──
         for (const dbRow of inserted) {
-          const originalNode = batch.find(
-            (n) => n.number === dbRow.issueNumber,
-          );
+          const originalNode = nodesByNumber.get(dbRow.issueNumber);
           if (!originalNode?.comments?.nodes?.length) continue;
 
           const commentRows = originalNode.comments.nodes.map((c) => ({
@@ -109,6 +154,13 @@ export const syncIssuesAndComments = async (
     let hasMorePrs = true;
     let pages = 0;
 
+    // ── Phase 1: read every page from GitHub into memory. No database
+    // writes happen in this loop, so a GitHub 500, a rate limit or a
+    // dropped connection at any page leaves the project's existing issues
+    // untouched.
+    const issueNodes: IssueOrPrNode[] = [];
+    const prNodes: IssueOrPrNode[] = [];
+
     while (
       (hasMoreIssues || hasMorePrs) &&
       pages < GITHUB_CONFIG.MAX_ISSUE_PAGES
@@ -128,18 +180,15 @@ export const syncIssuesAndComments = async (
 
       const { issues, pullRequests } = gqlResponse.repository;
 
-      // Process issues (isPullRequest = false)
-      await processNodes(issues.nodes, false);
-
-      // Process pull requests (isPullRequest = true)
-      await processNodes(pullRequests.nodes as IssueOrPrNode[], true);
+      issueNodes.push(...issues.nodes);
+      prNodes.push(...(pullRequests.nodes as IssueOrPrNode[]));
 
       hasMoreIssues = issues.pageInfo.hasNextPage;
       hasMorePrs = pullRequests.pageInfo.hasNextPage;
       issueCursor = issues.pageInfo.endCursor;
       prCursor = pullRequests.pageInfo.endCursor;
 
-      log("info", `Synced issues/PRs page ${pages}`, {
+      log("info", `Fetched issues/PRs page ${pages}`, {
         owner,
         repo,
         projectId,
@@ -147,13 +196,53 @@ export const syncIssuesAndComments = async (
       });
     }
 
+    // The page cap is a safety valve, not proof that we saw everything. Report
+    // it rather than presenting a capped pull as a complete one.
+    const truncated = hasMoreIssues || hasMorePrs;
+    if (truncated) {
+      log("warn", "Issue sync hit the page cap before GitHub was exhausted", {
+        owner,
+        repo,
+        projectId,
+        pages,
+        cap: GITHUB_CONFIG.MAX_ISSUE_PAGES,
+      });
+    }
+
+    // ── Phase 2: the pull succeeded, so it is now safe to write ──
+    await processNodes(issueNodes, false);
+    await processNodes(prNodes, true);
+
+    // ── Prune rows GitHub no longer has. Skipped when truncated: a capped
+    // sync never saw the whole set, so "not in this list" does not mean
+    // "gone from the repo", and deleting on that assumption loses data.
+    if (!truncated) {
+      const seen = [
+        ...new Set([...issueNodes, ...prNodes].map((node) => node.number)),
+      ];
+      await db
+        .delete(issuesTable)
+        .where(
+          seen.length > 0
+            ? and(
+                eq(issuesTable.projectId, projectId),
+                notInArray(issuesTable.issueNumber, seen),
+              )
+            : eq(issuesTable.projectId, projectId),
+        );
+    }
+
     log(
       "info",
       `Stored ${issuesStored} issues/PRs, ${commentsStored} comments`,
-      { owner, repo, projectId },
+      { owner, repo, projectId, truncated },
     );
 
-    return { issuesFetched: issuesStored, commentsFetched: commentsStored };
+    return {
+      issuesFetched: issuesStored,
+      commentsFetched: commentsStored,
+      truncated,
+    };
   } catch (error) {
     if (
       error instanceof GitHubValidationError ||
