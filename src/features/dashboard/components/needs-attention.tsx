@@ -57,7 +57,7 @@ function NeedsAttention() {
 
       {/* Empty state */}
       {!isLoading && totalItems === 0 && (
-        <p className="text-muted-foreground/60 text-xs">
+        <p className="text-muted-foreground text-xs">
           All clear — no open items
         </p>
       )}
@@ -81,7 +81,9 @@ function NeedsAttention() {
                     : "border-l-2 border-l-amber-500/40",
                 )}
               >
-                <div className="mt-0.5 shrink-0">
+                {/* Decorative: the border colour and the GitHub-shaped glyph both
+                    mark this as a PR, and the #number below says which. */}
+                <div aria-hidden="true" className="mt-0.5 shrink-0">
                   {item.isPullRequest ? (
                     <GitPullRequest className="h-3.5 w-3.5 text-emerald-400" />
                   ) : (

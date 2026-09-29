@@ -118,7 +118,7 @@ function ProjectCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-muted-foreground/60 hover:text-primary mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
+            className="text-muted-foreground hover:text-primary mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             aria-label={`View ${repoPath} on GitHub`}
           >
             <ExternalLink className="h-3 w-3" />
