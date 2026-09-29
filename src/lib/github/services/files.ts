@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import axios from "axios";
 import * as tar from "tar-stream";
 import { createGunzip } from "zlib";
+import { posix } from "path";
 import { computeHash } from "@/src/features/rag/services/code-chunker";
 import { GITHUB_CONFIG } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
@@ -108,6 +109,28 @@ export async function getRepositoryFiles(
 }
 
 /**
+ * Normalises a tar entry name for storage.
+ *
+ * Tarballs from the GitHub tarball API prefix every path with a
+ * `owner-repo-sha` segment, which is stripped. Stripping one segment is not
+ * sanitisation, so the remainder is resolved against the archive root: a name
+ * that still contains a `..` segment, or that resolves outside the root, is
+ * rejected. Returns `null` for such entries.
+ */
+function sanitizeEntryPath(rawName: string): string | null {
+  const relative = rawName.split("/").slice(1).join("/");
+  if (!relative) return null;
+
+  // `path.posix.normalize` collapses `a/./b` and `a/x/../b`; a surviving
+  // leading `..` means the entry still points above the archive root.
+  const normalized = posix.normalize(relative);
+  if (!normalized || normalized === ".." || normalized.startsWith("../")) {
+    return null;
+  }
+  return normalized;
+}
+
+/**
  * Pipe a raw .tar.gz stream through gunzip + tar-stream and insert
  * files into the database in batches (backpressure pattern).
  *
@@ -139,9 +162,14 @@ async function streamAndStoreTarball(
     let skippedCount = 0;
 
     extract.on("entry", (header, entryStream, next) => {
-      const cleanPath = header.name.split("/").slice(1).join("/");
+      const cleanPath = sanitizeEntryPath(header.name);
 
-      // Skip directories, empty paths, and ignored patterns immediately
+      // Skip directories, links, escaping paths, empty paths, and ignored
+      // patterns immediately. `sanitizeEntryPath` returns null for a name that
+      // still walks out of the tree after the leading segment is stripped —
+      // that name is never persisted, rendered in the file tree, or re-emitted
+      // as a RAG citation, where it would be attacker-controlled text in the
+      // AI's context.
       if (header.type !== "file" || !cleanPath || isIgnoredPath(cleanPath)) {
         entryStream.resume();
         return next();
