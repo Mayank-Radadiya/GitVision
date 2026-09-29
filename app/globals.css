@@ -50,10 +50,14 @@ body {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  /* GitVision add-repo identity — see brief */
+  /* GitVision add-repo identity — see brief. These used to load IBM Plex Sans
+     and IBM Plex Mono for the add-repo screens, which pushed the landing page
+     to seven families. The classes are used in around fifty places, so the
+     variables stay and now resolve to the two faces that are already loading:
+     the identity is the type scale and colour, not a third typeface. */
   --font-gv-display: var(--font-gv-display);
-  --font-gv-body: var(--font-gv-body);
-  --font-gv-mono: var(--font-gv-mono);
+  --font-gv-body: var(--font-geist-sans);
+  --font-gv-mono: var(--font-geist-mono);
   --color-gv-void: var(--gv-void);
   --color-gv-graphite: var(--gv-graphite);
   --color-gv-graphite-2: var(--gv-graphite-2);

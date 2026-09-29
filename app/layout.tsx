@@ -1,21 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Fira_Code,
-  Fira_Sans,
-  Bricolage_Grotesque,
-  IBM_Plex_Sans,
-  IBM_Plex_Mono,
-} from "next/font/google";
+import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import Provider from "@/shared/providers/app-provider";
 
-// Optimize font loading with preload strategy
+// Three families, one preload. This was seven with four preloads, which is the
+// worst of both: every family competes for the same connections as the CSS and
+// the hero image, and a preload is an instruction to fetch before the browser
+// gets to prioritise, so four of them were overriding the prioritisation the
+// browser would otherwise do correctly. `Fira_Code` and `Fira_Sans` were also
+// loaded for nothing at all — their CSS variables had no consumer anywhere.
+// The other two are gone because `globals.css` points the create-project
+// identity variables at these, so every `font-gv-body` / `font-gv-mono` class
+// still resolves and no component had to change.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   display: "swap",
+  // The only preload: this is `--font-sans`, so it is on screen first and a
+  // swap-out while it loads is the one flash worth spending bandwidth on.
   preload: true,
 });
 
@@ -23,50 +25,23 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
-  preload: true,
+  // `next/font` preloads by default in a production build, so the absence of
+  // the flag is not the absence of a preload. Verified in the build output:
+  // before this, all three families emitted a `rel="preload" as="font"` link.
+  preload: false,
 });
 
-// Fira Code for headings - technical, precise aesthetic
-const firaCode = Fira_Code({
-  variable: "--font-fira-code",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  preload: true,
-});
-
-// Fira Sans for body - clean, readable
-const firaSans = Fira_Sans({
-  variable: "--font-fira-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-  preload: true,
-});
-
-// ─── GitVision add-repo identity faces (brief §2) ─────────────────────────
-// Bricolage Grotesque — display headlines, step labels
-const bricolage = Bricolage_Grotesque({
+// Bricolage Grotesque — the display face. One headline uses it, and it is the
+// only family here that is not also the body face, which is what makes the
+// hierarchy read as intentional rather than as a font stack that defaulted.
+const gvDisplay = Bricolage_Grotesque({
   variable: "--font-gv-display",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
-});
-
-// IBM Plex Sans — body copy, labels
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-gv-body",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  display: "swap",
-});
-
-// IBM Plex Mono — urls, hashes, counters, captions
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-gv-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  display: "swap",
+  // It appears once, on a heading well below the fold. Preloading it would
+  // spend the connection the body face needs to paint.
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -120,7 +95,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${firaCode.variable} ${firaSans.variable} ${bricolage.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${gvDisplay.variable}`}
     >
       <body className="min-h-screen antialiased bg-background text-foreground">
         <Provider>{children}</Provider>
