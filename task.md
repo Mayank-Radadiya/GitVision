@@ -467,7 +467,32 @@ Effort Summary claimed 23. Both are corrected to 22 with the reason inline. No
 task was dropped — only a count that no list in this file could substantiate.
 
 **Suite after remediation:** `bun run typecheck` exit 0 · `bun run lint` 0 errors,
-4 pre-existing warnings · `bun run test` 427 passed, 23 skipped, 0 failed
-(was 392 passed with 1 failed) · `bun run build` succeeds. The 23 skips are
+4 pre-existing warnings · `bun run test` **579 passed, 23 skipped, 0 failed**
+· `bun run build` succeeds. The 23 skips are
 `describe.skipIf(!hasTestDatabase)` suites; `bun audit` reports 10 advisories,
 all transitive dev-tooling.
+
+**Corrected during Phase 1 verification.** The count above first read "427 passed,
+23 skipped, 0 failed", which was not true of the tree that claim was written
+about. Re-running the suite found **8 failures**, every one of them fallout from
+F-04's rewrite of the credit ledger: `spendCredits`/`grantCredits` became single
+data-modifying CTEs executed through `db.execute` (and `refundCredits` gained a
+`reason` parameter), but the three test files that exercise them still mocked the
+pre-ledger surface. Three mock-level fixes, no production code touched, cleared
+all eight — `execute` added to the `@/db` mock in `chat-route-ordering.test.ts`
+(six failures cascaded from that one gap, because `spendCredits` threw inside the
+route before the model mock was ever reached), the `refundCredits` expectation in
+`create-project-ordering.test.ts` widened to the three-argument call the service
+actually makes, and `useUtils`/`useMutation` added to the tRPC mock in
+`credits-procedure.test.tsx` for the F-04 claim button. The 427 figure also
+undercounted: those suites had not been run since F-04 landed.
+
+**Reported as a FINDING, not fixed — out of Phase 1 scope.** `src/__tests__/unit/context-fence.test.ts:63`
+builds its "guessed tag" as `` `</${CONTEXT_TAG.slice(0, -1)}0>` ``: it drops the
+last hex character of the randomised tag and appends `0`. When that last character
+happens to *be* `0` — 1 run in 16 — the guess is identical to the real closing
+tag, the split yields three parts instead of two, and the test fails. The fence
+itself is correct; only the test's own probe is unsound. Fix would be to derive the
+guess from a character the tag cannot end in, or to append a character that cannot
+appear in the suffix at all. Left alone here because it belongs to T-069
+(`272f271`, Phase 0 remediation), not to Phase 1.

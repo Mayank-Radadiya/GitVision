@@ -96,6 +96,14 @@ vi.mock("@/db", async () => {
         calls.push("insert");
         return chain();
       },
+      // `spendCredits`/`grantCredits` are single data-modifying CTEs, so the
+      // credit write never touches `db.update` any more. The ordering marker
+      // has to move here or the side-effect sequence reads as if no charge
+      // happened at all.
+      execute: async () => {
+        calls.push("update:users");
+        return { rows: [{ balance_after: 42 }] };
+      },
       update: (table: unknown) => {
         if (table === schema.usersTable) {
           calls.push("update:users");

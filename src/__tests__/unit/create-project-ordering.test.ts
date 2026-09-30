@@ -141,6 +141,6 @@ describe("createProject ordering", () => {
 
     expect(calls).toEqual(["spendCredits", "db.delete(project)"]);
     expect(inngest.send).toHaveBeenCalledTimes(1);
-    expect(spend.refund).toHaveBeenCalledWith("user-1", 10);
+    expect(spend.refund).toHaveBeenCalledWith("user-1", 10, "project_creation");
   });
 });

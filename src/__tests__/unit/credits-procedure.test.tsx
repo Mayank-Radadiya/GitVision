@@ -68,19 +68,27 @@ vi.mock("@/src/lib/trpc/client", () => ({
   trpc: new Proxy(
     {},
     {
-      get: (_target, group: string) =>
-        new Proxy(
-          {},
-          {
-            get: (_t2, procedure: string) => ({
-              useQuery: () => {
-                queried.push(`${group}.${procedure}`);
-                if (procedure === "getCredits") return { data: 42 };
-                return { data: { stats: { userCredits: 7 } } };
+      // `useUtils` is a hook, not a procedure group, so it has to short-circuit
+      // the group proxy below — a Proxy over `{}` is not callable.
+      get: (_target, prop: string) =>
+        prop === "useUtils"
+          ? () => ({
+              project: { getCredits: { invalidate: vi.fn() } },
+              user: { getCreditHistory: { invalidate: vi.fn() } },
+            })
+          : new Proxy(
+              {},
+              {
+                get: (_t2, procedure: string) => ({
+                  useQuery: () => {
+                    queried.push(`${prop}.${procedure}`);
+                    if (procedure === "getCredits") return { data: 42 };
+                    return { data: { stats: { userCredits: 7 } } };
+                  },
+                  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+                }),
               },
-            }),
-          },
-        ),
+            ),
     },
   ),
 }));
