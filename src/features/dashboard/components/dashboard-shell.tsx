@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CommandPalette } from "./command-palette";
 import Sidebar from "./sidebar/sidebar";
 import {
   SIDEBAR_WIDTH_COLLAPSED,
@@ -13,10 +14,10 @@ interface DashboardShellProps {
 
 /**
  * Client chrome for the (main) route group. Owns the sidebar collapse state
- * and the Cmd/Ctrl+B shortcut, then composes the fixed Sidebar + content
- * column. `children` is a server-rendered page slot passed through untouched,
- * so pages under this shell stay server components and are not pulled into
- * the client bundle.
+ * and the Cmd/Ctrl+B shortcut, mounts the Cmd/Ctrl+K palette, then composes the
+ * fixed Sidebar + content column. `children` is a server-rendered page slot
+ * passed through untouched, so pages under this shell stay server components
+ * and are not pulled into the client bundle.
  */
 export function DashboardShell({ children }: DashboardShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -46,6 +47,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
       />
+
+      {/* ⌘K palette (F-08). Portalled out of this tree, so where it sits here
+          only decides that it mounts once for the whole route group. */}
+      <CommandPalette />
 
       {/* Main content - desktop padding only; none on mobile (the sidebar is
           hidden below md, so a static paddingLeft would push content
