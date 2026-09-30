@@ -94,6 +94,14 @@ export const projectTables = pgTable(
     indexedFileCount: integer("indexed_file_count").notNull().default(0),
     totalFileCount: integer("total_file_count").notNull().default(0),
     lastEmbeddingAttempt: timestamp("last_embedding_attempt"), // Track when last attempted
+    /**
+     * When this project was last re-synchronised with GitHub (F-14).
+     *
+     * Null means "never re-synced", which is every project created before this
+     * column existed — the staleness cron treats null as stale, so those get one
+     * pass on their first eligible night and then fall on the 30-day cadence.
+     */
+    lastSyncedAt: timestamp("last_synced_at"),
     estimatedTokens: integer("estimated_tokens"), // Total token count across all embeddings — used for project size gate (null = unknown, treat as large)
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

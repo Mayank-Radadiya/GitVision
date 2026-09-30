@@ -128,3 +128,22 @@ export function useSyncIssues(projectId: string) {
     },
   });
 }
+
+/**
+ * Queues an incremental re-sync of the project's files.
+ *
+ * Fire-and-forget by design: the server returns as soon as the Inngest event
+ * is queued, and `lastSyncedAt` is what actually reports completion. So
+ * invalidating `getDetails` here refreshes the header immediately (the
+ * timestamp is still the old one), and the next poll or a page reload picks
+ * up the new value. Invalidating on a timer would be a guess at how long a
+ * tarball takes; the staleness cron guarantees the value converges either way.
+ */
+export function useResyncProject(projectId: string) {
+  const utils = trpc.useUtils();
+  return trpc.project.resync.useMutation({
+    onSuccess: () => {
+      utils.project.getDetails.invalidate({ projectId });
+    },
+  });
+}

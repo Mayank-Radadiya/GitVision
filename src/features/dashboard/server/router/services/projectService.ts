@@ -354,6 +354,47 @@ export function createProjectService() {
       };
     },
 
+    /**
+     * Queues an incremental re-sync of a project's files (F-14).
+     *
+     * Returns as soon as the event is queued — the tarball stream and the
+     * delta re-embedding both happen in the background, so a request that
+     * waited for them would sit on a connection for minutes. `lastSyncedAt` is
+     * the completion signal; it only moves when the run actually finishes.
+     */
+    async resyncProject(projectId: string, userId: string) {
+      await assertProjectOwnership(projectId, userId);
+
+      const project = await db
+        .select({ embeddingStatus: projectTables.embeddingStatus })
+        .from(projectTables)
+        .where(eq(projectTables.id, projectId))
+        .limit(1);
+
+      if (!project || project.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      // A full embedding run owns the project's files. Queuing a re-sync now
+      // would burn a tarball download and then have the Inngest function drop
+      // the result on the floor when it found the project busy, so say so
+      // here instead of letting the user wait for a no-op.
+      if (project[0].embeddingStatus === "processing") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "This project is being indexed right now. Try again once indexing finishes.",
+        });
+      }
+
+      await inngest.send({ name: "project/resync", data: { projectId } });
+
+      return { success: true };
+    },
+
     // ── Commit Queries ────────────────────────────────────────────────────────
 
     /**

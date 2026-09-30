@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "last_synced_at" timestamp;

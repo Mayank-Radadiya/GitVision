@@ -73,6 +73,10 @@ function ProjectOptionsDropdown({
       toast.error(err.message || "Failed to delete project");
     },
   });
+  const resyncMutation = trpc.project.resync.useMutation({
+    onSuccess: () => toast.success("Sync started — this runs in the background"),
+    onError: (err) => toast.error(err.message || "Failed to start sync"),
+  });
 
   const handleDelete = () => {
     deleteMutation.mutate({ projectId });
@@ -92,6 +96,19 @@ function ProjectOptionsDropdown({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onSelect={(e) => e.preventDefault()}
+            onClick={() => resyncMutation.mutate({ projectId })}
+            disabled={resyncMutation.isPending || isDeleting}
+            className="cursor-pointer focus:bg-muted/50"
+          >
+            {resyncMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {resyncMutation.isPending ? "Starting sync..." : "Sync now"}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
@@ -241,6 +258,7 @@ interface ProjectHeaderProps {
   totalFiles: number | null | undefined;
   indexedFileCount?: number | null;
   totalFileCount?: number | null;
+  lastSyncedAt?: Date | string | null;
 }
 
 function extractOwnerRepo(url: string) {
@@ -270,6 +288,7 @@ function ProjectHeader({
   totalFiles,
   indexedFileCount,
   totalFileCount,
+  lastSyncedAt,
 }: ProjectHeaderProps) {
   const router = useRouter();
   const cleanUrl = githubUrl?.replace(/\.git$/, "") || "";
@@ -410,6 +429,19 @@ function ProjectHeader({
                     projectName={projectName || ""}
                   />
                 </div>
+              )}
+
+              {/* When the index was last current. Absent until a re-sync has
+                  run — a project that has never been re-synced says nothing
+                  rather than implying the import timestamp is a sync. */}
+              {!isLoading && lastSyncedAt && (
+                <p className="text-muted-foreground mt-1 text-right text-xs">
+                  Last synced{" "}
+                  {new Date(lastSyncedAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </p>
               )}
             </div>
           </div>

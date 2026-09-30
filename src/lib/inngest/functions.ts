@@ -9,6 +9,7 @@ import { eq, and, ne, sql, sum, lt, asc, isNull, or, gt, inArray } from "drizzle
 import {
   getRepositoryFiles,
   syncIssuesAndComments,
+  resyncRepositoryFiles,
 } from "../github";
 import { parseGitHubUrl } from "../github/utils";
 import { inngest } from "./client";
@@ -568,3 +569,258 @@ export const dailyCreditGrant = inngest.createFunction(
  * outside the cap and stay permanently un-embedded — the delta has to be the
  * exact set of changed ids, uncapped.
  */
+export const resyncProject = inngest.createFunction(
+  {
+    id: "resync-project",
+    // One tarball re-stream per retry against the shared 5,000/hr token pool.
+    // Two is enough to ride out a transient 5xx; the cron is what makes a
+    // genuinely flaky repo retryable a week later, not a tighter retry budget.
+    retries: 2,
+    triggers: [{ event: "project/resync" }],
+    // No status column to write: a failed re-sync leaves the previous index
+    // fully intact and `lastSyncedAt` untouched, so the project is not
+    // stranded. The timestamp *is* the status — it only moves on success.
+    onFailure: async ({ event, error }) => {
+      logger.error(
+        `[Inngest] resyncProject exhausted retries for ${event.data.event.data?.projectId}: ${error.message}`,
+      );
+    },
+  },
+  async ({ event, step }) => {
+    const { projectId } = event.data;
+
+    const [project] = await db
+      .select({ githubUrl: projectTables.githubUrl })
+      .from(projectTables)
+      .where(eq(projectTables.id, projectId))
+      .limit(1);
+
+    if (!project) {
+      logger.warn(`[Inngest] resyncProject skipped: project ${projectId} is gone`);
+      return { success: false, projectId, reason: "not-found" };
+    }
+
+    const { owner, repo } = parseGitHubUrl(project.githubUrl);
+
+    const diff = await step.run("Diff Files", async () => {
+      logger.info(`[Inngest] Re-syncing ${owner}/${repo} for ${projectId}`);
+      return resyncRepositoryFiles(owner, repo, projectId);
+    });
+
+    // Nothing moved. Bail before spending an embedding call, and still stamp
+    // lastSyncedAt — an up-to-date project that is not stamped would be
+    // re-polled by the staleness cron every single night forever.
+    if (diff.changedFileIds.length === 0 && diff.removed === 0) {
+      await step.run("Finalize", async () => {
+        await db
+          .update(projectTables)
+          .set({ lastSyncedAt: new Date() })
+          .where(eq(projectTables.id, projectId));
+      });
+      return {
+        success: true,
+        projectId,
+        changed: 0,
+        removed: 0,
+        unchanged: diff.unchanged,
+        truncated: diff.truncated,
+      };
+    }
+
+    // A full embedding run in flight owns the project's files. Re-embedding
+    // concurrently would double-write every changed file's embeddings, and the
+    // delta ids were computed against a snapshot the full run is about to
+    // replace. lastSyncedAt is left alone so tomorrow's cron retries it.
+    if (diff.changedFileIds.length > 0) {
+      const [state] = await db
+        .select({ embeddingStatus: projectTables.embeddingStatus })
+        .from(projectTables)
+        .where(eq(projectTables.id, projectId))
+        .limit(1);
+
+      if (state?.embeddingStatus === "processing") {
+        logger.warn(
+          `[Inngest] resyncProject deferred for ${projectId}: embeddings already processing`,
+        );
+        return { success: false, projectId, reason: "embeddings-processing" };
+      }
+    }
+
+    // Uncapped by design — these are exactly the files that changed, so there
+    // is nothing to select. Batched so one bad file cannot lose the whole run.
+    const BATCH_SIZE = 5;
+    let embedded = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < diff.changedFileIds.length; i += BATCH_SIZE) {
+      const batchIndex = Math.floor(i / BATCH_SIZE);
+      const batch = diff.changedFileIds.slice(i, i + BATCH_SIZE);
+
+      const batchResult = await step.run(
+        `Re-embed Batch ${batchIndex + 1}`,
+        async () => {
+          const rows = await db
+            .select({
+              id: projectFiles.id,
+              fileName: projectFiles.fileName,
+              code: projectFiles.code,
+            })
+            .from(projectFiles)
+            .where(
+              and(
+                eq(projectFiles.projectId, projectId),
+                inArray(projectFiles.id, batch),
+              ),
+            );
+
+          const results = await Promise.all(
+            rows.map((file) =>
+              processFileForRag(file.id, file.fileName, file.code, projectId),
+            ),
+          );
+
+          return {
+            embedded: results.filter((r) => !r.skipped && !r.error).length,
+            errors: results
+              .filter((r) => r.error)
+              .map((r) => `${r.filePath}: ${r.error}`),
+          };
+        },
+      );
+
+      embedded += batchResult.embedded;
+      errors.push(...batchResult.errors);
+    }
+
+    await step.run("Finalize", async () => {
+      await db
+        .update(projectTables)
+        .set({
+          lastSyncedAt: new Date(),
+          // The tarball pass is authoritative for how many files the repo has,
+          // same as the initial import writes it.
+          totalFiles: diff.totalSeen,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectTables.id, projectId));
+    });
+
+    if (errors.length > 0) {
+      // Stamped anyway: the file reconciliation succeeded and the files are
+      // indexed as far as they were before. Re-polling the whole tarball
+      // nightly over a handful of files the embedding provider choked on
+      // would be a poor trade against the shared GitHub pool.
+      logger.error(
+        `[Inngest] Re-sync completed for ${projectId} with ${errors.length} file error(s): ${errors
+          .slice(0, 3)
+          .join("; ")}`,
+      );
+    }
+
+    logger.info(
+      `[Inngest] ✅ Re-synced ${projectId}: +${diff.added} ~${diff.modified} -${diff.removed} (${embedded} embedded, ${diff.unchanged} unchanged)`,
+    );
+
+    return {
+      success: true,
+      projectId,
+      changed: diff.changedFileIds.length,
+      added: diff.added,
+      modified: diff.modified,
+      removed: diff.removed,
+      unchanged: diff.unchanged,
+      embedded,
+      errors: errors.length,
+      truncated: diff.truncated,
+    };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// 6. Stale Project Re-sync — nightly sweep for stale projects (F-14)
+// ---------------------------------------------------------------------------
+
+/**
+ * Nightly sweep that re-syncs projects nobody has looked at in a while.
+ *
+ * The 5,000/hr GitHub ceiling is one pool for the whole application because
+ * every request spends the same GITHUB_TOKEN — there is no per-project budget
+ * to draw from. So this sweep is bounded three ways, and all three matter:
+ *
+ *   1. Only projects with real recent activity. `updatedAt` moves when a user
+ *      embeds, syncs issues, or otherwise touches the project, so an abandoned
+ *      demo never occupies the pool. Note the failure direction: a project
+ *      whose only recent activity was reading the dashboard is NOT bumped, so
+ *      it gets polled less often than a human would expect. Under-polling is
+ *      the safe direction for a shared budget.
+ *   2. Only projects not already synced in STALE_RESYNC_AFTER_DAYS, so a
+ *      healthy project costs nothing on most nights.
+ *   3. A hard batch cap, so one busy night cannot fan out into hundreds of
+ *      tarball streams. Whatever misses the cap is picked up the next night,
+ *      because lastSyncedAt was not stamped.
+ */
+const STALE_RESYNC_AFTER_DAYS = 30;
+const STALE_RESYNC_BATCH = 20;
+
+export const staleProjectResync = inngest.createFunction(
+  {
+    id: "stale-project-resync",
+    triggers: [{ cron: "0 4 * * *" }],
+    // Same as the other crons: no row to write, so a silent failure would be
+    // indistinguishable from a healthy sweep that found nothing to do.
+    onFailure: async ({ error }) => {
+      logger.error(`[Inngest] staleProjectResync failed: ${error.message}`);
+    },
+  },
+  async ({ step }) => {
+    const candidates = await step.run("Find Stale Projects", async () => {
+      const cutoff = new Date(
+        Date.now() - STALE_RESYNC_AFTER_DAYS * 24 * 60 * 60 * 1000,
+      );
+
+      const rows = await db
+        .select({ id: projectTables.id })
+        .from(projectTables)
+        .where(
+          and(
+            // Stale: never synced, or last synced before the cutoff.
+            or(
+              isNull(projectTables.lastSyncedAt),
+              lt(projectTables.lastSyncedAt, cutoff),
+            ),
+            // Active: touched within the same window. This is the half that
+            // protects the shared token — a project nobody has opened in months
+            // is not worth an API call.
+            gt(projectTables.updatedAt, cutoff),
+          ),
+        )
+        .limit(STALE_RESYNC_BATCH);
+
+      return rows.map((row) => row.id);
+    });
+
+    if (candidates.length === 0) {
+      logger.info("[Inngest] Stale re-sync sweep: nothing to do");
+      return { success: true, triggered: 0 };
+    }
+
+    let triggered = 0;
+    for (const projectId of candidates) {
+      await step.sendEvent(`resync ${projectId}`, {
+        name: "project/resync",
+        data: { projectId },
+      });
+      triggered++;
+    }
+
+    logger.info(
+      `[Inngest] Stale re-sync sweep triggered ${triggered} project(s)${
+        candidates.length >= STALE_RESYNC_BATCH
+          ? " (batch cap reached; remainder next run)"
+          : ""
+      }`,
+    );
+
+    return { success: true, triggered };
+  },
+);

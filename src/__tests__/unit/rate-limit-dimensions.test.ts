@@ -202,7 +202,7 @@ describe("limit table", () => {
   });
 
   it("covers every metered scope the routers and routes actually call", () => {
-    // project.ts: create, generateAiSummary, syncIssues.
+    // project.ts: create, generateAiSummary, syncIssues, resync.
     // app/api/chat/route.ts: chat. app/api/embeddings/route.ts: embeddings
     // (POST + DELETE) and embeddingsRead (GET).
     expect(Object.keys(LIMITS).sort()).toEqual([
@@ -211,6 +211,7 @@ describe("limit table", () => {
       "embeddingsRead",
       "issuesSync",
       "projectCreate",
+      "projectResync",
       "summary",
     ]);
   });

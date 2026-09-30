@@ -59,7 +59,8 @@ export type MeteredScope =
   | "embeddings"
   | "embeddingsRead"
   | "summary"
-  | "issuesSync";
+  | "issuesSync"
+  | "projectResync";
 
 export type LimitScope = "user" | "ip" | "daily";
 
@@ -108,6 +109,15 @@ export const LIMITS: Record<
   issuesSync: {
     user: { limit: 5, windowSeconds: 3600 },
     ip: { limit: 40, windowSeconds: 3600 },
+  },
+  // 5/hour per user, 20/hour per address — the same per-user budget as
+  // `issuesSync`, and a tighter IP ceiling than the 40 that the other sync
+  // uses. A re-sync spends one of the 5,000 shared GitHub calls per request
+  // and can re-embed every changed file behind it, so the address-wide
+  // ceiling is the one that actually bounds the shared-token bill.
+  projectResync: {
+    user: { limit: 5, windowSeconds: 3600 },
+    ip: { limit: 20, windowSeconds: 3600 },
   },
 };
 

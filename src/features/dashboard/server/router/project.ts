@@ -213,6 +213,23 @@ export const projectRouter = createTRPCRouter({
       return projectService.syncIssues(input.projectId, ctx.userId);
     }),
 
+  resync: protectedProcedure
+    .input(projectIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      // Re-streams the whole tarball and re-embeds every changed file behind
+      // it. The GitHub quota is the shared 5,000/hr pool, and the embedding
+      // spend scales with how much the repo moved, so it gets its own hourly
+      // budget rather than sharing one with the issue sync.
+      const rl = await enforceLimits("projectResync", ctx.userId, ctx.req);
+      if (!rl.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Re-sync limit reached. Please try again later.",
+        });
+      }
+      return projectService.resyncProject(input.projectId, ctx.userId);
+    }),
+
   /**
    * Platform-wide row counts for the landing page.
    *

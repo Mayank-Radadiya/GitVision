@@ -20,6 +20,11 @@ type Events = {
       projectId: string;
     };
   };
+  "project/resync": {
+    data: {
+      projectId: string;
+    };
+  };
 };
 
 // Create a client to send and receive events

@@ -8,6 +8,8 @@
 // ── Services ──
 export { createNewProject } from "./services/project";
 export { getRepositoryFiles } from "./services/files";
+export { resyncRepositoryFiles } from "./services/resync";
+export type { ResyncResult } from "./services/resync";
 export { getCommitHashes, getAiSummaryOfCommit } from "./services/commits";
 export { syncIssuesAndComments } from "./services/issues";
 

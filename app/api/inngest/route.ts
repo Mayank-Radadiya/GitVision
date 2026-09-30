@@ -4,6 +4,8 @@ import {
   generateEmbeddings,
   cleanupStaleData,
   dailyCreditGrant,
+  resyncProject,
+  staleProjectResync,
 } from "@/src/lib/inngest/functions";
 import { serve } from "inngest/next";
 
@@ -14,5 +16,7 @@ export const { GET, POST, PUT } = serve({
     generateEmbeddings,
     cleanupStaleData,
     dailyCreditGrant,
+    resyncProject,
+    staleProjectResync,
   ],
 });

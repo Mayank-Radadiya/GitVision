@@ -140,6 +140,7 @@ export default function ProjectPage() {
             totalFiles={project?.totalFiles}
             indexedFileCount={project?.indexedFileCount}
             totalFileCount={project?.totalFileCount}
+            lastSyncedAt={project?.lastSyncedAt}
           />
 
           {/* Sub-navigation tabs */}
