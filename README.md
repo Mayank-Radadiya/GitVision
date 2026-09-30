@@ -92,6 +92,9 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 > first. It covers the layering above, the ingestion and chat flows with
 > diagrams, and the three structural tensions worth knowing before you change
 > anything (no transactions, no row-level security, two ownership guards).
+>
+> Security engineering is real and mostly invisible; the defences and the tests
+> that pin them are written up in [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ---
 
