@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -57,6 +58,7 @@ export default function CreateNewProjectForm() {
     register,
     handleSubmit,
     setValue,
+    reset,
     watch,
     formState: { errors, isValid },
   } = useForm<CreateProjectInput>({
@@ -67,6 +69,17 @@ export default function CreateNewProjectForm() {
 
   const projectName = watch("projectName");
   const repoUrl = watch("repoUrl");
+
+  // ─── Deep Link: ?url= from the landing hero ──────────────────────────────
+  // Prefills the field only. The user still reviews and submits, so no credit
+  // is spent until they press the button.
+  const searchParams = useSearchParams();
+  const urlParam = searchParams.get("url")?.trim() ?? "";
+
+  useEffect(() => {
+    if (!urlParam) return;
+    reset((prevValues) => ({ ...prevValues, repoUrl: urlParam }));
+  }, [urlParam, reset]);
 
   // ─── Repo Validation & Live Graph Feed ──────────────────────────────────
   const [repoPreview, setRepoPreview] = useState<RepoInfo | null>(null);
