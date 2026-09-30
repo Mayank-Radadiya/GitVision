@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import nextConfig from "@/next.config";
-import { CSP_DIRECTIVES } from "@/src/lib/csp";
+import { CSP_DIRECTIVES, CSP_MIDDLEWARE_OPTIONS } from "@/src/lib/csp";
 
 /** Every static header `next.config.ts` promises, with the exact value it must carry. */
 const EXPECTED_STATIC_HEADERS: ReadonlyArray<readonly [string, string]> = [
@@ -68,6 +68,25 @@ describe("Content Security Policy hardening directives", () => {
     // must not add anything that would widen them.
     expect(CSP_DIRECTIVES["script-src"]).toBeUndefined();
     expect(CSP_DIRECTIVES["style-src"]).toBeUndefined();
+  });
+});
+
+describe("Content Security Policy enforcement", () => {
+  it("blocks rather than only reporting", () => {
+    // Clerk keys the response header off this flag: true emits
+    // Content-Security-Policy-Report-Only, false emits Content-Security-Policy.
+    expect(CSP_MIDDLEWARE_OPTIONS.reportOnly).toBe(false);
+  });
+
+  it("keeps strict mode on so a nonce and 'strict-dynamic' are minted", () => {
+    // Without strict there is no nonce, and an enforcing policy without a nonce
+    // under 'strict-dynamic' blocks every script the app emits.
+    expect(CSP_MIDDLEWARE_OPTIONS.strict).toBe(true);
+  });
+
+  it("mints the policy from the same directives the hardening tests pin", () => {
+    // If these drift, the browser enforces a policy nobody reviewed.
+    expect(CSP_MIDDLEWARE_OPTIONS.directives).toBe(CSP_DIRECTIVES);
   });
 });
 

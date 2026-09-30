@@ -13,6 +13,12 @@ import { MotionConfig } from "framer-motion";
 
 interface ProviderProps {
   children: React.ReactNode;
+  // The per-request CSP nonce, read from the `x-nonce` request header by the
+  // root layout. Clerk threads it onto the `clerk.browser.js` script tag, which
+  // is what the `'nonce-…'` entry in `script-src` matches against. Undefined
+  // when the request never passed through the middleware (e.g. a static render
+  // in a test harness), and the script tag is then simply left un-nonced.
+  nonce?: string;
 }
 
 const TOAST_STYLE: CSSProperties = {
@@ -55,7 +61,7 @@ function ThemedToaster() {
   );
 }
 
-const Provider = ({ children }: ProviderProps) => {
+const Provider = ({ children, nonce }: ProviderProps) => {
   // Create a client using the factory to ensure consistent configuration
   // (transformers, etc.). Query data is NOT persisted to localStorage — pages
   // prefetch fresh data server-side (RSC) and hydrate, so a persisted cache
@@ -75,7 +81,7 @@ const Provider = ({ children }: ProviderProps) => {
   );
 
   return (
-    <ClerkProvider>
+    <ClerkProvider nonce={nonce}>
       <MotionConfig reducedMotion="user">
         <QueryClientProvider client={queryClient}>
           <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -85,6 +91,7 @@ const Provider = ({ children }: ProviderProps) => {
               enableSystem
               enableColorScheme
               disableTransitionOnChange={false}
+              nonce={nonce}
             >
               <ThemedToaster />
               {children}

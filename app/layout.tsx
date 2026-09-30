@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import Provider from "@/shared/providers/app-provider";
@@ -87,11 +88,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+// Clerk's `clerkMiddleware` mints a fresh CSPRNG nonce per request and forwards
+// it on the `x-nonce` request header (it sets `x-middleware-override-headers`, so
+// `headers()` below sees it). It is the same nonce that lands in `script-src` as
+// `'nonce-…'` alongside `'strict-dynamic'`, so the value Clerk puts on the
+// `clerk.browser.js` tag and the value the policy checks are one and the same.
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -99,7 +107,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${gvDisplay.variable}`}
     >
       <body className="min-h-screen antialiased bg-background text-foreground">
-        <Provider>{children}</Provider>
+        <Provider nonce={nonce}>{children}</Provider>
         <ProductAnalytics />
       </body>
     </html>
