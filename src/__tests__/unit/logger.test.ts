@@ -165,6 +165,50 @@ describe("Logger Service", () => {
     expect(record.durationMs).toBe(12);
     expect(String(record.timestamp)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
+
+  it("recurses into a Map and masks denylisted keys on its entries", () => {
+    const record = capture("info", "provider call", {
+      headers: new Map<string, unknown>([
+        ["apiKey", "AIzaSyA1B2C3D4E5F6"],
+        ["count", 2],
+      ]),
+    });
+
+    const headers = record.headers as Record<string, unknown>;
+
+    expect(headers.apiKey).toBe("[redacted]");
+    expect(headers.count).toBe(2);
+    expect(JSON.stringify(record)).not.toContain("AIzaSyA1B2C3D4E5F6");
+  });
+
+  it("serializes a Date as its ISO string", () => {
+    const at = new Date("2026-09-30T12:34:56.000Z");
+    const record = capture("info", "deploy finished", { at });
+
+    expect(record.at).toBe("2026-09-30T12:34:56.000Z");
+  });
+
+  it("expands a class instance to its own enumerable properties, not {}", () => {
+    class Session {
+      userId = "u_1";
+      token = "sk-proj-6f1c0a9e";
+    }
+
+    const record = capture("info", "provider call", { session: new Session() });
+    const session = record.session as Record<string, unknown>;
+
+    expect(session.userId).toBe("u_1");
+    expect(session.token).toBe("[redacted]");
+    expect(JSON.stringify(record)).not.toContain("sk-proj-6f1c0a9e");
+  });
+
+  it("flattens a Set into an array", () => {
+    const record = capture("info", "provider call", {
+      repos: new Set(["gitvision", "ghostnotes"]),
+    });
+
+    expect(record.repos).toEqual(["gitvision", "ghostnotes"]);
+  });
 });
 
 /**
