@@ -58,13 +58,17 @@ export const PLANS: Plan[] = [
     icon: ShieldIcon,
     description: "For individuals exploring repositories",
     price: "Free",
-    priceLabel: "No credit card required",
+    priceLabel: "100 credits on signup",
+    // Every bullet below is a shipped behaviour. No quota and no retention
+    // window is listed because neither exists: there is no per-month project
+    // cap in `project.create`, and no code prunes project history (the only
+    // nightly cron clears rate-limit windows, see `src/lib/inngest/functions.ts`).
     features: [
-      "5 public repositories per month",
-      "Basic commit analysis",
-      "7-day history retention",
+      "100 free credits on signup",
+      "Public repository analysis",
+      "Commit, issue & PR history",
+      "AI chat over your own code",
       "Standard visualizations",
-      "Community support",
     ],
     cta: "Get Started",
     popular: false,
@@ -76,10 +80,12 @@ export const PLANS: Plan[] = [
     description: "For serious developers and small teams",
     price: "$19",
     priceLabel: "/month per user",
+    // Not purchasable yet (`comingSoon`), so these describe the tier's scope
+    // rather than any shipped entitlement. Nothing here promises a limit the
+    // free tier does not already have.
     features: [
-      "Unlimited repositories",
+      "Everything in Basic",
       "Advanced AI commit analysis",
-      "30-day history retention",
       "Interactive visualizations",
       "AI chat assistant",
       "Priority email support",
@@ -98,7 +104,6 @@ export const PLANS: Plan[] = [
     features: [
       "Everything in Pro",
       "Unlimited team members",
-      "90-day history retention",
       "Advanced contribution analytics",
       "Team performance metrics",
       "Dedicated support",
