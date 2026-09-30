@@ -64,7 +64,14 @@ vi.mock("@/src/lib/inngest/client", () => ({
 let fileResults: Record<string, unknown>[] = [];
 
 vi.mock("@/src/features/rag/services/rag-ingestion", () => ({
-  processFileForRag: vi.fn(async (fileId: string, filePath: string) => fileResults.find((r) => r.fileId === fileId)),
+  // `delayMs` lets a test make one batch resolve *after* a later one, which is
+  // the only way to observe progress that is derived from completion order.
+  processFileForRag: vi.fn(async (fileId: string, filePath: string) => {
+    const result = fileResults.find((r) => r.fileId === fileId);
+    const delayMs = (result as { delayMs?: number } | undefined)?.delayMs;
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    return result;
+  }),
 }));
 
 vi.mock("@/src/lib/github", () => ({ getRepositoryFiles: vi.fn(), syncIssuesAndComments: vi.fn() }));
@@ -149,6 +156,79 @@ describe("generateEmbeddings finalize", () => {
     const final = updates.at(-1)!;
     expect(final.embeddingStatus).toBe("completed");
     expect(final.embeddingProgress).toBe(100);
+  });
+});
+
+describe("generateEmbeddings batching", () => {
+  // Batches run concurrently, so they resolve out of order. Progress is
+  // published after each one completes and must never move backwards —
+  // deriving it from the batch's position in the queue lets a late batch 1
+  // overwrite batch 3's higher count.
+  function twelveFiles() {
+    results[1] = Array.from({ length: 12 }, (_, i) => ({
+      id: `f${i + 1}`,
+      fileName: `f${i + 1}.ts`,
+      code: `const v = ${i};`,
+    }));
+    results[2] = [{ total: 12 }];
+    fileResults = Array.from({ length: 12 }, (_, i) => ({
+      fileId: `f${i + 1}`,
+      filePath: `f${i + 1}.ts`,
+      chunksProcessed: 1,
+      embeddingsGenerated: 1,
+      skipped: false,
+    }));
+  }
+
+  function progressWrites() {
+    return updates.filter(
+      (u) => "embeddingProgress" in u && !("embeddingStatus" in u),
+    );
+  }
+
+  it("publishes one progress write per batch", async () => {
+    twelveFiles();
+
+    await run();
+
+    // 12 files at the default batch size of 5 is 3 batches.
+    expect(progressWrites()).toHaveLength(3);
+  });
+
+  it("never reports less progress than it already reported", async () => {
+    twelveFiles();
+    // Make the very first batch the slowest, so it finishes after the batches
+    // that follow it. Progress keyed off completion order must still climb.
+    for (const r of fileResults.slice(0, 5)) {
+      (r as { delayMs?: number }).delayMs = 30;
+    }
+
+    await run();
+
+    const seen = progressWrites().map((u) => u.embeddingProgress as number);
+    expect(seen).toHaveLength(3);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i]).toBeGreaterThan(seen[i - 1]);
+    }
+  });
+
+  it("counts a file as indexed only once it has succeeded", async () => {
+    twelveFiles();
+    // Batch 2's first file fails.
+    fileResults[5] = {
+      fileId: "f6",
+      filePath: "f6.ts",
+      chunksProcessed: 0,
+      embeddingsGenerated: 0,
+      skipped: false,
+      error: "Embedding provider returned 0 of 1 chunks",
+    };
+
+    await run();
+
+    const last = progressWrites().at(-1)!;
+    expect(last.embeddingProgress).toBe(100);
+    expect(last.indexedFileCount).toBe(11);
   });
 });
 

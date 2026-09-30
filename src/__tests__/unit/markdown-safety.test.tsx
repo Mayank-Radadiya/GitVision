@@ -76,7 +76,7 @@ describe("chat markdown escapes raw HTML", () => {
     expect(container.textContent).toContain('onerror="alert(1)"');
   });
 
-  it("keeps rehype-highlight working on fenced code blocks", () => {
+  it("keeps fenced code blocks rendering with their language class", () => {
     const { container } = render(
       <ChatMessage
         role="assistant"

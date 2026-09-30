@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
 import { User, Bot, Copy, Check, FileText } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
@@ -168,7 +167,6 @@ export function ChatMessage({
           ) : (
             <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown
-                rehypePlugins={[rehypeHighlight]}
                 components={{
                   code({ className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || "");

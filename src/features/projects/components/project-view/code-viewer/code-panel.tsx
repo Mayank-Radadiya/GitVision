@@ -14,7 +14,8 @@
  * - Zero flicker across file tree navigation with cached highlighter and HTML
  */
 
-import { memo, useState, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import type { Highlighter, BundledLanguage, BundledTheme } from "shiki";
@@ -28,7 +29,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/src/lib/trpc/client";
 import { cn } from "@/shared/lib/utils";
-import { CODE_THEMES, type ThemeOption } from "./utils";
+import { CODE_THEMES, splitHighlightedLines, type ThemeOption } from "./utils";
 
 // ─── Module-scope Shiki Highlighter & Theme Singletons ──────────────────────
 
@@ -334,21 +335,48 @@ function CodePanel({
     };
   }, [content, language, selectedTheme]);
 
+  // ─── Virtualized lines ───────────────────────────────────────────────────
+  // Shiki returns the whole file as one HTML blob. Split it once per
+  // (content, highlight result) so the virtualizer only mounts the rows that
+  // are actually on screen.
+  const highlighted = useMemo(
+    () => splitHighlightedLines(highlightedHtml, content),
+    [highlightedHtml, content],
+  );
+  const virtualizer = useVirtualizer({
+    count: highlighted.lines.length,
+    getScrollElement: () => codeAreaRef.current,
+    // Matches the row height below (text-[13px] + leading-6) so the estimate
+    // never drifts from what is rendered.
+    estimateSize: () => 24,
+    overscan: 15,
+  });
+  const totalSize = virtualizer.getTotalSize();
+  // The 1-based line the deep link is currently tinting, if any.
+  const [highlightedLine, setHighlightedLine] = useState<number | null>(null);
+
   // ─── Deep-link line targeting (?line=) ────────────────────────────────────
+  // The target row may not be mounted yet (the virtualizer only renders the
+  // visible window), so scrolling and tinting are separate passes: this one
+  // tells the virtualizer where to go, the next one tints once the row exists.
   useEffect(() => {
     if (!highlightLine || isHighlighting) return;
-    // Shiki wraps each rendered line in <span class="line"> (the counter CSS
-    // below keys off it). The raw-text fallback has no such spans, so an
-    // unknown line or an unhighlightable file is a silent no-op.
-    const lineEl = codeAreaRef.current?.querySelectorAll(".line")[
-      highlightLine - 1
-    ];
+    if (highlightLine > highlighted.lines.length) return;
+    virtualizer.scrollToIndex(highlightLine - 1, { align: "center" });
+    setHighlightedLine(highlightLine);
+    // `totalSize` is what causes the rows to mount, so it has to be a dep.
+  }, [highlighted.lines.length, highlightLine, isHighlighting, totalSize, virtualizer]);
+
+  useEffect(() => {
+    if (highlightedLine === null) return;
+    const lineEl = codeAreaRef.current?.querySelector(
+      `[data-line="${highlightedLine}"]`,
+    );
     if (!(lineEl instanceof HTMLElement)) return;
     // bg-primary/10 is a literal elsewhere in the tree, so Tailwind emits it.
     lineEl.classList.add("bg-primary/10");
-    lineEl.scrollIntoView({ block: "center" });
     return () => lineEl.classList.remove("bg-primary/10");
-  }, [highlightedHtml, highlightLine, filePath, isHighlighting]);
+  }, [highlightedLine, totalSize]);
 
   // ─── Copy to clipboard ─────────────────────────────────────────────────
   const handleCopy = useCallback(async () => {
@@ -534,20 +562,36 @@ function CodePanel({
             ))}
           </div>
         ) : (
-          /* Shiki output */
+          /* Virtualized Shiki output — only the visible window is mounted. */
           <div
-            className={cn(
-              "shiki-container min-h-full text-sm",
-              "[&_pre]:m-0! [&_pre]:min-h-full [&_pre]:rounded-none [&_pre]:bg-transparent! [&_pre]:p-4!",
-              "[&_code]:text-[13px] [&_code]:leading-6",
-              "[&_.line]:before:counter-increment-[line] [&_.line]:before:content-[counter(line)]",
-              "[&_.line]:before:mr-4 [&_.line]:before:inline-block [&_.line]:before:w-8",
-              "[&_.line]:before:text-muted-foreground/40 [&_.line]:before:text-right",
-              "[&_.line]:before:select-none",
-            )}
-            style={{ counterReset: "line" } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-          />
+            className="relative text-[13px]"
+            style={highlighted.preStyle}
+          >
+            <div
+              className="absolute top-0 left-0 w-full"
+              style={{ height: totalSize }}
+            >
+              {virtualizer.getVirtualItems().map((item) => (
+                <div
+                  key={item.key}
+                  data-line={item.index + 1}
+                  className="line absolute top-0 left-0 flex w-full leading-6 select-none"
+                  style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                >
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground/40 sticky left-0 w-8 shrink-0 pr-4 text-right tabular-nums"
+                  >
+                    {item.index + 1}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 whitespace-pre"
+                    dangerouslySetInnerHTML={{ __html: highlighted.lines[item.index] }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

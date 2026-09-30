@@ -5,6 +5,8 @@
  * flat path list → nested tree structure conversion.
  */
 
+import type React from "react";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface FileEntry {
@@ -143,4 +145,72 @@ function sortTree(nodes: TreeNode[]): void {
   for (const node of nodes) {
     if (node.children.length > 0) sortTree(node.children);
   }
+}
+// ─── Virtualized Rendering ───────────────────────────────────────────────────
+
+export interface HighlightedLines {
+  /** Background/color lifted off the <pre> so the container can adopt it. */
+  preStyle: React.CSSProperties;
+  /** One entry per source line, ready to drop into a virtual row. */
+  lines: string[];
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function parsePreStyle(style: string | undefined): React.CSSProperties {
+  if (!style) return {};
+  // The style attribute is a flat `a:b;c:d` list; split on the first colon
+  // only so a value containing one (`url(a:b)`) survives. React wants
+  // camelCase keys, so `background-color` becomes `backgroundColor`.
+  const out: Record<string, string> = {};
+  for (const decl of style.split(";")) {
+    const colon = decl.indexOf(":");
+    if (colon === -1) continue;
+    const prop = decl.slice(0, colon).trim();
+    const value = decl.slice(colon + 1).trim();
+    if (!prop || !value) continue;
+    out[prop.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())] = value;
+  }
+  return out as React.CSSProperties;
+}
+
+/**
+ * Turns a Shiki `codeToHtml` blob into the per-line strings the virtualizer
+ * windows. Shiki tokenizes per line, so the only `\n` characters in its output
+ * are line separators and splitting on a newline that precedes a line span is
+ * unambiguous. Falls back to escaped raw lines when the input is the
+ * un-highlighted `<pre class="shiki"><code>…</code></pre>` placeholder, which
+ * carries no line spans.
+ */
+export function splitHighlightedLines(
+  html: string,
+  rawContent: string,
+): HighlightedLines {
+  const openPre = html.match(/<pre\b([^>]*)>/);
+  if (!openPre) {
+    return { preStyle: {}, lines: escapeLines(rawContent) };
+  }
+
+  const preStyle = parsePreStyle(openPre[1].match(/style="([^"]*)"/)?.[1]);
+  const inner = html
+    .slice(openPre[0].length)
+    .replace(/^<code[^>]*>/, "")
+    .replace(/<\/code>\s*<\/pre>\s*$/, "");
+
+  if (!inner.includes('<span class="line"')) {
+    return { preStyle, lines: escapeLines(rawContent) };
+  }
+
+  return { preStyle, lines: inner.split(/\n(?=<span class="line">)/) };
+}
+
+function escapeLines(rawContent: string): string[] {
+  // An empty file still needs one row, otherwise the virtualizer mounts nothing.
+  return (rawContent === "" ? [""] : rawContent.split("\n")).map(escapeHtml);
 }

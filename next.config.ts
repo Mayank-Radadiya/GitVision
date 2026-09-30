@@ -1,3 +1,4 @@
+import withBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
@@ -86,9 +87,19 @@ const nextConfig: NextConfig = {
 // previous call passed none and never uploaded anything. All three are undefined
 // in local dev and CI, which keeps the build free of outbound calls; set them in
 // the Vercel production env to get symbolicated server traces.
-export default withSentryConfig(nextConfig, {
-  silent: true,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-});
+// The analyzer wraps the Sentry config rather than the other way round: Sentry
+// stays inner so it keeps owning the webpack hook it injects, and the analyzer
+// sees the fully composed config. `ANALYZE=true bun run build` writes reports to
+// .next/analyze; a normal build is unaffected. openAnalyzer stays off so CI
+// never tries to launch a browser.
+export default withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+  openAnalyzer: false,
+})(
+  withSentryConfig(nextConfig, {
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+  }),
+);

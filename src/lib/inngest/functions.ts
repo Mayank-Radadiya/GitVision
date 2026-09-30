@@ -13,6 +13,7 @@ import {
 } from "../github";
 import { parseGitHubUrl } from "../github/utils";
 import { inngest } from "./client";
+import pLimit from "p-limit";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 import { generateRepoBriefing } from "@/src/features/rag/services/rag/briefing-generator";
 import { logger } from "@/src/lib/logger";
@@ -23,6 +24,20 @@ import { grantDailyCredits, DAILY_CREDIT_GRANT } from "../credits";
 // bounds what one minified bundle can do to a single ingestion call.
 const MAX_EMBEDDING_FILES = 500;
 const MAX_EMBEDDING_FILE_CHARS = 50_000;
+
+// Batching knobs. Each batch is its own durable step, so a single bad file
+// cannot lose the whole run; running several batches at once shortens wall-clock
+// on large repos. Concurrency is capped so we don't stampede the embedding
+// provider's rate limit.
+const EMBEDDING_BATCH_SIZE = Number(process.env.EMBEDDING_BATCH_SIZE) || 5;
+const EMBEDDING_BATCH_CONCURRENCY =
+  Number(process.env.EMBEDDING_BATCH_CONCURRENCY) || 3;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // 1. Project Created — imports files, syncs issues, auto-triggers embeddings
@@ -248,53 +263,64 @@ export const generateEmbeddings = inngest.createFunction(
 
     const files = prepared.files;
 
-    // Step 2: Process files in batches (each batch is a durable step)
-    const BATCH_SIZE = 5;
+    // Step 2: Process files in batches (each batch is a durable step).
+    // Batches run EMBEDDING_BATCH_CONCURRENCY at a time; the step bodies are
+    // unchanged, so a batch that fails is still retried on its own.
     let totalChunks = 0;
     let totalEmbeddings = 0;
     const errors: string[] = [];
+    let completedBatches = 0;
+    const limit = pLimit(EMBEDDING_BATCH_CONCURRENCY);
 
-    for (let i = 0; i < files.length; i += BATCH_SIZE) {
-      const batchIndex = Math.floor(i / BATCH_SIZE);
-      const batch = files.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk(files, EMBEDDING_BATCH_SIZE).map((batch, batchIndex) =>
+        limit(async () => {
+          const batchResult = await step.run(
+            `Process Batch ${batchIndex + 1}`,
+            async () => {
+              let batchChunks = 0;
+              let batchEmbeddings = 0;
+              const batchErrors: string[] = [];
 
-      const batchResult = await step.run(
-        `Process Batch ${batchIndex + 1}`,
-        async () => {
-          let batchChunks = 0;
-          let batchEmbeddings = 0;
-          const batchErrors: string[] = [];
+              // Process files concurrently within the batch
+              const results = await Promise.all(
+                batch.map((file) =>
+                  processFileForRag(file.id, file.fileName, file.code, projectId),
+                ),
+              );
 
-          // Process files concurrently within the batch
-          const results = await Promise.all(
-            batch.map((file) =>
-              processFileForRag(file.id, file.fileName, file.code, projectId),
-            ),
+              for (const result of results) {
+                if (result.error) {
+                  batchErrors.push(`${result.filePath}: ${result.error}`);
+                } else if (!result.skipped) {
+                  batchChunks += result.chunksProcessed;
+                  batchEmbeddings += result.embeddingsGenerated;
+                }
+              }
+
+              return { batchChunks, batchEmbeddings, batchErrors };
+            },
           );
 
-          for (const result of results) {
-            if (result.error) {
-              batchErrors.push(`${result.filePath}: ${result.error}`);
-            } else if (!result.skipped) {
-              batchChunks += result.chunksProcessed;
-              batchEmbeddings += result.embeddingsGenerated;
-            }
-          }
+          totalChunks += batchResult.batchChunks;
+          totalEmbeddings += batchResult.batchEmbeddings;
+          errors.push(...batchResult.batchErrors);
 
-          // Update progress
-          const attempted = Math.min(i + BATCH_SIZE, files.length);
+          // Progress is published here rather than inside the step: batches
+          // finish out of order, so deriving it from the loop index would let
+          // a late batch 1 overwrite batch 3's higher count. Counting completed
+          // batches keeps it monotonic. This is a running estimate; Finalize
+          // overwrites it with the authoritative count.
+          completedBatches++;
+          const attempted = Math.min(
+            completedBatches * EMBEDDING_BATCH_SIZE,
+            files.length,
+          );
           const progress = Math.min(
-            Math.round(((i + BATCH_SIZE) / files.length) * 100),
+            Math.round((attempted / files.length) * 100),
             100,
           );
-          // Files attempted so far, minus every one that failed. `errors` holds
-          // batches 1..N-1 (pushed after each step resolves) and `batchErrors`
-          // holds the current batch, so this stays monotonic. Finalize
-          // overwrites it with the authoritative count when the run ends.
-          const indexed = Math.max(
-            0,
-            attempted - errors.length - batchErrors.length,
-          );
+          const indexed = Math.max(0, attempted - errors.length);
 
           await db
             .update(projectTables)
@@ -308,15 +334,9 @@ export const generateEmbeddings = inngest.createFunction(
           logger.info(
             `[Inngest] Batch ${batchIndex + 1}: ${attempted}/${files.length} files (${progress}%)`,
           );
-
-          return { batchChunks, batchEmbeddings, batchErrors };
-        },
-      );
-
-      totalChunks += batchResult.batchChunks;
-      totalEmbeddings += batchResult.batchEmbeddings;
-      errors.push(...batchResult.batchErrors);
-    }
+        }),
+      ),
+    );
 
     // Step 3: Verify and finalize
     const finalResult = await step.run("Finalize", async () => {
@@ -689,49 +709,50 @@ export const resyncProject = inngest.createFunction(
 
     // Uncapped by design — these are exactly the files that changed, so there
     // is nothing to select. Batched so one bad file cannot lose the whole run.
-    const BATCH_SIZE = 5;
     let embedded = 0;
     const errors: string[] = [];
+    const limit = pLimit(EMBEDDING_BATCH_CONCURRENCY);
 
-    for (let i = 0; i < diff.changedFileIds.length; i += BATCH_SIZE) {
-      const batchIndex = Math.floor(i / BATCH_SIZE);
-      const batch = diff.changedFileIds.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk(diff.changedFileIds, EMBEDDING_BATCH_SIZE).map((batch, batchIndex) =>
+        limit(async () => {
+          const batchResult = await step.run(
+            `Re-embed Batch ${batchIndex + 1}`,
+            async () => {
+              const rows = await db
+                .select({
+                  id: projectFiles.id,
+                  fileName: projectFiles.fileName,
+                  code: projectFiles.code,
+                })
+                .from(projectFiles)
+                .where(
+                  and(
+                    eq(projectFiles.projectId, projectId),
+                    inArray(projectFiles.id, batch),
+                  ),
+                );
 
-      const batchResult = await step.run(
-        `Re-embed Batch ${batchIndex + 1}`,
-        async () => {
-          const rows = await db
-            .select({
-              id: projectFiles.id,
-              fileName: projectFiles.fileName,
-              code: projectFiles.code,
-            })
-            .from(projectFiles)
-            .where(
-              and(
-                eq(projectFiles.projectId, projectId),
-                inArray(projectFiles.id, batch),
-              ),
-            );
+              const results = await Promise.all(
+                rows.map((file) =>
+                  processFileForRag(file.id, file.fileName, file.code, projectId),
+                ),
+              );
 
-          const results = await Promise.all(
-            rows.map((file) =>
-              processFileForRag(file.id, file.fileName, file.code, projectId),
-            ),
+              return {
+                embedded: results.filter((r) => !r.skipped && !r.error).length,
+                errors: results
+                  .filter((r) => r.error)
+                  .map((r) => `${r.filePath}: ${r.error}`),
+              };
+            },
           );
 
-          return {
-            embedded: results.filter((r) => !r.skipped && !r.error).length,
-            errors: results
-              .filter((r) => r.error)
-              .map((r) => `${r.filePath}: ${r.error}`),
-          };
-        },
-      );
-
-      embedded += batchResult.embedded;
-      errors.push(...batchResult.errors);
-    }
+          embedded += batchResult.embedded;
+          errors.push(...batchResult.errors);
+        }),
+      ),
+    );
 
     await step.run("Finalize", async () => {
       await db

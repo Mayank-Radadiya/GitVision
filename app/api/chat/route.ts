@@ -1,6 +1,5 @@
 import {
   streamText,
-  generateText,
   createUIMessageStream,
   createUIMessageStreamResponse,
   toUIMessageStream,
@@ -17,6 +16,7 @@ import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
+import { rewriteQueryForRetrieval } from "@/src/lib/llm/query-rewrite";
 import {
   fenceContext,
   UNTRUSTED_DATA_DELIMITER,
@@ -124,56 +124,6 @@ INSTRUCTIONS:
 - Keep responses focused and actionable.${UNTRUSTED_DATA_DELIMITER}`,
     conversationHistory,
   );
-}
-
-// ---------------------------------------------------------------------------
-// LLM-based standalone query rewrite
-// ---------------------------------------------------------------------------
-
-/**
- * Uses a small Gemini Flash call to rewrite the conversation into a
- * standalone search query. This prevents query drift on long threads and
- * produces a better embedding input than raw user messages.
- *
- * Returns the original userMessage as a fallback if the call fails.
- */
-async function rewriteQueryForRetrieval(
-  userMessage: string,
-  conversationHistory: string,
-  abortSignal?: AbortSignal,
-): Promise<string> {
-  // If there's no real history, the current message is already standalone
-  if (
-    !conversationHistory ||
-    conversationHistory === "No previous conversation."
-  ) {
-    return userMessage;
-  }
-
-  try {
-    const { text } = await generateText({
-      model: google(LLM_SETTINGS.queryRewrite.model),
-      maxRetries: LLM_SETTINGS.queryRewrite.maxRetries,
-      maxOutputTokens: LLM_SETTINGS.queryRewrite.maxOutputTokens,
-      timeout: LLM_SETTINGS.queryRewrite.timeout,
-      abortSignal,
-      system: `You are a search query optimizer for a code repository.
-Given a conversation and the user's latest message, output ONLY a concise
-standalone search query (max 20 words) that captures what the user wants to
-find in the codebase. Output nothing else — no explanation, no punctuation
-at the end.`,
-      messages: [
-        {
-          role: "user",
-          content: `Conversation so far:\n${conversationHistory}\n\nLatest message: ${userMessage}`,
-        },
-      ],
-    });
-
-    return text.trim() || userMessage;
-  } catch {
-    return userMessage;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -549,6 +499,7 @@ export async function POST(req: Request) {
                     rewriteQueryForRetrieval(
                       userMessage,
                       conversationHistory,
+                      chatId,
                       req.signal,
                     ),
                 );
