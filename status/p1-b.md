@@ -7,27 +7,28 @@ Branch: `lane/p1-b` (off `main` @ `c9ffe92`)
 | T-016 | done | secret-file patterns added to `IGNORED_FILE_PATTERNS`; 15 tests added | `c222a3a` |
 | T-015 | done | entry names resolved with `posix.normalize`; escaping entries dropped; 5 tests added | `1d27991` |
 | T-021 | done | report-only CSP + report collector route; 9 tests added | `bff7167` |
-| T-022 | blocked | needs human review of violation report — no violations have been observed yet | |
+| T-022 | partial | enforcing — `reportOnly: false`, both script tags nonced; **no runtime evidence**, the phase rule forbade running the app | `a62d460`, `a0edfc0` |
 
 ## Notes
 
-- **T-022 is blocked, not skipped.** Its first step is "review the T-021
-  violation report and close every legitimate gap", and that report does not
-  exist yet: the report-only header was committed minutes ago and nobody has
-  exercised the running app against it. The task's own verify step
-  (`curl -sI http://localhost:3000 | rg -i content-security-policy`, then "read
-  the violation log") needs a dev server, a browser, Clerk credentials, a
-  database and a GitHub token, so it cannot be self-certified in this session.
-  Promoting the header now would be the exact "documentation, not a control"
-  outcome the task warns about — with zero evidence that the policy is safe.
-  To unblock: run the app against the report-only header, exercise chat
-  streaming, the code viewer, sign-in and project creation, read the
-  `logger.warn` lines in the collector, then set both headers
-  (`Content-Security-Policy` enforcing + the relaxed `…-Report-Only` kept
-  alongside) and flip the assertion in
-  `src/__tests__/integration/security-headers.test.ts`. If the `'unsafe-inline'`
-  /`'unsafe-eval'` allowances are to go too, that needs a per-request nonce
-  threaded through `proxy.ts` — a separate change, not this task.
+- **T-022 shipped as partial, and the original block is still unmet.** The
+  header now enforces (`reportOnly: false`) and both script tags carry the nonce
+  Clerk publishes on `x-nonce` — `clerk.browser.js` via `<ClerkProvider nonce>`,
+  the next-themes colour-scheme script via `<ThemeProvider nonce>`, which
+  `next-themes` does expose. What did *not* happen is the first step this note
+  described: nobody has exercised the running app against the policy and read the
+  violation log. The phase rule forbade it, and `bun test` / `bun run build`
+  were out of scope, so the three new assertions in
+  `src/__tests__/integration/security-headers.test.ts` have never executed
+  either. The "documentation, not a control" concern stands; what changed is that
+  the control is now reachable rather than hypothetical.
+  Still to do by hand: run the app, exercise chat streaming, the code viewer,
+  sign-in and project creation, read the `logger.warn` lines in
+  `app/api/csp-report/route.ts`, and confirm
+  `curl -sI http://localhost:3000 | rg -i content-security-policy` returns
+  `Content-Security-Policy` with a `'nonce-'` in `script-src`. Expect PostHog and
+  Vercel Insights beacons in that log — `connect-src` has no scheme fallback, so
+  they are blocked by design and the page is unaffected.
 - Files touched outside the lane's declared ownership:
   - **T-021: `app/api/csp-report/route.ts`** (new) and **`proxy.ts`**. The
     collector route is the task's own requirement ("add a minimal

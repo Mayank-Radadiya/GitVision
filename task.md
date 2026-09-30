@@ -56,13 +56,6 @@
   - **Effort/Priority:** S / ⚠️ P1
   - **Source:** `status/p1-e.md:L` (T-036 blocked), §5.23
 
-- **T-022** — Promote CSP from report-only to enforcing
-  - **What:** CSP ships report-only, so violations are collected but never blocked. The violation report does not exist yet, and the verify step needs a dev server, browser, Clerk creds, DB, and a GitHub token — it cannot be self-certified.
-  - **How:** Run the app, exercise chat / code viewer / sign-in / project creation, read `logger.warn` in the `app/api/csp-report/route.ts` collector, then set both headers and flip the assertion in `src/__tests__/integration/security-headers.test.ts`. Blocked on T-082 for the nonce work.
-  - **Dependencies:** T-082
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** `status/p1-b.md:L` (T-022 blocked), §8.6
-
 - **F-04** — Add the credit ledger and claim flow
   - **What:** There is no way back in once credits run out, and no honest record of why a balance changed.
   - **How:** Migration `0005` creating `credit_ledger` (`userId`, `delta`, `reason`, unique `refId`, `createdAt`); an Inngest daily-grant cron; a "Claim credits" sidebar button limited to 50 per 24h via a `credits.claim` key at 1/86400s per user. The unique `refId` is what makes `refundCredits` idempotent. No Stripe yet.
@@ -427,7 +420,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p1-a:** T-014 (`57de263`, `onFailure` handlers) · T-017 (`e3ff9be`, chat model pinned to `gemini-2.0-flash-001` in `src/lib/llm/config.ts`) · T-012 (`ff91397`, Prepare counts every file; Finalize stores `partial`) · T-013 (`dda38cf`, partial-index badge) · T-024 (`d42c004`, retention doc no longer advertises a sweep that does not exist) · T-028 (`b0fcb1b`, AI-triage fields dropped from selects and insert) · **T-084** (`ff91397`, reset `lane/p1-a` branch reference to `ff91397` to remove foreign commit `dc2c3b7` and restore lane isolation)
 
-**Lane p1-b:** T-016 (`c222a3a`, secret-file patterns) · T-015 (`1d27991`, entry names resolved with `posix.normalize`) · T-021 (`bff7167`, report-only CSP + `app/api/csp-report/route.ts` collector + `proxy.ts` PUBLIC entry) · **T-082** (`a62d460`, `RootLayout` goes `async` and reads the nonce Clerk publishes on `x-nonce`, `app-provider.tsx` forwards it to both `ClerkProvider` and `ThemeProvider`, so `clerk.browser.js` and next-themes' colour-scheme script are the only scripts the policy has to trust — the hash is real but the commit *label* is not: the file landed inside `a62d460`, which a concurrent agent had already committed under `[T-022]` when it flipped the same policy to enforcing, before this task could open its own commit)
+**Lane p1-b:** T-016 (`c222a3a`, secret-file patterns) · T-015 (`1d27991`, entry names resolved with `posix.normalize`) · T-021 (`bff7167`, report-only CSP + `app/api/csp-report/route.ts` collector + `proxy.ts` PUBLIC entry) · **T-082** (`a62d460`, `RootLayout` goes `async` and reads the nonce Clerk publishes on `x-nonce`, `app-provider.tsx` forwards it to both `ClerkProvider` and `ThemeProvider`, so `clerk.browser.js` and next-themes' colour-scheme script are the only scripts the policy has to trust — the hash is real but the commit *label* is not: the file landed inside `a62d460`, which a concurrent agent had already committed under `[T-022]` when it flipped the same policy to enforcing, before this task could open its own commit) · **T-022** (`a62d460` + `a0edfc0`, `reportOnly: false` so the response carries `Content-Security-Policy` and blocks instead of logging; the middleware options moved out of `proxy.ts` into `src/lib/csp.ts` as `CSP_MIDDLEWARE_OPTIONS` so `reportOnly`/`strict` are assertable without booting a server. **PARTIAL** — the phase rule forbade running the app, so no violation report was ever read and the new assertions were never executed; `status/p1-b.md` called an evidence-free promotion "documentation, not a control", and that caveat still stands)
 
 **Lane p1-c:** T-019 (`f6e00ab`, redaction at all four levels, deep through context and errors) · **T-020** (`45fa5da`, redaction walker extended to Map, Set, Date, Error, and class instances with a depth and cycle ceiling; error transport registered from `sentry.server.config.ts` so the already-redacted record is the only thing that ever leaves the process, and the SDK stays out of the client bundle entirely; gated to production with a DSN present)
 
