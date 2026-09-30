@@ -1,5 +1,6 @@
 import { chromium, expect, type FullConfig } from "@playwright/test";
-import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
+import { clerk, clerkSetup } from "@clerk/testing/playwright";
+import { config as loadEnv } from "dotenv";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -38,6 +39,14 @@ import path from "node:path";
 
 const AUTH_STATE_PATH = path.join(__dirname, ".auth", "user.json");
 
+// Overridable because the password must satisfy whatever policy the instance
+// enforces, and a locked-down dev instance will reject the default.
+const E2E_USER_EMAIL =
+  process.env.CLERK_E2E_USER_EMAIL ??
+  "gitvision-e2e+clerk_test@example.com";
+const E2E_USER_PASSWORD =
+  process.env.CLERK_E2E_USER_PASSWORD ?? "GitVisionE2E!2026";
+
 function credentialHelp(name: string, hint: string): Error {
   return new Error(
     [
@@ -53,6 +62,19 @@ function credentialHelp(name: string, hint: string): Error {
 }
 
 export default async function globalSetup(config: FullConfig) {
+  // The Playwright runner does not read `.env`; only the `webServer` it boots
+  // does, so `next dev` sees the Clerk keys and this hook does not. Without
+  // this line the guard below reads `undefined` and refuses a run whose keys
+  // are in fact valid, which is how T-033 shipped failing on a clean checkout.
+  //
+  // `clerkSetup()` loads these same two files a few lines down. It has to happen
+  // earlier than that: the guard is the thing that decides whether we are
+  // allowed to call out at all, and a guard cannot read a file nobody has
+  // loaded yet. Precedence matches Clerk's own (`clerkSetup` is called with no
+  // `dotenv: false`), and `dotenv` never overwrites a variable already present,
+  // so an exported `CLERK_SECRET_KEY` still wins over the file.
+  loadEnv({ path: [".env.local", ".env"] });
+
   const publishableKey =
     process.env.CLERK_TESTING_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -71,10 +93,37 @@ export default async function globalSetup(config: FullConfig) {
     );
   }
 
-  // Exchanges the key pair for a token and installs the route handler that
-  // attaches it to every Frontend API call, so the app boots already signed
-  // in rather than rendering a sign-in screen we then have to click through.
+  // Exchanges the key pair for a short-lived testing token and installs the
+  // route handler that attaches it to every Frontend API call.
   await clerkSetup({ publishableKey });
+
+  // Clerk refuses to create a user on a `.test` domain and this instance
+  // requires a password, so both are load-bearing rather than decorative. The
+  // address is the `+clerk_test` shape Clerk's own helpers document; the
+  // design's `gitvision-e2e@clerk.test` default (see `status/p1-e.md`) is
+  // rejected by the API with `form_param_format_invalid`.
+  //
+  // 422 here is "already exists", which is every run after the first, so it is
+  // the normal path and not an error to surface.
+  const response = await fetch("https://api.clerk.com/v1/users", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email_address: [E2E_USER_EMAIL],
+      password: E2E_USER_PASSWORD,
+      first_name: "GitVision",
+      last_name: "E2E",
+    }),
+  });
+  if (response.status !== 200 && response.status !== 422) {
+    throw new Error(
+      `T-033: could not create the E2E Clerk user (HTTP ${response.status}): ` +
+        (await response.text()).slice(0, 300),
+    );
+  }
 
   // globalSetup has no page fixture, so drive a context by hand.
   const browser = await chromium.launch();
@@ -83,21 +132,28 @@ export default async function globalSetup(config: FullConfig) {
       baseURL: config.projects[0]?.use?.baseURL,
     });
     const page = await context.newPage();
-    await setupClerkTestingToken({ page });
-    await page.goto("/");
 
-    // A token that never landed is worse than no token: every downstream spec
-    // would load and then assert against /sign-in. Prove Clerk actually holds a
-    // session before writing the state out.
-    const signedIn = await page.evaluate(() =>
-      Object.keys(window.localStorage).some((k) =>
-        k.toLowerCase().includes("clerk"),
-      ),
-    );
-    expect(
-      signedIn,
-      "Clerk wrote no session to localStorage — the testing token was not accepted.",
-    ).toBe(true);
+    // `clerk.signIn` is the step that actually establishes a session; it calls
+    // `setupClerkTestingToken` internally to authorize the browser, then mints
+    // a ticket sign-in for the fixture user. Without it the token is accepted
+    // and no user is ever signed in — the browser holds `__clerk_db_jwt` and
+    // still lands on /sign-in.
+    await page.goto("/");
+    await clerk.signIn({ page, emailAddress: E2E_USER_EMAIL });
+
+    // A state file written without a session is worse than no state file: every
+    // downstream spec would load it and assert against /sign-in. Ask Clerk for
+    // the user id rather than sniffing storage, because the session lives in
+    // the `__session` cookie — localStorage only ever holds
+    // `__clerk_environment`, which is written whether or not anyone is signed
+    // in and so would pass this check while proving nothing.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => (window as { Clerk?: { user?: { id?: string } } }).Clerk?.user?.id ?? null),
+        { message: "Clerk never produced a user — the E2E sign-in did not take.", timeout: 15_000 },
+      )
+      .toBeTruthy();
 
     mkdirSync(path.dirname(AUTH_STATE_PATH), { recursive: true });
     await context.storageState({ path: AUTH_STATE_PATH });

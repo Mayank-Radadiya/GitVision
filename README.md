@@ -150,6 +150,14 @@ GEMINI_API_KEY=AIza...
 OPENROUTER_API_KEY=sk-or-...
 ```
 
+`bun run test:e2e` needs the Clerk keys to point at a **development** instance
+(`pk_test_` / `sk_test_`). `e2e/global-setup.ts` refuses anything else before it
+calls out, so a test run cannot mint a session against a live one. It creates a
+fixture user on first run and writes `e2e/.auth/user.json` — gitignored, because
+that file is a live credential. Every spec loads that state, so the signed-in
+specs cannot start without a session. Override the identity with
+`CLERK_E2E_USER_EMAIL` / `CLERK_E2E_USER_PASSWORD`.
+
 ### 4. Set up the database
 
 ```bash
