@@ -4,6 +4,7 @@
  */
 
 import { logger } from "@/src/lib/logger";
+import { RAG_CONFIG } from "@/src/lib/rag/rag.config";
 import { PINNED_GEMINI_FLASH } from "./config";
 
 export interface BudgetAllocation {
@@ -31,7 +32,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
  * describing anything real — cost, latency and prompt size all grow with the
  * repo instead of staying bounded.
  */
-export const MAX_CONTEXT_TOKENS = 32_768;
+export const MAX_CONTEXT_TOKENS = RAG_CONFIG.maxContextTokens;
 
 /**
  * Fast token count estimator using ~4 characters per token ratio.
