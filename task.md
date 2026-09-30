@@ -42,13 +42,6 @@
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
-- **T-086** — Add the three authenticated E2E specs
-  - **What:** Nothing covers ingest → RAG → chat. The gap is that a user can break the entire thesis and CI stays green.
-  - **How:** With storage state from T-033, add three specs — ingest a tiny public repo and assert file count > 0; ask a question and assert a citation appears and its click-through resolves; spend credits to zero and assert the block.
-  - **Dependencies:** T-033
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** §5.23 item 3, §2.3 row 17
-
 - **T-034** — E2E-spec the ingestion pipeline
   - **What:** Ingestion is the product's front door and has zero browser coverage.
   - **How:** Blocked behind T-033's storage state; assert a tiny public repo reaches a completed index with a non-zero file count.
@@ -300,7 +293,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 14 | Citations not clickable; no `?file=` deep link | fixed | F-02 |
 | 15 | No settings/account page, no project settings, no chat UI | open | F-17, F-07 |
 | 16 | Console-only logger; no error tracking | fixed | F-24, T-020 |
-| 17 | 53 unit test files, 1 unauthenticated E2E spec | open | T-086 |
+| 17 | 53 unit test files, 1 unauthenticated E2E spec | fixed | T-086 |
 | 18 | `clerk-webhook.test.ts` flaky under parallel load | fixed | F-23 |
 | 19 | PascalCase `AiSummary` in snake_case schema | open | T-067 |
 | 20 | Shared single `GITHUB_TOKEN` = one 5,000/hr pool | open | F-14 |
@@ -462,6 +455,8 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 **Lane p1-d:** T-018 (`0f0415b`, charge before enqueue with explicit compensation) · T-029 (`3be9f2b`, 10 round-trips measured) · T-030 (`5a96c81`, 10 → 3 round-trips) · **T-031 — skipped with evidence** (production Neon: 7-day window uses `Index Scan` at 0.085 ms, 2000-day worst case is a 402-row `Seq Scan` at 0.588 ms total, against a 394 ms dashboard load; the planner declined both candidate indexes on a 4,000-commit PG18)
 
 **Lane p1-e:** T-032 (`9746a25`, suite boots its own server, `bun run test:e2e` passes cold)
+
+**Lane p1-f:** T-086 (`b0282b8`, three authenticated specs on the T-033 storage state — ingestion proves the code viewer's file count is > 0, the RAG spec asserts the citation badge's click-through resolves to the cited path in the viewer breadcrumb rather than a README auto-selection fallback, and the credits spec zeroes the balance test-side to prove both the create and chat gates explain themselves)
 
 **Lane p2-a:** T-037 (`9907918`, one `ProjectAccessError` ownership check repo-wide; `verifyOwnership` deleted, 8 call sites repointed) · T-045 (`1c74f99`, upsert-then-prune over delete-then-repull) · T-050 (`a092b7e`, compound keyset pagination) · T-051 (`d35790a`) · T-055 (`4ca4d93`, `chats_user_id_updated_at_idx` + `project_files_language_idx`) · T-056 (`af8f5e2`, ordered `(author_date DESC, id DESC)`)
 
