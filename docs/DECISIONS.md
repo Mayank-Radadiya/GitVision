@@ -23,6 +23,7 @@ Where a decision imposes an invariant, that invariant must be respected by all s
 | **D-11** | Stateless `neon-http` Driver & Compensating Writes | Accepted | T-018, T-045 | Stay on `neon-http` for serverless scale; multi-step operations use explicit compensation latches instead of `db.transaction()`. |
 | **D-12** | Database Backup Destination & Retention | Accepted | T-001 | Off-peak daily cron backup script in CI with 14-day retention artifact; S3/R2 long-term durable store queued. |
 | **D-13** | Monolithic App Structure & Route Colocation | Accepted | — | Colocate API route handlers, tRPC procedures, and server components within Next.js App Router. |
+| **D-14** | `isProUser` Tier Column | Decided (Drop) | T-085 / V-09 | Drop the write-only `users.isProUser` boolean; migration `0007`. Tier gating is V-09's problem. |
 
 ---
 
@@ -322,3 +323,54 @@ refactor — and it supersedes this record.
 The same reasoning applies elsewhere: `app/api/chat/route.ts` latches its
 credit refund with a per-request `refunded` flag rather than relying on a
 transaction to guarantee single-refund semantics.
+
+---
+
+### D-14: `isProUser` Tier Column
+
+| Field | Value |
+|---|---|
+| **Status** | Decided (Drop) |
+| **Date** | 2026-09-30 |
+| **Blocks / Relates To** | T-085 / V-09 |
+| **Impacted Files** | `db/schema.ts`, `src/features/dashboard/server/router/services/projectService.ts`, `app/api/webhooks/clerk/route.ts`, `db/migrations/0007_true_leech.sql` |
+
+**Context.** `users.isProUser` was a non-null boolean with a `false` default,
+declared in `db/schema.ts` and written in exactly two places: the Clerk-user
+lazy-provisioning insert in `projectService.ts` and the Clerk webhook insert in
+`app/api/webhooks/clerk/route.ts`. Both wrote the literal `false`. No select,
+filter, or guard anywhere in the codebase read it. The column was therefore
+write-only: it claimed a tier that nothing consumed, and it lied twice — once
+per insert path — about the state of that tier.
+
+**Options.**
+
+- **Option A — wire the tier.** Gate credit perks on `isProUser` and add the read
+  checks the column was presumably declared for. REJECTED: gating requires a
+  source of truth to read. There is no Stripe integration, no subscription
+  table, no webhook that could ever write `true`. Wiring the reads would build a
+  gate that is permanently shut, behind a code path that has to be edited again
+  when V-09 introduces billing.
+- **Option B — keep the column, stop writing it.** REJECTED: a column with no
+  writer and no reader is strictly worse than one with a writer — it becomes
+  `NOT NULL DEFAULT false` that can never be updated, so the next reader has no
+  way to tell whether `false` means "not pro" or "nobody ever set it".
+- **Option C — drop the column.** **CHOSEN.** Remove the declaration, drop the
+  column, and remove both writes.
+
+**Decision.** Option C, commit `8174b42`. `db/schema.ts` no longer declares
+`isProUser`; `projectService.ts` and `app/api/webhooks/clerk/route.ts` no longer
+write it; migration `0007_true_leech.sql` drops the column with
+`ALTER TABLE "users" DROP COLUMN "is_pro_user";`.
+
+**Consequences.** `users` has six columns, not seven — the same reason
+`0008_clever_taskmaster.notes.md` §7 cites when reading the table's shape. Both
+insert paths still write the other five columns; removing one key from each
+insert object was the whole of the write-site change. `src/lib/inngest/functions.ts`
+notes that there is no `is_pro_user` left to filter on. Any future tier is V-09's
+to add, with a real writer behind it; this record exists so that the next person
+who reaches for `isProUser` finds the reasoning instead of the column.
+
+**Note.** Historical snapshots under `db/migrations/meta/` through `0006` still
+contain the column, which is correct — they are the immutable record of the
+schema as it was, and `0007` is the statement of change.
