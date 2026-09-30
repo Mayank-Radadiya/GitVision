@@ -42,13 +42,6 @@
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
-- **T-034** — E2E-spec the ingestion pipeline
-  - **What:** Ingestion is the product's front door and has zero browser coverage.
-  - **How:** Blocked behind T-033's storage state; assert a tiny public repo reaches a completed index with a non-zero file count.
-  - **Dependencies:** T-033
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** `status/p1-e.md:L` (T-034 blocked), §5.23
-
 - **T-035** — E2E-spec the RAG chat path
   - **What:** The core pitch has zero coverage; the design notes that the Clerk test user must carry an email because the app reads `email` off the Clerk user.
   - **How:** Blocked behind T-033; ask a grounded question and assert a typed citation renders and deep-links into the viewer.
@@ -431,7 +424,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-56 tasks shipped across 10 lanes. Original IDs preserved.
+57 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -454,7 +447,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p1-d:** T-018 (`0f0415b`, charge before enqueue with explicit compensation) · T-029 (`3be9f2b`, 10 round-trips measured) · T-030 (`5a96c81`, 10 → 3 round-trips) · **T-031 — skipped with evidence** (production Neon: 7-day window uses `Index Scan` at 0.085 ms, 2000-day worst case is a 402-row `Seq Scan` at 0.588 ms total, against a 394 ms dashboard load; the planner declined both candidate indexes on a 4,000-commit PG18)
 
-**Lane p1-e:** T-032 (`9746a25`, suite boots its own server, `bun run test:e2e` passes cold)
+**Lane p1-e:** T-032 (`9746a25`, suite boots its own server, `bun run test:e2e` passes cold) · **T-034** (`b0282b8`, `e2e/ingestion.spec.ts` — submits `octocat/Hello-World` through the real `/create-project` form on the T-033 storage state, then reads the terminal embedding state from `/chat` asserting `Ready for codebase chat`, which is the only surface that distinguishes `completed`/`partial` from `processing` and `failed`: `indexing-status-badge.tsx:26` branches *only* on `partial`, so `pending`, `processing` and `failed` all render the same green `AI Synced` and the project page could never prove the index ran; the non-zero count comes from `code-viewer/index.tsx:135`'s `N files`, parsed and asserted `> 0`, and the `projectId` is read off the dashboard card's href rather than hardcoded, with cleanup through the actions menu so a re-run is not blocked by the unique `(owner_id, github_url)` index; requires `bun run inngest` running by hand, since `playwright.config.ts` boots only `bun run dev`. Note the hash is real but the commit *label* is not: the file landed inside `b0282b8`, which a concurrent agent had already committed under `[T-086]` alongside the T-035 and T-036 specs before this task could open its own commit)
 
 **Lane p1-f:** T-086 (`b0282b8`, three authenticated specs on the T-033 storage state — ingestion proves the code viewer's file count is > 0, the RAG spec asserts the citation badge's click-through resolves to the cited path in the viewer breadcrumb rather than a README auto-selection fallback, and the credits spec zeroes the balance test-side to prove both the create and chat gates explain themselves)
 
