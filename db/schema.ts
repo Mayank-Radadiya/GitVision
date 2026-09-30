@@ -7,6 +7,7 @@ import {
   boolean,
   index,
   unique,
+  uniqueIndex,
   uuid,
   timestamp,
   jsonb,
@@ -395,7 +396,9 @@ export type CreditReason =
   | "signup_grant"
   | "project_creation"
   | "commit_summary"
-  | "chat_turn";
+  | "chat_turn"
+  | "claim"
+  | "daily_grant";
 
 /**
  * Append-only ledger of every credit movement. `users.credits` is still the
@@ -410,6 +413,12 @@ export type CreditReason =
  *
  * `balance_after` is denormalised deliberately: a ledger you have to replay to
  * answer "what did I have yesterday" is a ledger nobody queries.
+ *
+ * `ref_id` carries the second, separate guarantee: at most one row per
+ * non-null `ref_id`. Nullable, because a `spendCredits` row has no external
+ * reference to record and a NOT NULL unique column would reject every one of
+ * them; Postgres treats NULLs as distinct in a unique index, so the rows that
+ * do not need a key are not constrained by it.
  */
 export const creditTransactions = pgTable(
   "credit_transactions",
@@ -428,6 +437,11 @@ export const creditTransactions = pgTable(
       .$type<CreditReason>()
       .notNull(),
     balanceAfter: integer("balance_after").notNull(),
+    // Idempotency key for grants that can legitimately be replayed — the 24h
+    // claim and the daily cron both derive it from the user and the UTC date,
+    // so a second attempt writes no second row. See `claimCredits` in
+    // `src/lib/credits.ts` for how ON CONFLICT uses this.
+    refId: varchar("ref_id", { length: 255 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => {
@@ -441,6 +455,11 @@ export const creditTransactions = pgTable(
         table.createdAt,
         table.id,
       ),
+      // The claim's rolling 24h check reads `user_id` + a `created_at` range and
+      // filters `reason` on the rows it gets back, so the composite above
+      // already serves it; this index is for the write side only — one lookup
+      // per grant to reject a replayed `ref_id`.
+      refIdIdx: uniqueIndex("credit_transactions_ref_id_idx").on(table.refId),
     };
   },
 );

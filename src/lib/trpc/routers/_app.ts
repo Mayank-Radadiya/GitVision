@@ -7,6 +7,7 @@
 import { projectRouter } from "@/src/features/dashboard/server/router/project";
 import { chatRouter } from "@/src/features/chat/server/router/chat";
 import { userRouter } from "@/src/features/user/server/router/user";
+import { creditsRouter } from "@/src/features/user/server/router/credits";
 import { createTRPCRouter } from "../init";
 
 // Root TRPC router that groups all procedure endpoints
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   project: projectRouter,
   chat: chatRouter,
   user: userRouter,
+  credits: creditsRouter,
 });
 
 // Export API type for full type-safety across client and server

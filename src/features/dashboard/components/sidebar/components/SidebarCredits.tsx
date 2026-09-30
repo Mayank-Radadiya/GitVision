@@ -13,8 +13,11 @@
 
 import { Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import toast from "react-hot-toast";
 import { cn } from "@/shared/lib/utils";
 import { useCredits } from "@/features/dashboard/hooks/use-dashboard";
+import { trpc } from "@/src/lib/trpc/client";
+import { Button } from "@/shared/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -49,6 +52,37 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
 
   // Default parsing logic handling missing/loading state gracefully.
   const credits = data ?? 0;
+
+  // The 24-hour claim top-up. These mirror CLAIM_AMOUNT and DAILY_CREDIT_GRANT in
+  // `src/lib/credits.ts` and cannot be imported from it: that module pulls
+  // `@/db` and therefore the neon driver into the browser bundle. Kept as
+  // literals, as MAX_FREE_CREDITS below already is.
+  const CLAIM_AMOUNT = 50;
+  const DAILY_GRANT = 5;
+
+  // The claim is offered unconditionally and the server refuses it. Hiding the
+  // button when it would not work would need a "last claim" read that nothing
+  // returns today, and a button that silently disappears is worse than one that
+  // explains why it cannot be pressed.
+  const utils = trpc.useUtils();
+  const claim = trpc.credits.claim.useMutation({
+    onSuccess: ({ balance }) => {
+      // The balance on screen comes from project.getCredits, not from this
+      // mutation, so it has to be invalidated for the number to move.
+      utils.project.getCredits.invalidate();
+      // F-17's settings ledger should show the row the claim just wrote.
+      utils.user.getCreditHistory.invalidate();
+      toast.success(`Claimed! You now have ${balance} credits.`, {
+        icon: <Zap className="h-4 w-4 text-amber-500" />,
+      });
+    },
+    onError: (error) => {
+      toast.error(
+        error.message || "Couldn't claim credits. Please try again.",
+        { icon: <Zap className="h-4 w-4 text-rose-500" /> },
+      );
+    },
+  });
 
   // Determine baseline for the progress bar rendering.
   // We assume 100 as standard free-tier limit to establish 0-100% fill.
@@ -151,10 +185,24 @@ export function SidebarCredits({ isCollapsed }: SidebarCreditsProps) {
                 />
               </div>
 
-              {/* Upgrade Trigger Text */}
-              <p className="text-muted-foreground group-hover:text-foreground mt-2 text-[10px] font-medium transition-colors">
-                Credits refresh monthly
-              </p>
+              {/* Claim trigger. The copy states the real rules: a top-up every
+                  24 hours, and a smaller automatic grant each day. It used to
+                  read "Credits refresh monthly", which described no mechanism
+                  that exists. */}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-muted-foreground group-hover:text-foreground text-[10px] leading-tight font-medium transition-colors">
+                  +{CLAIM_AMOUNT} every 24h · {DAILY_GRANT}/day free
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary h-6 shrink-0 px-2 text-[10px] font-semibold"
+                  onClick={() => claim.mutate()}
+                  disabled={claim.isPending}
+                >
+                  {claim.isPending ? "Claiming…" : "Claim"}
+                </Button>
+              </div>
             </motion.div>
           </AnimatePresence>
         </div>

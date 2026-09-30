@@ -10,6 +10,7 @@ import { getRepositoryFiles, syncIssuesAndComments } from "../github";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 import { logger } from "@/src/lib/logger";
+import { grantDailyCredits, DAILY_CREDIT_GRANT } from "../credits";
 
 // Ceilings for the embedding pipeline's file load. The SQL LIMIT bounds how much
 // of the repo enters memory (and the Inngest step payload); the per-file cap
@@ -460,5 +461,58 @@ export const cleanupStaleData = inngest.createFunction(
       success: true,
       cleanedRateLimits: rateLimitResult.count,
     };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// 4. Daily Credit Grant — Free-tier top-up, runs daily at 00:00 UTC
+// ---------------------------------------------------------------------------
+
+/**
+ * The free tier is a 100-credit signup grant and nothing else, so a user who
+ * exhausts it has no way back in short of paying. This tops every account below
+ * the ceiling back up a little each day, and `credits.claim` (the sidebar
+ * button) lets a user take the rest immediately rather than waiting out the
+ * drip.
+ *
+ * Both paths write the same kind of ledger row, so the two are independently
+ * idempotent rather than competing: the cron keys on `daily:<date>:<user_id>`
+ * and the claim on `claim:<user_id>:<date>`, and each is rejected only by its own
+ * key. A user can therefore receive both on the same day, which is intended —
+ * they are two separate entitlements, not two attempts at one.
+ *
+ * Note the asymmetry with `cleanupStaleData`: this grants to every account
+ * holding a `users` row, including ones that have never logged in since signup.
+ * There is no `is_pro_user` to filter on (dropped in 0007) and no per-user
+ * opt-out, so the sweep's cost scales with total accounts rather than active
+ * ones. `grantDailyCredits` writes no row for an account already at the ceiling,
+ * which bounds the damage to a `SELECT` over those accounts.
+ */
+export const dailyCreditGrant = inngest.createFunction(
+  {
+    id: "daily-credit-grant",
+    triggers: [{ cron: "0 0 * * *" }],
+    // Same reasoning as cleanupStaleData: a cron has no row to write status to,
+    // so a silent failure would look identical to a healthy sweep that granted
+    // nobody. Log loudly instead.
+    onFailure: async ({ error }) => {
+      logger.error(`[Inngest] dailyCreditGrant failed: ${error.message}`);
+    },
+  },
+  async ({ step }) => {
+    return step.run("Grant Daily Credits", async () => {
+      // The date lives in the key, not just in the cron schedule. Inngest can
+      // retry a step, and a retry that reused a fresh key would double-grant;
+      // pinning the date means a retry on the same UTC day collides with the
+      // rows the first attempt already wrote and the unique index rejects them.
+      const prefix = `daily:${new Date().toISOString().slice(0, 10)}:`;
+      const { granted } = await grantDailyCredits(prefix);
+
+      logger.info(
+        `[Credits] Daily grant: ${granted} account(s) received ${DAILY_CREDIT_GRANT} credits`,
+      );
+
+      return { granted };
+    });
   },
 );
