@@ -55,3 +55,7 @@ plan.md
 
 # database backups — dumps must never reach the repo
 /backups
+# T-033: Playwright auth state. Written by `e2e/auth.setup.ts` from a Clerk
+# testing token — a live session credential, so it must never be committed.
+# Re-generated on every `bun run test:e2e`.
+.auth/
