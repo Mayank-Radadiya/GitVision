@@ -83,28 +83,35 @@ const REPO_URL = "https://github.com/octocat/Hello-World";
 const PROJECT_NAME = "E2E Octocat";
 
 /**
- * Pick `name` in the `/chat` project dropdown. Re-selecting is what refreshes
- * the status: the dropdown's `onValueChange` is the only thing that re-fires
- * the `verifyStatus` fetch (`chat-landing.tsx:166-189`).
- */
-async function selectProject(page: Page, name: string) {
-  await page.getByRole("combobox").first().click();
-  await page.getByRole("option", { name }).click();
-}
-
-/**
  * One observation of the project's embedding state, as the UI presents it.
  * Anything that is not ready or failed is reported as still-progressing,
  * including `pending`, which the page renders as "Embeddings required" with a
  * Generate button. Deliberately never clicks that Generate button — automatic
  * ingestion is the behaviour under test, and kicking off a manual job would
  * make the spec pass for the wrong reason.
+ *
+ * Every observation re-loads `/chat`, and both halves of that are load-bearing:
+ *
+ * 1. The status only exists on `/chat`. The dashboard's one combobox is the
+ *    "Sort projects" `<select>` (`project-search-bar.tsx:52`), whose options
+ *    are sort orders and never a project name.
+ * 2. Re-selecting the *same* project cannot refresh anything. Radix does fire
+ *    `onValueChange` unconditionally on a re-pick, but React bails out of the
+ *    re-render when `setSelectedProject` gets an identical value, so the
+ *    `verifyStatus` effect keyed on `[selectedProject]`
+ *    (`chat-landing.tsx:166-189`) never re-runs. Without the reload every
+ *    poll after the first would re-read the same stale snapshot and the run
+ *    would sit at "processing" until the ceiling, however long the job took.
  */
 async function readEmbeddingState(page: Page): Promise<string> {
-  await selectProject(page, PROJECT_NAME);
+  await page.goto("/chat");
+  await page.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: PROJECT_NAME }).click();
 
-  if (await page.getByText("Ready for codebase chat").isVisible()) return "ready";
-  if (await page.getByText("Indexing failed").isVisible()) return "failed";
+  if (await page.getByText("Ready for codebase chat").isVisible())
+    return "ready";
+  if (await page.getByRole("button", { name: "Retry" }).isVisible())
+    return "failed";
   return "progressing";
 }
 
@@ -129,9 +136,7 @@ test.describe("ingestion", () => {
     // ── Submit ────────────────────────────────────────────────────────────
     await page.goto("/create-project");
 
-    await page
-      .getByLabel("GitHub Repository URL")
-      .fill(REPO_URL);
+    await page.getByLabel("GitHub Repository URL").fill(REPO_URL);
     await page.getByLabel("Project Name").fill(PROJECT_NAME);
 
     const submit = page.getByRole("button", {
@@ -156,6 +161,7 @@ test.describe("ingestion", () => {
     expect(projectId, "project card link carried no id").toBeTruthy();
 
     // ── Wait for the background job to reach a terminal state ──────────────
+    // `readEmbeddingState` navigates to `/chat` itself on every observation.
     await expect
       .poll(() => readEmbeddingState(page), {
         timeout: READY_TIMEOUT_MS,
