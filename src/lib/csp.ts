@@ -26,12 +26,11 @@ export const CSP_DIRECTIVES: CspDirectives = {
   // (code-panel.tsx) and globals.css inlines an SVG data URI.
   "img-src": [
     "data:",
+    // Fallback author avatar for commits and issues with no GitHub picture
+    // (src/lib/github/constants.ts).
     "https://ui-avatars.com",
     "https://avatars.githubusercontent.com",
     "https://camo.githubusercontent.com",
-    // Fallback author avatar for commits and issues with no GitHub picture
-    // (src/lib/github/constants.ts).
-    "https://via.placeholder.com",
   ],
   "font-src": ["'self'"],
   "object-src": ["'none'"],

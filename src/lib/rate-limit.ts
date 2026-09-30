@@ -57,6 +57,7 @@ export type MeteredScope =
   | "chat"
   | "projectCreate"
   | "embeddings"
+  | "embeddingsRead"
   | "summary"
   | "issuesSync";
 
@@ -90,6 +91,13 @@ export const LIMITS: Record<
   embeddings: {
     user: { limit: 5, windowSeconds: 600 },
     ip: { limit: 40, windowSeconds: 600 },
+  },
+  // 30/min per user, 200/min per address. Status polling, not generation, so it
+  // gets a far wider budget than `embeddings` — but it is still metered, because
+  // an unrated status endpoint is a free amplification loop for whoever wants one.
+  embeddingsRead: {
+    user: { limit: 30, windowSeconds: 60 },
+    ip: { limit: 200, windowSeconds: 60 },
   },
   // 20/hour per user, 120/hour per address.
   summary: {

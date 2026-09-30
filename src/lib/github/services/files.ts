@@ -9,13 +9,12 @@
 import { db } from "@/db";
 import { projectFiles, projectTables } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import axios from "axios";
 import * as tar from "tar-stream";
 import { createGunzip } from "zlib";
 import { computeHash } from "@/src/features/rag/services/code-chunker";
 import { GITHUB_CONFIG } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
-import { getGitHubAuthHeader } from "../client";
+import { fetchRepoTarballStream } from "../client";
 import { isIgnoredPath } from "../utils";
 import { logger } from "@/src/lib/logger";
 
@@ -57,16 +56,7 @@ export async function getRepositoryFiles(
     });
 
     // ── 1 API call: stream the entire repo as .tar.gz ──
-    const response = await axios({
-      method: "get",
-      url: `https://api.github.com/repos/${owner}/${repo}/tarball`,
-      responseType: "stream",
-      headers: {
-        ...getGitHubAuthHeader(),
-        Accept: "application/vnd.github.v3+json",
-      },
-      timeout: 120000, // 2-minute timeout for large repos
-    });
+    const response = await fetchRepoTarballStream(owner, repo);
 
     // ── Stream directly into DB (bounded memory) ──
     const totalStored = await streamAndStoreTarball(response.data, projectId);

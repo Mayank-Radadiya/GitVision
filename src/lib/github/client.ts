@@ -45,6 +45,25 @@ export function getGitHubAuthHeader(): Record<string, string> {
 }
 
 /**
+ * Streams a repository tarball straight from the GitHub API.
+ * Octokit cannot hand back a response body as a stream, so this stays the one
+ * sanctioned place services/ may reach GitHub over HTTP — see the
+ * `no-restricted-imports` rule in eslint.config.mjs.
+ */
+export async function fetchRepoTarballStream(owner: string, repo: string) {
+  return axios({
+    method: "get",
+    url: `https://api.github.com/repos/${owner}/${repo}/tarball`,
+    responseType: "stream",
+    headers: {
+      ...getGitHubAuthHeader(),
+      Accept: "application/vnd.github.v3+json",
+    },
+    timeout: 120000, // 2-minute timeout for large repos
+  });
+}
+
+/**
  * HTTP GET with automatic retries and exponential backoff.
  * Retries on 404 (GitHub CDN propagation lag), 429, and 5xx.
  */

@@ -108,6 +108,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Status polling (30/min per user, plus the IP ceiling and the global daily
+    // backstop) — see rate-limit.ts. Pass `req` so the IP dimension is actually
+    // reachable; without it a fresh Clerk account escapes the cost ceiling.
+    const rl = await enforceLimits("embeddingsRead", userId, req);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Embedding status limit reached. Please wait." },
+        { status: 429 },
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const projectIdRaw = searchParams.get("projectId");
     const parsed = projectIdSchema.safeParse({ projectId: projectIdRaw });
@@ -172,6 +183,17 @@ export async function DELETE(req: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Cancellation shares the `embeddings` budget (5/10min per user, 40/10min per
+    // address) with POST on purpose: both mutate embedding state, and two
+    // separate counters would be one more allowance to burn through.
+    const rl = await enforceLimits("embeddings", userId, req);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Embedding generation limit reached. Please wait." },
+        { status: 429 },
+      );
     }
 
     const { searchParams } = new URL(req.url);

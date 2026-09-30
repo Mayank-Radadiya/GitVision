@@ -54,9 +54,13 @@ describe("Content Security Policy hardening directives", () => {
   it("allows the inline data URI in globals.css and the GitHub avatar hosts", () => {
     const img = CSP_DIRECTIVES["img-src"];
     expect(img).toContain("data:");
+    expect(img).toContain("https://ui-avatars.com");
     expect(img).toContain("https://avatars.githubusercontent.com");
     expect(img).toContain("https://camo.githubusercontent.com");
-    expect(img).toContain("https://via.placeholder.com");
+  });
+
+  it("no longer allowlists via.placeholder.com, which is shut down", () => {
+    expect(CSP_DIRECTIVES["img-src"]).not.toContain("https://via.placeholder.com");
   });
 
   it("does not relax scripts or styles beyond what the framework needs", () => {
