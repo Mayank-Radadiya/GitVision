@@ -26,20 +26,6 @@
 
 ### Phase 0 — Make It True (Week 1) — est. 23h (19 S, 1 M)
 
-- **F-25** — Add the unique `(ownerId, githubUrl)` constraint
-  - **What:** `db/schema.ts` contains zero `uniqueIndex` declarations, so a double-submit creates two project rows and charges 20 credits.
-  - **How:** Migration `0005` adding `uniqueIndex("projects_owner_id_github_url_unique").on(table.ownerId, table.githubUrl)`, regenerate with `bun run db:generate`, and translate the constraint violation into a friendly "already added" error in `project.create`.
-  - **Dependencies:** none
-  - **Effort/Priority:** M / 🔥 P0
-  - **Source:** §5.25, §2.3 row 4
-
-- **F-11** — Record the four empty blocking decisions
-  - **What:** D-1, D-3, D-4, and D-8 are listed as decided but carry zero content; they block T-005, T-020, and T-038.
-  - **How:** D-1 → nullable `users.email` in migration `0005`, dropping the `example@gmail.com` default; D-4 → Sentry for errors plus structured JSON to stdout, with the transport calling `serialize`/`redact` from `src/lib/logger.ts`; D-8 → read T-038 then record; D-3 → record or mark N/A.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / 🔥 P0
-  - **Source:** §5.11, §2.3 row 5, §12.1
-
 - **F-02** — Make citations clickable into the viewer
   - **What:** Citation badges are inert text and the code viewer has no `?file=` deep link, so the core pitch cannot be verified. `useSearchParams` has zero occurrences repo-wide.
   - **How:** Wrap badges in `next/link` to `/code-viewer/[projectId]?file=<path>&line=<n>` and read the params in the viewer; front-end only, no backend or schema change.
@@ -459,8 +445,8 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 1 | `?url=` param pushed but never read | fixed | F-01 |
 | 2 | Dead dashboard payload on the hottest query | open | F-10 |
 | 3 | `enforceLimits` missing on embeddings GET + DELETE | fixed | F-20 |
-| 4 | No unique `(ownerId, githubUrl)` | open | F-25 |
-| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | open | F-11 |
+| 4 | No unique `(ownerId, githubUrl)` | fixed | F-25 |
+| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11 |
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
@@ -604,7 +590,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-45 tasks shipped across 10 lanes. Original IDs preserved.
+47 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -614,7 +600,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-D:** T-004 (`a9eed54`, gunzip stream had no error handler) · T-009 (`7464b8c`, two routes with zero production callers and no rate limiting) · **T-002 — skipped, already resolved at HEAD**
 
-**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client)
+**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client) · **F-25** (`ee86613`, `unique("projects_owner_id_github_url_unique")` on `projects(owner_id, github_url)` via migration `0005`, so a double-submit can no longer bill 10 credits twice; the 23505 is re-thrown at `createNewProject` as `PROJECT_ALREADY_EXISTS` instead of being buried in `details.originalError`, and `project.create` maps it to a `CONFLICT` "already added" — safe because the insert precedes `spendCredits`, so the duplicate never reaches the charge)
 
 **Lane p0-t001 (batch):** T-040 · T-041 · T-042 (`bun audit` added to CI) · T-043 (raw `console` routed through `logger`) · T-046 (404/400 not 500 from chat router) · T-047 (400 for malformed body; `await` was inside `safeParse`) · T-048 (user-chosen chat title no longer overwritten) · T-049 (`chat.delete` distinguishes deleted from never-existed) · T-050 (honest issue/comment pagination) · T-051 (`getFileContent` validated with `z.string().uuid()`) · T-053 (Zod 4 migration finished, 12 call sites) · T-054 (font/asset fix, 12 preloads → 1) · T-055 (composite + language indexes) · T-056 (compound commit cursor) · T-057 (IP-based rate-limit dimension) · T-059 (coverage thresholds — no provider was installed) · T-062 (LICENSE decision + architecture doc)
 
@@ -636,7 +622,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Already shipped:** T-063 (`5bf6a89`) — `@radix-ui/react-select` declared in `package.json` + `bun.lock`; clean installs typecheck clean.
 
-**Lane docs:** T-088 (`c1c8071`, wrote `docs/SECURITY.md` covering the tarball path-traversal and symlink defence, 404-not-403 ownership, atomic credit spending with the DB-level `CHECK` and the latched refund, three-dimensional rate limiting, and nine-key log redaction — each linked to the suite that pins it; linked from the README)
+**Lane docs:** T-088 (`c1c8071`, wrote `docs/SECURITY.md` covering the tarball path-traversal and symlink defence, 404-not-403 ownership, atomic credit spending with the DB-level `CHECK` and the latched refund, three-dimensional rate limiting, and nine-key log redaction — each linked to the suite that pins it; linked from the README) · **F-11** (`74da0d6`, recorded blocking decisions D-1, D-3, D-4, and D-8 with full context, trade-offs, and invariants in `docs/DECISIONS.md`, unblocking T-005, T-020, and T-038)
 
 ---
 
