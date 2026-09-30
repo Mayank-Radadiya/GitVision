@@ -156,6 +156,27 @@ export function registerErrorTransport(fn: ErrorTransport): void {
   transport = fn;
 }
 
+/**
+ * The redaction gate for telemetry that leaves this process off-box (F-24).
+ *
+ * Decision D-4 requires every Sentry event and breadcrumb to pass through the
+ * same walker as stdout. Sentry's own filtering is substring-based, covers a
+ * different key set, and does not truncate, so it cannot be relied on here.
+ *
+ * `redact` is deliberately not exported raw: it returns `unknown`, and the Sentry
+ * hooks must hand back the concrete type they were given. This adapter is that
+ * cast, in one place, so no caller re-implements the walk.
+ *
+ * Cost worth naming: the walker stops at `MAX_DEPTH`, so fields nested deeper
+ * than that in a Sentry event — `exception.values[].stacktrace.frames[].vars`,
+ * for one — come back as `"[circular]"` and are not sent.
+ * ponytail: depth ceiling is inherited from the stdout walker; raise MAX_DEPTH or
+ * shard by event section if stack-frame locals ever need to survive.
+ */
+export function sanitizeForOutbound<T>(value: T): T {
+  return redact(value) as T;
+}
+
 export const logger = {
   info(message: string, context?: LogContext) {
     console.log(

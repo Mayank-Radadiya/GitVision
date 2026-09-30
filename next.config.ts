@@ -80,6 +80,15 @@ const nextConfig: NextConfig = {
 
 // T-020 — source-map upload so Sentry can symbolicate server stack traces.
 // `silent: true` keeps Sentry from writing to the console during the build.
+//
+// F-24 — the credentials below are what actually enable the upload. The plugin
+// skips it (with a warning) when org, project or authToken is missing, so the
+// previous call passed none and never uploaded anything. All three are undefined
+// in local dev and CI, which keeps the build free of outbound calls; set them in
+// the Vercel production env to get symbolicated server traces.
 export default withSentryConfig(nextConfig, {
   silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
 });

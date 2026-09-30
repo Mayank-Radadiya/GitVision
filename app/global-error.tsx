@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function GlobalError({
@@ -9,6 +11,17 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // F-24 — a render error that reaches this boundary is the one class the Sentry
+  // SDK never captures on its own, so the copy below claiming "we have logged the
+  // issue" was untrue until this. The event passes through `beforeSend` in
+  // instrumentation-client.ts and is redacted there like every other event.
+  useEffect(() => {
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: error.stack ?? null } },
+      tags: { boundary: "global-error" },
+    });
+  }, [error]);
+
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[#09090b] text-foreground flex items-center justify-center p-4 font-sans antialiased">

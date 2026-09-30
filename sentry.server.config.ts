@@ -5,10 +5,15 @@
  * The transport receives the already-redacted record, so this file must never
  * re-derive or re-log the payload: doing either would create a second path
  * around the redaction in src/lib/logger.ts.
+ *
+ * F-24 — the transport above only covers `logger.error` calls. Errors the
+ * framework captures on its own (unhandled route handlers, load errors) never
+ * touch the logger, so `beforeSend` and `beforeBreadcrumb` put every event and
+ * breadcrumb through the same walker before it can leave the process.
  */
 import * as Sentry from "@sentry/nextjs";
 
-import { registerErrorTransport } from "@/src/lib/logger";
+import { registerErrorTransport, sanitizeForOutbound } from "@/src/lib/logger";
 
 const dsn = process.env.SENTRY_DSN;
 const enabled = process.env.NODE_ENV === "production" && Boolean(dsn);
@@ -20,6 +25,8 @@ Sentry.init({
   // Sentry's own diagnostics would add a second console write per error and
   // break the one-line-per-error contract in src/__tests__/unit/logger.test.ts.
   debug: false,
+  beforeSend: sanitizeForOutbound,
+  beforeBreadcrumb: sanitizeForOutbound,
 });
 
 if (enabled) {
