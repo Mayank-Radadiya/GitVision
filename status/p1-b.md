@@ -7,28 +7,34 @@ Branch: `lane/p1-b` (off `main` @ `c9ffe92`)
 | T-016 | done | secret-file patterns added to `IGNORED_FILE_PATTERNS`; 15 tests added | `c222a3a` |
 | T-015 | done | entry names resolved with `posix.normalize`; escaping entries dropped; 5 tests added | `1d27991` |
 | T-021 | done | report-only CSP + report collector route; 9 tests added | `bff7167` |
-| T-022 | partial | enforcing — `reportOnly: false`, both script tags nonced; **no runtime evidence**, the phase rule forbade running the app | `a62d460`, `a0edfc0` |
+| T-022 | done | enforcing — `reportOnly: false`, both script tags nonced, `reportTo` restored so violations still reach the collector; **runtime evidence captured** | `a62d460`, `a0edfc0`, `Promote Content Security Policy from report-only to enforcing` |
 
 ## Notes
 
-- **T-022 shipped as partial, and the original block is still unmet.** The
-  header now enforces (`reportOnly: false`) and both script tags carry the nonce
-  Clerk publishes on `x-nonce` — `clerk.browser.js` via `<ClerkProvider nonce>`,
-  the next-themes colour-scheme script via `<ThemeProvider nonce>`, which
-  `next-themes` does expose. What did *not* happen is the first step this note
-  described: nobody has exercised the running app against the policy and read the
-  violation log. The phase rule forbade it, and `bun test` / `bun run build`
-  were out of scope, so the three new assertions in
-  `src/__tests__/integration/security-headers.test.ts` have never executed
-  either. The "documentation, not a control" concern stands; what changed is that
-  the control is now reachable rather than hypothetical.
-  Still to do by hand: run the app, exercise chat streaming, the code viewer,
-  sign-in and project creation, read the `logger.warn` lines in
-  `app/api/csp-report/route.ts`, and confirm
-  `curl -sI http://localhost:3000 | rg -i content-security-policy` returns
-  `Content-Security-Policy` with a `'nonce-'` in `script-src`. Expect PostHog and
-  Vercel Insights beacons in that log — `connect-src` has no scheme fallback, so
-  they are blocked by design and the page is unaffected.
+- **T-022's runtime evidence is now captured, and the earlier note is closed.**
+  The header enforces (`reportOnly: false`), both script tags carry the nonce Clerk
+  publishes on `x-nonce` — `clerk.browser.js` via `<ClerkProvider nonce>`, the
+  next-themes colour-scheme script via `<ThemeProvider nonce>`, which
+  `next-themes` does expose — and violations still reach the collector.
+  The three assertions in `src/__tests__/integration/security-headers.test.ts` had
+  never executed; they do now (`bun run test` → 15/15). Against a running dev
+  server the response carries `content-security-policy:` with `'strict-dynamic'`
+  and a `'nonce-…'` in `script-src`, **no** `content-security-policy-report-only`,
+  and `reporting-endpoints: csp-endpoint="/api/csp-report"`; within a single
+  request the header nonce and the `nonce` on the `clerk.browser.js` tag are
+  byte-identical. A posted `reports+json` violation returns 204 and logs
+  `[CSP] Violation: script-src-elem blocked …`.
+  That last one is the substantive fix, not a formality: `reportOnly` and
+  `reportTo` are independent. Clerk only appends `report-to csp-endpoint` when
+  `reportTo` is set, so until this change the enforcing policy was reporting
+  nothing at all and `/api/csp-report` could never have fired. `docs/DECISIONS.md`
+  D-5 and `docs/SECURITY.md` both asserted the collector was live; they were
+  wrong and are corrected in the same change.
+  Still worth doing by hand: exercise chat streaming, the code viewer, sign-in
+  and project creation in a browser and read the collector log for anything the
+  enforcing policy blocks. PostHog and Vercel Insights beacons are expected
+  there — `connect-src` has no scheme fallback, so they are blocked by design and
+  the page is unaffected.
 - Files touched outside the lane's declared ownership:
   - **T-021: `app/api/csp-report/route.ts`** (new) and **`proxy.ts`**. The
     collector route is the task's own requirement ("add a minimal

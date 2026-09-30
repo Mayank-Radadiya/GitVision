@@ -88,6 +88,13 @@ describe("Content Security Policy enforcement", () => {
     // If these drift, the browser enforces a policy nobody reviewed.
     expect(CSP_MIDDLEWARE_OPTIONS.directives).toBe(CSP_DIRECTIVES);
   });
+
+  it("still routes violations to the collector", () => {
+    // Clerk only emits `report-to csp-endpoint` when this is set, so leaving it
+    // undefined would make the enforcing policy report nothing and
+    // /api/csp-report dead.
+    expect(CSP_MIDDLEWARE_OPTIONS.reportTo).toBe("/api/csp-report");
+  });
 });
 
 /**

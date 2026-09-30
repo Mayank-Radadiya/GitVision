@@ -220,13 +220,36 @@ header rule. It is built by Clerk's `clerkMiddleware` in `proxy.ts:47-80` from
 
 ```ts
 clerkMiddleware(handler, {
-  contentSecurityPolicy: { strict: true, reportOnly: false, directives: CSP_DIRECTIVES },
+  contentSecurityPolicy: {
+    strict: true,
+    reportOnly: false,
+    reportTo: "/api/csp-report",
+    directives: CSP_DIRECTIVES,
+  },
 })
 ```
 
 `reportOnly: false` is what makes the browser **block** a violation rather than
 log it, so the response carries `Content-Security-Policy` and not
 `Content-Security-Policy-Report-Only`.
+
+### How violations are still reported
+
+Enforcing does not by itself preserve reporting. `reportTo` is the directive that
+does, and it is separate from `reportOnly`: Clerk appends `report-to
+csp-endpoint` to the policy and emits a matching
+`Reporting-Endpoints: csp-endpoint="/api/csp-report"` response header **only
+when `reportTo` is set** (`@clerk/nextjs` →
+`dist/esm/server/content-security-policy.js`, `createContentSecurityPolicyHeaders`).
+Leave it unset and the enforcing policy is silent — the browser blocks the
+script and tells nobody, and `/api/csp-report` never fires.
+
+A blocked resource is reported exactly like a merely-disallowed one, which is the
+signal worth having: the report says the browser refused to run something, not
+that it was allowed to try. The endpoint is unauthenticated by design, reads a
+bounded 16 KB body, logs one line, and returns `204` — see
+`app/api/csp-report/route.ts`, which accepts both the legacy `csp-report` body
+and the Reporting API's `reports+json` array.
 
 ### Where the nonce comes from
 
@@ -299,10 +322,10 @@ when the PostHog host is pinned.
 
 `src/__tests__/integration/security-headers.test.ts` reads
 `CSP_MIDDLEWARE_OPTIONS` directly — no server needed — and asserts
-`reportOnly === false`, `strict === true`, and that
-`directives` is the same object the hardening tests pin. A sibling suite asserts
-`CSP_DIRECTIVES["script-src"]` and `["style-src"]` stay `undefined`, so nothing
-here can quietly widen what the framework needs.
+`reportOnly === false`, `strict === true`, `reportTo === "/api/csp-report"`, and
+that `directives` is the same object the hardening tests pin. A sibling suite
+asserts `CSP_DIRECTIVES["script-src"]` and `["style-src"]` stay `undefined`, so
+nothing here can quietly widen what the framework needs.
 
 ## What is not defended here
 

@@ -62,3 +62,9 @@ export const CSP_MIDDLEWARE_OPTIONS = {
   reportOnly: false,
   directives: CSP_DIRECTIVES,
 } satisfies NonNullable<ClerkMiddlewareOptions["contentSecurityPolicy"]>;
+  // Without this the policy carries no reporting directive at all and the
+  // collector is dead: Clerk only appends `report-to csp-endpoint` plus the
+  // matching `Reporting-Endpoints` header when `reportTo` is set. Promoting the
+  // policy to enforcing does not preserve reporting on its own — a blocked
+  // script is reported only because the browser still knows where to send it.
+  reportTo: "/api/csp-report",

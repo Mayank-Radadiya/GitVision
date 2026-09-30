@@ -14,7 +14,7 @@ Where a decision imposes an invariant, that invariant must be respected by all s
 | **D-2** | AI Issue-Triage Columns | Decided (Drop) | T-028 / F-13 | T-028 dropped triage affordances; F-13 recommendation on record proposes reviving them without migration. |
 | **D-3** | Decision Ledger Reconciliation & Repo Indexing Caps | **Resolved / N/A** | T-012, T-013 | Bounded at 500 files prioritized by `asc(length(code))`; marks `indexingStatus: "partial"` with UI badge. Blank ledger entries reconciled. |
 | **D-4** | Production Logging & Error Transport | **Accepted** | **T-020** | `@sentry/nextjs` via `instrumentation.ts` + stdout JSON for Vercel drain. Must route through `src/lib/logger.ts` redaction. |
-| **D-5** | Report-Only Content Security Policy | Accepted | T-021, T-022 | Serve CSP in report-only mode with `/api/csp-report` collector until nonce support is wired. |
+| **D-5** | Enforcing Content Security Policy with report collection | Accepted | T-021, T-022 | Once nonces were threaded (T-082), flip the policy from report-only to enforcing (`reportOnly: false`) and keep `/api/csp-report` live via `reportTo`, so blocked scripts are still reported. |
 | **D-6** | Retention Policy Scope & Guarantees | Accepted | T-024 | Align documentation with live system behaviour; avoid advertising unbuilt automatic sweeps. |
 | **D-7** | In-Memory & Concurrency Rate-Limit Ceiling | Accepted | T-057, T-058 | Three-dimensional rate limiting (scope, user, IP) in PostgreSQL/memory; accept provider limits without Redis overhead. |
 | **D-8** | Cross-Origin-Opener-Policy (COOP) Scope | **Accepted** | **T-038** | `same-origin` globally. Authentication is full-redirect, so no `window.opener` dependency exists to trade isolation away for. |
