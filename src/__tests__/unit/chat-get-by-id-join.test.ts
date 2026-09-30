@@ -12,6 +12,10 @@ const CHAT_ID = "22222222-2222-4222-8222-222222222222";
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 
 let leftJoins = 0;
+// Lives out here so `beforeEach` can reset it: the factory below is hoisted, so
+// a counter declared inside it survives across every test in this file. Without
+// the reset, the second test starts on an even select and reads an empty result.
+let selects = 0;
 
 const chatRow = {
   id: CHAT_ID,
@@ -41,15 +45,15 @@ function makeRows(getRows: () => unknown[]) {
 }
 
 vi.mock("@/db", () => {
-  let query = 0;
   return {
     db: {
       select: () => {
-        query += 1;
-        // 1st select in the procedure is the chat row, the next is messages.
-        // Only a joined query can produce the project name.
+        selects += 1;
+        // The first select in the procedure is the joined chat row; every
+        // later select fetches something the chat already implies. Only a
+        // joined query can produce the project name.
         return makeRows(() =>
-          query % 2 === 1
+          selects % 2 === 1
             ? leftJoins > 0
               ? [{ ...chatRow, projectName: "acme/demo" }]
               : [chatRow]
@@ -75,6 +79,7 @@ const caller = createCallerFactory(chatRouter)({
 
 beforeEach(() => {
   leftJoins = 0;
+  selects = 0;
 });
 
 describe("chat.getById", () => {
