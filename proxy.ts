@@ -1,5 +1,9 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import { CSP_MIDDLEWARE_OPTIONS } from "@/src/lib/csp";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import {
+  CSP_MIDDLEWARE_OPTIONS,
+  stripUnsafeScriptDirectives,
+} from "@/src/lib/csp";
 
 /**
  * The complete set of routes a signed-out visitor may reach.
@@ -44,7 +48,7 @@ function isPublicRoute(req: { nextUrl?: { pathname: string }; url?: string }): b
   return PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 
-export default clerkMiddleware(
+const withCsp = clerkMiddleware(
   async (auth, req) => {
     const requestId =
       req.headers.get("x-request-id") || crypto.randomUUID();
@@ -64,6 +68,26 @@ export default clerkMiddleware(
     contentSecurityPolicy: CSP_MIDDLEWARE_OPTIONS,
   },
 );
+
+export default async function proxy(req: NextRequest, event: NextFetchEvent) {
+  const result = await withCsp(req, event);
+
+  // `clerkMiddleware` writes the policy onto the response *after* the handler
+  // above returns, so the only place to reach it is here. See
+  // `stripUnsafeScriptDirectives` for why the two unsafe script keywords cannot
+  // be configured away instead.
+  if (result instanceof Response) {
+    const policy = result.headers.get("content-security-policy");
+    if (policy) {
+      result.headers.set(
+        "content-security-policy",
+        stripUnsafeScriptDirectives(policy),
+      );
+    }
+  }
+
+  return result;
+}
 
 export const config = {
   matcher: [

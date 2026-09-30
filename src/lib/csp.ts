@@ -60,11 +60,48 @@ export const CSP_DIRECTIVES: CspDirectives = {
 export const CSP_MIDDLEWARE_OPTIONS = {
   strict: true,
   reportOnly: false,
-  directives: CSP_DIRECTIVES,
-} satisfies NonNullable<ClerkMiddlewareOptions["contentSecurityPolicy"]>;
   // Without this the policy carries no reporting directive at all and the
   // collector is dead: Clerk only appends `report-to csp-endpoint` plus the
   // matching `Reporting-Endpoints` header when `reportTo` is set. Promoting the
   // policy to enforcing does not preserve reporting on its own — a blocked
   // script is reported only because the browser still knows where to send it.
   reportTo: "/api/csp-report",
+  directives: CSP_DIRECTIVES,
+} satisfies NonNullable<ClerkMiddlewareOptions["contentSecurityPolicy"]>;
+
+const UNSAFE_SCRIPT_SOURCES = new Set(["'unsafe-inline'", "'unsafe-eval'"]);
+
+/**
+ * Drop `'unsafe-inline'` and `'unsafe-eval'` from `script-src` in a policy
+ * `clerkMiddleware` has already built.
+ *
+ * Configuration alone cannot do this. Clerk's `strict: true` only deletes the
+ * bare `http:`/`https:` scheme sources and adds `'strict-dynamic'` plus the
+ * nonce; the two unsafe keywords survive. And its `directives` option *unions*
+ * into `DEFAULT_DIRECTIVES` (`handleExistingDirective`), so no configuration
+ * value can subtract one. The header is also written after our middleware
+ * handler returns, via `setHeader` on the response object, so the handler
+ * cannot post-process it either. Owning the default export and rewriting the
+ * header on the way out is the only seam.
+ *
+ * They are inert here — CSP3 ignores both whenever a nonce or
+ * `'strict-dynamic'` is present — so this is about the policy reading as what
+ * it actually enforces. `style-src` keeps `'unsafe-inline'` on purpose; see
+ * the note on `CSP_DIRECTIVES`.
+ *
+ * `ponytail:` a text scrub, correct only because Clerk is the sole producer of
+ * this header. If a second CSP writer ever appears, this has to become a real
+ * policy builder rather than a rewrite.
+ */
+export function stripUnsafeScriptDirectives(policy: string): string {
+  return policy.replace(
+    /(^|;)([ \t]*script-src[ \t]+)([^;]*)/,
+    (_directive, lead: string, name: string, sources: string) =>
+      lead +
+      name +
+      sources
+        .split(/[ \t]+/)
+        .filter((source) => source !== "" && !UNSAFE_SCRIPT_SOURCES.has(source))
+        .join(" "),
+  );
+}

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import nextConfig from "@/next.config";
-import { CSP_DIRECTIVES, CSP_MIDDLEWARE_OPTIONS } from "@/src/lib/csp";
+import {
+  CSP_DIRECTIVES,
+  CSP_MIDDLEWARE_OPTIONS,
+  stripUnsafeScriptDirectives,
+} from "@/src/lib/csp";
 
 /** Every static header `next.config.ts` promises, with the exact value it must carry. */
 const EXPECTED_STATIC_HEADERS: ReadonlyArray<readonly [string, string]> = [
@@ -94,6 +98,97 @@ describe("Content Security Policy enforcement", () => {
     // undefined would make the enforcing policy report nothing and
     // /api/csp-report dead.
     expect(CSP_MIDDLEWARE_OPTIONS.reportTo).toBe("/api/csp-report");
+  });
+});
+
+/**
+ * `stripUnsafeScriptDirectives`.
+ *
+ * The fixture is verbatim output from Clerk's own generator configured with
+ * `CSP_MIDDLEWARE_OPTIONS` (captured by importing
+ * `createContentSecurityPolicyHeaders` from a scratch script). It is pinned
+ * here as a literal rather than generated at test time because the generator is
+ * not reachable from the public export map: `@clerk/nextjs`'s `exports` has no
+ * wildcard, so `import "@clerk/nextjs/dist/esm/server/content-security-policy.js"`
+ * throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. Reaching into `node_modules` by file
+ * URL would pin the suite to a dependency's internal build layout, so the string
+ * is pinned instead and re-verified whenever Clerk is upgraded.
+ */
+const CLERK_POLICY =
+  "base-uri 'self'; connect-src 'self' https://clerk-telemetry.com https://*.clerk-telemetry.com https://api.stripe.com https://maps.googleapis.com https://img.clerk.com https://images.clerkstage.dev https://*.protect.clerk.com app-example.clerk.accounts.dev; default-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'self' https://challenges.cloudflare.com https://*.js.stripe.com https://js.stripe.com https://hooks.stripe.com https://*.protect.clerk.com; img-src 'self' https://img.clerk.com data: https://ui-avatars.com https://avatars.githubusercontent.com https://camo.githubusercontent.com; object-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.js.stripe.com https://js.stripe.com https://maps.googleapis.com https://*.protect.clerk.com 'strict-dynamic' 'nonce-LSoK8Dsn5iUQi0NCyjPAMg=='; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; report-to csp-endpoint";
+
+/** The same policy with only `script-src` scrubbed. */
+const SCRUBBED_POLICY = CLERK_POLICY.replace(
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' ",
+  "script-src 'self' ",
+);
+
+const scriptSrc = (policy: string) =>
+  policy
+    .split(";")
+    .find((directive) => directive.trim().startsWith("script-src"))!;
+
+describe("stripUnsafeScriptDirectives", () => {
+  it("removes both unsafe keywords from a real Clerk policy and changes nothing else", () => {
+    expect(stripUnsafeScriptDirectives(CLERK_POLICY)).toBe(SCRUBBED_POLICY);
+  });
+
+  it("leaves the nonce byte-for-byte, since it is what the scripts are tagged with", () => {
+    // Getting this wrong does not weaken the policy, it breaks the app: the
+    // scripts carry the same nonce, so a mangled one blocks every one of them.
+    expect(scriptSrc(stripUnsafeScriptDirectives(CLERK_POLICY))).toContain(
+      "'nonce-LSoK8Dsn5iUQi0NCyjPAMg=='",
+    );
+  });
+
+  it("keeps 'strict-dynamic', which is what makes the policy nonce-only", () => {
+    expect(scriptSrc(stripUnsafeScriptDirectives(CLERK_POLICY))).toContain(
+      "'strict-dynamic'",
+    );
+  });
+
+  it("keeps the vendor hosts, so the scrub is not mistaken for host removal", () => {
+    // Under 'strict-dynamic' a CSP3 browser ignores these anyway; removing
+    // them would be a different change with its own test.
+    const scrubbed = scriptSrc(stripUnsafeScriptDirectives(CLERK_POLICY));
+    expect(scrubbed).toContain("https://js.stripe.com");
+    expect(scrubbed).toContain("https://*.protect.clerk.com");
+    expect(scrubbed).toContain("'self'");
+  });
+
+  it("never touches another directive, including style-src 'unsafe-inline'", () => {
+    // style-src keeps 'unsafe-inline' on purpose: Tailwind, Next's critical CSS
+    // and Shiki's inline styles cannot be pre-hashed.
+    expect(stripUnsafeScriptDirectives(CLERK_POLICY)).toContain(
+      "style-src 'self' 'unsafe-inline'",
+    );
+    for (const directive of ["connect-src", "frame-src", "img-src", "worker-src"]) {
+      const before = CLERK_POLICY.split("; ").find((d) => d.startsWith(directive));
+      const after = SCRUBBED_POLICY.split("; ").find((d) => d.startsWith(directive));
+      expect(after, `${directive} was altered`).toBe(before);
+    }
+  });
+
+  it("still strips when script-src is the only directive, and when it is last", () => {
+    // The trailing `;` and the no-sibling cases exercise the anchor on either
+    // side of the replacement.
+    expect(stripUnsafeScriptDirectives("script-src 'self' 'unsafe-inline';")).toBe(
+      "script-src 'self';",
+    );
+    expect(
+      stripUnsafeScriptDirectives("default-src 'self'; script-src 'self' 'unsafe-eval'"),
+    ).toBe("default-src 'self'; script-src 'self'");
+  });
+
+  it("returns a policy with no script-src unchanged", () => {
+    const noScripts = "default-src 'self'; object-src 'none'";
+    expect(stripUnsafeScriptDirectives(noScripts)).toBe(noScripts);
+  });
+
+  it("does not mistake script-src-elem for script-src", () => {
+    // A substring match would strip the keyword from the wrong directive.
+    const policy = "script-src-elem 'unsafe-inline'";
+    expect(stripUnsafeScriptDirectives(policy)).toBe(policy);
   });
 });
 

@@ -285,6 +285,33 @@ omits `script-src` and `style-src`: `strict: true` derives `script-src` (includi
 CSS, and Shiki; `'unsafe-inline'` in `script-src` is the opposite case, since CSP3
 ignores it entirely when a nonce or `'strict-dynamic'` is present.
 
+### Removing the unsafe script keywords
+
+`script-src` on the wire carries **no** `'unsafe-inline'` and no `'unsafe-eval'`:
+
+```
+script-src 'self' https://*.js.stripe.com https://js.stripe.com
+  https://maps.googleapis.com https://*.protect.clerk.com
+  'strict-dynamic' 'nonce-<base64>'
+```
+
+They are gone, but not by configuration. Three things rule that out:
+
+- `strict: true` only deletes `http:` and `https:` from Clerk's `script-src`.
+- `CSP_DIRECTIVES` can only **add** to `script-src`. Clerk unions
+  `customDirectives` into the defaults it already built, so no value can be
+  subtracted through that path.
+- Clerk writes the policy onto the response *after* the middleware handler
+  returns, with `setHeader`. A handler that tried to rewrite the header would be
+  clobbered.
+
+So `proxy.ts` wraps `clerkMiddleware` and rewrites the header on the way out
+(`stripUnsafeScriptDirectives` in `src/lib/csp.ts`). It is a textual scrub, which
+is only sound because Clerk is the sole producer of this header; a second writer
+would make it a real policy builder instead. It removes both keywords, leaves
+`'strict-dynamic'`, the nonce, and the vendor hosts untouched, and does not match
+`script-src-elem` (the pattern anchors on the full directive name).
+
 ### Why it is safe to enforce
 
 Enforcing is only safe once every script the app emits is nonced. Under
@@ -326,6 +353,19 @@ when the PostHog host is pinned.
 that `directives` is the same object the hardening tests pin. A sibling suite
 asserts `CSP_DIRECTIVES["script-src"]` and `["style-src"]` stay `undefined`, so
 nothing here can quietly widen what the framework needs.
+
+The scrub has its own suite in the same file. Clerk's `createContentSecurityPolicyHeaders`
+is not reachable from tests — `@clerk/nextjs`'s `exports` map has no wildcard, so
+the deep import fails with `ERR_PACKAGE_PATH_NOT_EXPORTED` — so the suite pins a
+verbatim capture of its output as a literal and asserts the rewrite against it:
+the exact scrubbed policy, the nonce preserved byte for byte, `'strict-dynamic'`
+kept, vendor hosts and `'self'` kept, no other directive altered, `style-src` left intact. Re-verify that fixture
+on a Clerk upgrade.
+
+Verified against a running dev server: three consecutive requests returned three
+different nonces; all 98 script tags carried the nonce of their own request; the
+header nonce and the tags' nonce were byte-identical within a request; and no
+response carried `content-security-policy-report-only`.
 
 ## What is not defended here
 
