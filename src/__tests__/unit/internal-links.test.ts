@@ -48,6 +48,7 @@ const VALID_APP_ROUTES = new Set<string>([
   "/create-project",
   "/chat",
   "/code-viewer",
+  "/settings",
 
   // Legal routes — app/legal/*
   "/legal/privacy-policy",
@@ -75,12 +76,13 @@ const BANNED_ROUTES = [
 //   src/features/auth/components/*                                   (hardcoded hrefs)
 // ---------------------------------------------------------------------------
 
-/** Hrefs from PRIMARY_NAVIGATION (sidebar) */
+/** Hrefs from PRIMARY_NAVIGATION and SECONDARY_NAVIGATION (sidebar) */
 const SIDEBAR_NAV_HREFS: string[] = [
   "/dashboard",
   "/create-project",
   "/chat",
   "/code-viewer",
+  "/settings",
 ];
 
 /** Internal hrefs from FOOTER_LINKS (excludes #-anchors and external URLs) */
@@ -160,6 +162,7 @@ describe("Internal application links resolve to defined App Router routes", () =
       "/create-project",
       "/chat",
       "/code-viewer",
+      "/settings",
       "/legal/privacy-policy",
       "/legal/terms-of-service",
     ];

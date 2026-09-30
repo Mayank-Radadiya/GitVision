@@ -42,6 +42,13 @@ const tsvector = customType<{ data: string }>({
   },
 });
 
+/**
+ * The three choices the theme switcher offers. `system` defers to the OS via
+ * next-themes. The column is the cross-device copy: next-themes owns
+ * localStorage, this owns the value that follows the user to another browser.
+ */
+export type ThemePreference = "light" | "dark" | "system";
+
 export const usersTable = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull().default("unknown"),
@@ -50,6 +57,13 @@ export const usersTable = pgTable("users", {
   // are exempt from uniqueness in Postgres, so many email-less users coexist.
   email: varchar("email", { length: 255 }).unique(),
   credits: integer("credits").notNull().default(100),
+  // Defaults to 'dark' because that is what the root provider already rendered
+  // before this column existed. Backfilling anything else would silently
+  // repaint every existing user on first settings load.
+  themePreference: varchar("theme_preference", { length: 16 })
+    .$type<ThemePreference>()
+    .notNull()
+    .default("dark"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

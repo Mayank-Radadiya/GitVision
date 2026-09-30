@@ -17,6 +17,7 @@ import {
   PlusCircle,
   MessageSquare,
   Code2Icon,
+  SettingsIcon,
   LucideIcon,
 } from "lucide-react";
 
@@ -118,5 +119,17 @@ export const PRIMARY_NAVIGATION: NavItem[] = [
     name: "Code Viewer",
     href: "/code-viewer",
     icon: Code2Icon,
+  },
+];
+
+/**
+ * Account-level pages, rendered in their own section below the primary nav so
+ * the app's daily work stays visually separate from configuration.
+ */
+export const SECONDARY_NAVIGATION: NavItem[] = [
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: SettingsIcon,
   },
 ];

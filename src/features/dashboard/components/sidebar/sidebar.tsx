@@ -53,6 +53,7 @@ import { useUser } from "@clerk/nextjs";
 import {
   SidebarProps,
   PRIMARY_NAVIGATION,
+  SECONDARY_NAVIGATION,
   SIDEBAR_WIDTH_COLLAPSED,
   SIDEBAR_WIDTH_EXPANDED,
   SIDEBAR_SPRING_CONFIG,
@@ -101,11 +102,11 @@ function SidebarContent({ isCollapsed, onToggle }: SidebarContentProps) {
 
         {/* Secondary Navigation & Sign Out */}
         <div>
-          {/* <SidebarNavSection
+          <SidebarNavSection
             label="Settings"
             items={SECONDARY_NAVIGATION}
             isCollapsed={isCollapsed}
-          /> */}
+          />
         </div>
       </div>
 
