@@ -38,6 +38,21 @@ const thenable = {
       : (resolve({ rowCount: 1 }), undefined),
 };
 
+// user.created awaits `.onConflictDoNothing().returning({ id })` and only
+// grants the signup credits when a row actually came back, so the mock has to
+// answer `.returning()` with a non-empty array.
+const returningRows = {
+  then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+    state.failNext
+      ? reject(state.failNext)
+      : (resolve([{ id: "user_abc" }]), undefined),
+};
+
+const doNothingChain = {
+  then: thenable.then,
+  returning: () => returningRows,
+};
+
 const chain = {
   values(v: Record<string, unknown>) {
     state.insert.values = v;
@@ -48,7 +63,7 @@ const chain = {
     return thenable;
   },
   onConflictDoNothing() {
-    return thenable;
+    return doNothingChain;
   },
   where() {
     return thenable;
@@ -64,6 +79,8 @@ vi.mock("@/db", () => ({
         return thenable;
       },
     }),
+    // grantCredits issues one raw CTE through db.execute.
+    execute: async () => ({ rows: [{ balance_after: 100 }] }),
   },
 }));
 
@@ -108,68 +125,168 @@ beforeEach(() => {
 // This is the correct fix for shared-state mocks: the `state` object is reset
 // in beforeEach, but only one test must touch it at a time.
 describe.sequential("Clerk webhook", () => {
-  it("upserts on the primary key so an existing user is updated in place", async () => {
-    (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
-      type: "user.updated",
-      data: {
-        id: "user_abc",
-        email_addresses: [{ email_address: "a@b.com" }],
-        first_name: "Ada",
-        last_name: "Lovelace",
-      },
-    };
+  it(
+    "upserts on the primary key so an existing user is updated in place",
+    { timeout: 20000 },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "user.updated",
+        data: {
+          id: "user_abc",
+          email_addresses: [{ email_address: "a@b.com" }],
+          first_name: "Ada",
+          last_name: "Lovelace",
+        },
+      };
 
-    const res = await invoke();
+      const res = await invoke();
 
-    expect(res.status).toBe(200);
-    // The stable identity is Clerk's user id (the PK), not the mutable email.
-    expect(state.insert.conflict?.target).toBeDefined();
-    const target = state.insert.conflict?.target as { name: string } | undefined;
-    expect(target?.name).toBe("id");
-  }, { timeout: 20000 });
+      expect(res.status).toBe(200);
+      // The stable identity is Clerk's user id (the PK), not the mutable email.
+      expect(state.insert.conflict?.target).toBeDefined();
+      const target = state.insert.conflict?.target as
+        { name: string } | undefined;
+      expect(target?.name).toBe("id");
+    },
+  );
 
-  it("does not hand out credits on an update, only on insert", async () => {
-    (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
-      type: "user.updated",
-      data: {
-        id: "user_abc",
-        email_addresses: [{ email_address: "a@b.com" }],
-        first_name: "Ada",
-      },
-    };
+  it(
+    "does not hand out credits on an update, only on insert",
+    { timeout: 20000 },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "user.updated",
+        data: {
+          id: "user_abc",
+          email_addresses: [{ email_address: "a@b.com" }],
+          first_name: "Ada",
+        },
+      };
 
-    await invoke();
+      await invoke();
 
-    // credits must be in the INSERT values only; replaying the webhook
-    // must never refill a user's balance.
-    expect(state.insert.values?.credits).toBe(100);
-    expect(state.insert.conflict?.set).not.toHaveProperty("credits");
-  }, { timeout: 20000 });
+      // credits must be in the INSERT values only; replaying the webhook
+      // must never refill a user's balance.
+      expect(state.insert.values?.credits).toBe(100);
+      expect(state.insert.conflict?.set).not.toHaveProperty("credits");
+    },
+  );
 
-  it("returns 500 when the database write fails so Clerk retries", async () => {
-    (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
-      type: "user.updated",
-      data: {
-        id: "user_abc",
-        email_addresses: [{ email_address: "a@b.com" }],
-      },
-    };
-    state.failNext = new Error("connection terminated unexpectedly");
+  it(
+    "returns 500 when the database write fails so Clerk retries",
+    { timeout: 20000 },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "user.updated",
+        data: {
+          id: "user_abc",
+          email_addresses: [{ email_address: "a@b.com" }],
+        },
+      };
+      state.failNext = new Error("connection terminated unexpectedly");
 
-    const res = await invoke();
+      const res = await invoke();
 
-    // Silently returning 200 here is what made provisioning fail unnoticed.
-    expect(res.status).toBe(500);
-  }, { timeout: 20000 });
+      // Silently returning 200 here is what made provisioning fail unnoticed.
+      expect(res.status).toBe(500);
+    },
+  );
 
-  it("still returns 200 for events it does not handle", async () => {
-    (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
-      type: "session.created",
-      data: { id: "sess_1" },
-    };
+  it(
+    "still returns 200 for events it does not handle",
+    {
+      timeout: 20000,
+    },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "session.created",
+        data: { id: "sess_1" },
+      };
 
-    const res = await invoke();
-    expect(res.status).toBe(200);
-  }, { timeout: 20000 });
+      const res = await invoke();
+      expect(res.status).toBe(200);
+    },
+  );
+
+  // T-005 / D-1: an OAuth-only Clerk account has no email address at all.
+  // The handler must still provision the row rather than skipping the user,
+  // which used to leave them signed in with no users row and no visible error.
+  it(
+    "creates a user row with a null email when the account has no address",
+    { timeout: 20000 },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "user.created",
+        data: {
+          id: "user_oauth_1",
+          email_addresses: [],
+          first_name: "Grace",
+          last_name: "Hopper",
+        },
+      };
+
+      const res = await invoke();
+
+      expect(res.status).toBe(200);
+      expect(state.insert.values?.id).toBe("user_oauth_1");
+      expect(state.insert.values?.email).toBeNull();
+      // The row is inserted with a zero balance and topped up by grantCredits;
+      // a null email must not cause the insert to be skipped.
+      expect(state.insert.values?.credits).toBe(0);
+    },
+  );
+
+  it(
+    "still stores the address when the account has one",
+    { timeout: 20000 },
+    async () => {
+      (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+        type: "user.created",
+        data: {
+          id: "user_email_1",
+          email_addresses: [{ email_address: "a@b.com" }],
+          first_name: "Ada",
+        },
+      };
+
+      const res = await invoke();
+
+      expect(res.status).toBe(200);
+      expect(state.insert.values?.email).toBe("a@b.com");
+    },
+  );
+
+  // The old default of 'example@gmail.com' plus a unique index meant the
+  // second email-less signup hit Postgres 23505 and got a 500 from Clerk.
+  // NULL is exempt from unique indexes, so both rows land. This asserts the
+  // handler emits a distinct PK per event with no shared placeholder email —
+  // the mock cannot enforce the index itself, but two distinct null values are
+  // the precondition the constraint requires.
+  it(
+    "provisions every email-less account instead of colliding on a shared email",
+    { timeout: 20000 },
+    async () => {
+      const seen: Record<string, unknown>[] = [];
+
+      for (const id of ["user_oauth_1", "user_oauth_2"]) {
+        (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
+          type: "user.created",
+          data: { id, email_addresses: [], first_name: "Grace" },
+        };
+
+        const res = await invoke();
+
+        expect(res.status).toBe(200);
+        seen.push({
+          id: state.insert.values?.id,
+          email: state.insert.values?.email,
+        });
+      }
+
+      expect(seen.map((r) => r.id)).toEqual(["user_oauth_1", "user_oauth_2"]);
+      // No row carries the old shared placeholder.
+      expect(seen.every((r) => r.email === null)).toBe(true);
+      expect(seen.some((r) => r.email === "example@gmail.com")).toBe(false);
+    },
+  );
 });
-
