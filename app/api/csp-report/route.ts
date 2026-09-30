@@ -11,9 +11,10 @@ import { logger } from "@/src/lib/logger";
  * log, and returns nothing. A violation report already contains attacker-
  * chosen strings, so nothing from the body is ever echoed back.
  *
- * Phase 2 (T-022) turns `Content-Security-Policy-Report-Only` into
- * `Content-Security-Policy` once this log has been read and the origin list
- * has stopped moving. This route stays either way.
+ * The header is now `Content-Security-Policy` — enforcing, not report-only —
+ * and this collector still receives reports. A blocked script produces a report
+ * too, which is exactly the signal you want: it says the browser refused to run
+ * something, not merely that it was allowed to try.
  */
 export const dynamic = "force-dynamic";
 

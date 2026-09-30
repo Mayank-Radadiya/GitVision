@@ -207,8 +207,102 @@ Pinned by `src/__tests__/integration/security-headers.test.ts` — "serves every
 security header for all routes (/:path*) with its exact value" reads
 `nextConfig.headers()` back, finds the `/:path*` rule, and asserts each key/value
 pair in `EXPECTED_STATIC_HEADERS` (`:6-16`), where COOP is pinned at `:16`. The
-same suite asserts `X-XSS-Protection` is absent and checks the `CSP_DIRECTIVES`
-values separately.
+same suite asserts `X-XSS-Protection` is absent, checks the `CSP_DIRECTIVES`
+values separately, and — in "Content Security Policy enforcement" — asserts the
+policy is enforcing rather than report-only.
+
+## Content-Security-Policy: per-request nonce, enforcing
+
+Unlike the six headers above, the CSP is **not** declared in `next.config.ts`. It
+is the one policy that has to vary per request, so it cannot live in a static
+header rule. It is built by Clerk's `clerkMiddleware` in `proxy.ts:47-80` from
+`CSP_MIDDLEWARE_OPTIONS` in `src/lib/csp.ts`:
+
+```ts
+clerkMiddleware(handler, {
+  contentSecurityPolicy: { strict: true, reportOnly: false, directives: CSP_DIRECTIVES },
+})
+```
+
+`reportOnly: false` is what makes the browser **block** a violation rather than
+log it, so the response carries `Content-Security-Policy` and not
+`Content-Security-Policy-Report-Only`.
+
+### Where the nonce comes from
+
+`strict: true` makes Clerk mint a fresh nonce per request: 16 bytes from
+`crypto.getRandomValues`, base64-encoded (`@clerk/nextjs` →
+`dist/esm/server/content-security-policy.js`, `generateNonce`). Strict mode then
+deletes `http:`/`https:` from `script-src`, adds `'strict-dynamic'`, and adds
+`'nonce-<base64>'`. Third-party hosts do not need allowlisting precisely because
+a nonced script is trusted to load them transitively.
+
+The nonce is published on the `x-nonce` request header, and Clerk forwards it to
+server components through `x-middleware-override-headers` so that
+`await headers()` can see it. The layout reads it, the provider passes it to both
+`<ClerkProvider nonce={…}>` and `<ThemeProvider nonce={…}>`, and Clerk puts it on
+the `clerk.browser.js` script tag:
+
+```
+clerkMiddleware → "x-nonce: <base64>"
+      → app/layout.tsx        (await headers()).get("x-nonce")
+      → app-provider.tsx      → <ClerkProvider nonce>   → <script nonce="<same base64>">
+                              → <ThemeProvider nonce>   → <script nonce="<same base64>">
+```
+
+The nonce the policy checks and the nonce on the tag are the same value, which
+is the whole point: there is no second place to keep in sync. `RootLayout` is
+`async` for this, which opts the app into dynamic rendering — unavoidable, since
+a per-request nonce cannot be baked into a statically cached response.
+
+`src/lib/csp.ts` remains the only customisation point, and it still deliberately
+omits `script-src` and `style-src`: `strict: true` derives `script-src` (including
+`'strict-dynamic'` and the nonce) and the Clerk frontend API host in
+`connect-src`. `style-src` needs `'unsafe-inline'` for Tailwind, Next's critical
+CSS, and Shiki; `'unsafe-inline'` in `script-src` is the opposite case, since CSP3
+ignores it entirely when a nonce or `'strict-dynamic'` is present.
+
+### Why it is safe to enforce
+
+Enforcing is only safe once every script the app emits is nonced. Under
+`'strict-dynamic'` a CSP3 browser ignores `'self'` and `'unsafe-inline'` and runs
+**only** nonced scripts, so a single un-nonced tag is an unhydrated page and a
+broken sign-in — not a console warning. That is the reason this policy sat in
+report-only mode for as long as it did, and it is why the flip and the nonce
+plumbing were one change rather than two.
+
+Both tags that matter are now nonced:
+
+- `clerk.browser.js`, through `<ClerkProvider nonce={…}>`.
+- The inline colour-scheme script that `next-themes` injects from inside
+  `<ThemeProvider>`, through `<ThemeProvider nonce={…}>`. `next-themes` does
+  expose a `nonce` prop (`next-themes/dist/index.d.ts`) and stamps it on that
+  script during server render, so no provider replacement or tag shadowing was
+  needed.
+
+Third-party scripts that are not nonced still load, because a nonced script is
+trusted to load them transitively under `'strict-dynamic'`. That covers the
+Vercel Analytics tag, which `@vercel/analytics` injects with
+`document.createElement("script")`.
+
+### Known gap: analytics beacons
+
+`'strict-dynamic'` covers `script-src`, but `connect-src` has no scheme
+fallback. PostHog (`us.i.posthog.com`, from `src/shared/components/product-analytics.tsx`)
+and Vercel Insights beacons (`*.vercel-insights.com`) are therefore blocked while
+the page itself renders normally. This is analytics-only degradation and was
+deliberately left unfixed: `NEXT_PUBLIC_POSTHOG_HOST` is per-environment, so
+allowlisting it by hand starts a drift the policy cannot police. Add the origins
+when the PostHog host is pinned.
+
+### Pinned by tests
+
+`src/__tests__/integration/security-headers.test.ts` reads
+`CSP_MIDDLEWARE_OPTIONS` directly — no server needed — and asserts
+`reportOnly === false`, `strict === true`, and that
+`directives` is the same object the hardening tests pin. A sibling suite asserts
+`CSP_DIRECTIVES["script-src"]` and `["style-src"]` stay `undefined`, so nothing
+here can quietly widen what the framework needs.
 
 ## What is not defended here
 
