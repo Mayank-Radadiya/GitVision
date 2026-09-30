@@ -42,9 +42,9 @@ export default async function ChatDetailPage({
         initialFilePath={file}
         type={chatData.type as "project" | "general"}
         title={chatData.title}
-        // ponytail: only the newest 300 messages load. Longer chats start
-        // mid-conversation for the model. Add a "load earlier" control that
-        // pages getById by cursor if that ever matters.
+        // F-07: the server already answers whether older rows were held back
+        // at MAX_MESSAGE_LIMIT — the room renders the banner from this flag.
+        hasMoreMessages={chatData.hasMoreMessages}
         initialMessages={chatData.messages.map((m) => ({
           id: m.id,
           role: m.role as "user" | "assistant" | "system",

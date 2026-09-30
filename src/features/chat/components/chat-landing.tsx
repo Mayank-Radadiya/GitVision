@@ -6,7 +6,6 @@ import {
   MessageSquare,
   FolderGit2,
   Sparkles,
-  ArrowRight,
   Zap,
   Loader2,
   CheckCircle2,
@@ -26,6 +25,7 @@ import {
 import { trpc } from "@/src/lib/trpc/client";
 import { logger } from "@/src/lib/logger";
 import { formatDistanceToNow } from "date-fns";
+import { ChatActionsMenu } from "./chat-actions-menu";
 
 interface Project {
   id: string;
@@ -56,6 +56,74 @@ function StatusDot({ status }: { status: string | null }) {
     <span
       className={`inline-block h-2 w-2 rounded-full ${colors[status ?? ""] ?? "bg-zinc-600"}`}
     />
+  );
+}
+
+/**
+ * One row of the Recent conversations list (F-07).
+ *
+ * A div with button semantics rather than a <button>: the row carries the
+ * actions menu, and a button cannot contain the menu's button trigger.
+ * Keyboard behavior matches: Enter/Space navigates, the menu trigger and
+ * the inline rename form stop propagation so they never navigate.
+ */
+function RecentChatRow({
+  chat,
+  projectName,
+}: {
+  chat: Chat;
+  projectName?: string;
+}) {
+  const router = useRouter();
+  const [displayTitle, setDisplayTitle] = useState(chat.title);
+  const [deleted, setDeleted] = useState(false);
+
+  // The list is a static server prop, so a delete hides the row locally;
+  // the menu already invalidates getAll for every other reader.
+  if (deleted) return null;
+
+  const open = () => router.push(`/chat/${chat.id}`);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open chat ${displayTitle}`}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+      className="group hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
+    >
+      <MessageSquare className="text-muted-foreground/50 h-4 w-4 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm">{displayTitle}</p>
+      </div>
+      {projectName && (
+        <Badge
+          variant="outline"
+          className="border-border/30 text-muted-foreground shrink-0 gap-1 font-mono text-[10px]"
+        >
+          <FolderGit2 className="h-2.5 w-2.5" />
+          {projectName}
+        </Badge>
+      )}
+      <span className="text-muted-foreground/50 shrink-0 text-[10px]">
+        {formatDistanceToNow(new Date(chat.updatedAt), {
+          addSuffix: true,
+        })}
+      </span>
+      <ChatActionsMenu
+        chatId={chat.id}
+        title={displayTitle}
+        variant="row"
+        onRenamed={setDisplayTitle}
+        onDeleted={() => setDeleted(true)}
+      />
+    </div>
   );
 }
 
@@ -406,31 +474,11 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
               {chats.slice(0, 5).map((chat) => {
                 const project = projects.find((p) => p.id === chat.projectId);
                 return (
-                  <button
+                  <RecentChatRow
                     key={chat.id}
-                    onClick={() => router.push(`/chat/${chat.id}`)}
-                    className="group hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
-                  >
-                    <MessageSquare className="text-muted-foreground/50 h-4 w-4 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{chat.title}</p>
-                    </div>
-                    {project && (
-                      <Badge
-                        variant="outline"
-                        className="border-border/30 text-muted-foreground shrink-0 gap-1 font-mono text-[10px]"
-                      >
-                        <FolderGit2 className="h-2.5 w-2.5" />
-                        {project.name}
-                      </Badge>
-                    )}
-                    <span className="text-muted-foreground/50 shrink-0 text-[10px]">
-                      {formatDistanceToNow(new Date(chat.updatedAt), {
-                        addSuffix: true,
-                      })}
-                    </span>
-                    <ArrowRight className="text-muted-foreground/0 group-hover:text-muted-foreground/50 h-3.5 w-3.5 shrink-0 transition-all" />
-                  </button>
+                    chat={chat}
+                    projectName={project?.name}
+                  />
                 );
               })}
             </div>

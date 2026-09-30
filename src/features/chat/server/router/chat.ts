@@ -258,4 +258,32 @@ export const chatRouter = createTRPCRouter({
         .returning({ id: projectChats.id });
       return { success: true, deleted: deleted.length > 0 };
     }),
+
+  rename: protectedProcedure
+    .input(
+      z.object({
+        chatId: z.uuid(),
+        title: z.string().trim().min(1).max(255),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Same answer-shape honesty as `delete`: `.returning()` tells a real
+      // rename from a miss, and a miss stays a miss so "not yours" and "not
+      // there" both answer `renamed: false` instead of leaking existence.
+      //
+      // `updatedAt` moves with the rename so the renamed chat resurfaces at
+      // the top of the getAll ordering — the title is the freshest signal
+      // the user has about what the conversation holds.
+      const renamed = await db
+        .update(projectChats)
+        .set({ title: input.title, updatedAt: new Date() })
+        .where(
+          and(
+            eq(projectChats.id, input.chatId),
+            eq(projectChats.userId, ctx.userId),
+          ),
+        )
+        .returning({ id: projectChats.id });
+      return { success: true, renamed: renamed.length > 0 };
+    }),
 });

@@ -14,6 +14,7 @@ import {
   type ChatErrorInfo,
 } from "@/src/shared/lib/chat-errors";
 import { getStarterChips } from "@/src/features/chat/lib/starter-chips";
+import { ChatActionsMenu } from "./chat-actions-menu";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatRoomProps {
@@ -26,6 +27,12 @@ interface ChatRoomProps {
   projectDependencies?: string[];
   type: "project" | "general";
   title: string;
+  /**
+   * True when the server held back older rows at MAX_MESSAGE_LIMIT (F-07).
+   * Drives the "earlier history not loaded" banner — never inferred from
+   * `messages.length`, which would lie for short chats if the cap changed.
+   */
+  hasMoreMessages?: boolean;
   /**
    * File path from `?file=` — the code viewer's "Ask About This File" (F-09).
    * Pre-fills the input with a file inquiry; the query classifier already
@@ -153,10 +160,15 @@ export function ChatRoom({
   type,
   title,
   initialFilePath,
+  hasMoreMessages = false,
   initialMessages = [],
 }: ChatRoomProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Optimistic title after a rename from the actions menu (F-07). The page
+  // is server-rendered per navigation, so this only needs to last the visit.
+  const [displayTitle, setDisplayTitle] = useState(title);
 
   // Track whether we've received the first streaming token for the current
   // assistant reply — distinguishes "retrieval phase" from "streaming phase"
@@ -304,6 +316,20 @@ export function ChatRoom({
     return [];
   };
 
+  // Snapshot for the Markdown exporter (F-07): UIMessage parts flattened to
+  // text, citations reattached. Recomputed per render — the list is capped
+  // at 300 rows and the exporter only reads it on menu click.
+  const exportMessages = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: getMessageText(m),
+      relatedFiles: getRelatedFiles(
+        m.id,
+        m.id === lastMsg?.id && m.role === "assistant" && isLoading,
+      ),
+    }));
+
   // The current response is in "retrieval phase" when loading, the last
   // message is from the user (waiting for assistant), and no token has arrived
   const isRetrieving =
@@ -342,17 +368,36 @@ export function ChatRoom({
           ) : (
             <Sparkles className="h-4 w-4 shrink-0 text-emerald-500" />
           )}
-          <h1 className="truncate text-sm font-medium">{title}</h1>
+          <h1 className="truncate text-sm font-medium">{displayTitle}</h1>
           {projectName && (
             <span className="text-muted-foreground shrink-0 font-mono text-xs">
               · {projectName}
             </span>
           )}
         </div>
+        <ChatActionsMenu
+          chatId={chatId}
+          title={displayTitle}
+          variant="header"
+          messages={exportMessages}
+          projectName={projectName}
+          isActive
+          onRenamed={setDisplayTitle}
+        />
       </div>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" role="log" aria-live="polite" aria-busy={isLoading}>
+        {hasMoreMessages && messages.length > 0 && (
+          <div className="mx-auto max-w-3xl px-4 pt-4">
+            <p
+              role="status"
+              className="border-border/40 bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2 text-center text-xs"
+            >
+              Showing the latest 300 messages. Earlier history is not loaded.
+            </p>
+          </div>
+        )}
         {messages.length === 0 && !isRetrieving ? (
           <div className="flex h-full items-center justify-center p-6">
             <div className="max-w-md text-center">
