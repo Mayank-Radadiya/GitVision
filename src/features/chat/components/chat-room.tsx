@@ -26,6 +26,12 @@ interface ChatRoomProps {
   projectDependencies?: string[];
   type: "project" | "general";
   title: string;
+  /**
+   * File path from `?file=` — the code viewer's "Ask About This File" (F-09).
+   * Pre-fills the input with a file inquiry; the query classifier already
+   * treats a prompt naming a source file as `file-specific`.
+   */
+  initialFilePath?: string;
   initialMessages?: Array<{
     id: string;
     role: "user" | "assistant" | "system";
@@ -146,6 +152,7 @@ export function ChatRoom({
   projectDependencies = [],
   type,
   title,
+  initialFilePath,
   initialMessages = [],
 }: ChatRoomProps) {
   const router = useRouter();
@@ -164,7 +171,14 @@ export function ChatRoom({
     "rewriting" | "searching" | "ranking"
   >("searching");
 
-  const [input, setInput] = useState("");
+  // F-09: seeded from ?file= by the code viewer. Only on a fresh conversation,
+  // so reloading an active chat doesn't resurrect the prompt.
+  const [input, setInput] = useState(
+    () =>
+      initialFilePath && initialMessages.length === 0
+        ? `Explain the role and key functions in "${initialFilePath}".`
+        : "",
+  );
 
   // Categorized streaming/HTTP error for the current reply (null = no error)
   const [chatError, setChatError] = useState<ChatErrorInfo | null>(null);

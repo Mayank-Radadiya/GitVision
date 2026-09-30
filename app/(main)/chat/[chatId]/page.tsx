@@ -5,13 +5,20 @@ import { ChatRoom } from "@/src/features/chat/components/chat-room";
 
 interface ChatPageProps {
   params: Promise<{ chatId: string }>;
+  searchParams: Promise<{ file?: string }>;
 }
 
-export default async function ChatDetailPage({ params }: ChatPageProps) {
+export default async function ChatDetailPage({
+  params,
+  searchParams,
+}: ChatPageProps) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
   const { chatId } = await params;
+  // F-09: the code viewer's "Ask About This File" lands here. Read on the
+  // server so no client component consumes search params (no Suspense needed).
+  const { file } = await searchParams;
 
   let chatData;
   try {
@@ -30,6 +37,9 @@ export default async function ChatDetailPage({ params }: ChatPageProps) {
         // Also joined in / parsed by chat.getById, for the F-03 starter chips.
         projectLanguages={chatData.languages}
         projectDependencies={chatData.dependencies}
+        // F-09: pre-fills the input with a file inquiry when arriving from
+        // the code viewer's "Ask About This File" button.
+        initialFilePath={file}
         type={chatData.type as "project" | "general"}
         title={chatData.title}
         // ponytail: only the newest 300 messages load. Longer chats start

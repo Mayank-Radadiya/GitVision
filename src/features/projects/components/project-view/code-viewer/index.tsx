@@ -207,6 +207,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
                 filePath={selectedFile.path}
                 content={fileContent || ""}
                 language={selectedFile.language}
+                projectId={projectId}
                 highlightLine={activeLine}
               />
             ) : (

@@ -8,6 +8,7 @@
  * - User-selectable themes (8 curated options)
  * - Line numbers
  * - Copy-to-clipboard button
+ * - "Ask About This File" — opens a project chat seeded with this path
  * - File path breadcrumb
  * - Theme-aware: defaults based on system dark/light mode
  * - Memoized highlighting to prevent re-renders
@@ -15,7 +16,16 @@
 
 import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
-import { Copy, Check, FileCode, ChevronDown, Palette } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Copy,
+  Check,
+  FileCode,
+  ChevronDown,
+  Palette,
+  MessageSquare,
+} from "lucide-react";
+import { trpc } from "@/src/lib/trpc/client";
 import { cn } from "@/shared/lib/utils";
 import { CODE_THEMES, type ThemeOption } from "./utils";
 
@@ -23,6 +33,8 @@ interface CodePanelProps {
   filePath: string;
   content: string;
   language: string;
+  /** Owning project — lets "Ask About This File" open a project chat (F-09). */
+  projectId: string;
   // 1-based line to scroll to and tint, from the viewer's ?line= deep link.
   highlightLine?: number;
 }
@@ -31,9 +43,22 @@ function CodePanel({
   filePath,
   content = "",
   language,
+  projectId,
   highlightLine,
 }: CodePanelProps) {
   const { theme: systemTheme } = useTheme();
+  const router = useRouter();
+
+  // F-09: open a fresh project chat pre-seeded with this file's path. The
+  // seeded prompt matches the query classifier's file-specific pattern, so the
+  // backend already routes it to the file context fetcher — no extra plumbing.
+  const askMutation = trpc.chat.create.useMutation({
+    onSuccess: (data) => {
+      router.push(
+        `/chat/${data.id}?file=${encodeURIComponent(filePath)}`,
+      );
+    },
+  });
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [isHighlighting, setIsHighlighting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -152,6 +177,25 @@ function CodePanel({
           <span className="text-muted-foreground hidden text-xs sm:inline">
             {lineCount} lines
           </span>
+
+          {/* Ask about this file */}
+          <button
+            onClick={() =>
+              askMutation.mutate({ type: "project", projectId })
+            }
+            disabled={askMutation.isPending}
+            aria-label={`Ask about ${fileName} in chat`}
+            className={cn(
+              "bg-background/50 hover:bg-accent/50 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors",
+              "border-border/40 text-muted-foreground hover:text-foreground",
+              askMutation.isPending && "cursor-not-allowed opacity-60",
+            )}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">
+              {askMutation.isPending ? "Opening…" : "Ask About This File"}
+            </span>
+          </button>
 
           {/* Theme selector */}
           <div className="relative" ref={menuRef}>
