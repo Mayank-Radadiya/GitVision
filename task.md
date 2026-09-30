@@ -26,13 +26,6 @@
 
 ### Phase 0 — Make It True (Week 1) — est. 23h (19 S, 1 M)
 
-- **F-07** — Add chat rename, delete, export, and load-more
-  - **What:** `chat.delete` and `chat.rename` exist as tRPC procedures with **no UI caller** (only `src/__tests__/unit/chat-delete.test.ts` references them), and `chat.ts:15` caps history at `MAX_MESSAGE_LIMIT = 300` with no "load more".
-  - **How:** Add a per-chat dropdown calling the two existing procedures plus a Markdown export; add per-message regenerate; make the 300 cap visible and pageable.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.7
-
 - **T-066** — Lazy-load issue comments to kill the N+1
   - **What:** `use-project.ts:104` prefetches comments and is called at `issues-tab.tsx:40`, so N issues mean N queries on the hottest tab.
   - **How:** Pass `enabled: expanded` to `useIssueComments` so comments fetch on row expand; the hook already exists.
@@ -540,7 +533,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Noted but not fixed:** `0003_commits_project_id_author_date_idx.sql` exists, so T-031's recipe *was* applied despite the task being closed as "skipped, with evidence."
 
-**Already shipped:** T-063 (`5bf6a89`) — `@radix-ui/react-select` declared in `package.json` + `bun.lock`; clean installs typecheck clean.
+**Already shipped:** T-063 (`5bf6a89`) — `@radix-ui/react-select` declared in `package.json` + `bun.lock`; clean installs typecheck clean. · **F-07** (`1769417`, per-chat actions menu — inline rename via new `chat.rename`, delete confirm via `chat.delete`, client-side Markdown export with citations — on the room header and Recent rows, plus a banner from `getById.hasMoreMessages` when history hits the 300-message cap; not run, per the Phase 0 rule)
 
 **Lane docs:** T-088 (`c1c8071`, wrote `docs/SECURITY.md` covering the tarball path-traversal and symlink defence, 404-not-403 ownership, atomic credit spending with the DB-level `CHECK` and the latched refund, three-dimensional rate limiting, and nine-key log redaction — each linked to the suite that pins it; linked from the README) · **F-11** (`74da0d6`, recorded blocking decisions D-1, D-3, D-4, and D-8 with full context, trade-offs, and invariants in `docs/DECISIONS.md`, unblocking T-005, T-020, and T-038)
 
