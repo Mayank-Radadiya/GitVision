@@ -58,30 +58,102 @@ function truncate(text: string, key?: string): string {
   return `${text.slice(0, MAX_STRING_LENGTH)}… [truncated ${text.length - MAX_STRING_LENGTH} chars]`;
 }
 
-function isPlainObject(value: object): boolean {
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
+const CIRCULAR = "[circular]";
+
+/**
+ * How deep the walk goes before it gives up.
+ *
+ * A payload that nests further than this is a structure nobody is reading; the
+ * alternative — walking it whole — is unbounded work on the error path, which
+ * is the one path that must not be the reason a request fails.
+ */
+const MAX_DEPTH = 8;
 
 /**
  * One pass over everything about to be logged: replace the values of
  * {@link REDACTED_KEYS} and shorten the unbounded ones. Nested objects and
  * arrays are walked because a secret arrives one level down far more often than
- * at the top. Anything that is not a plain object or array — a `Date`, a `Map`,
- * a class instance — is left to `JSON.stringify` exactly as before.
+ * at the top.
+ *
+ * The non-array types `JSON.stringify` would flatten or discard are handled
+ * explicitly, because "whatever stringify did with it" is not a redaction
+ * decision: a `Date` becomes its ISO string, an `Error` becomes
+ * name/message/stack, a `Map` and a `Set` are walked entry by entry with their
+ * keys checked, and any other object — a class instance, a `URL`, a `Headers` —
+ * contributes its enumerable own properties and nothing else. Objects already
+ * on the current path become {@link CIRCULAR} rather than recursing forever.
  */
-function redact(value: unknown, key?: string): unknown {
+function redact(
+  value: unknown,
+  key?: string,
+  seen: WeakSet<object> = new WeakSet(),
+  depth = 0,
+): unknown {
   if (typeof value === "string") return truncate(value, key);
-  if (Array.isArray(value)) return value.map((item) => redact(item));
-  if (value !== null && typeof value === "object" && isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [
-        k,
-        isRedactedKey(k) ? REDACTED : redact(v, k),
-      ]),
-    );
+  if (depth > MAX_DEPTH) return CIRCULAR;
+
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
   }
-  return value;
+  if (value === null || typeof value !== "object") return value;
+
+  // Only containers below recurse, so only they need to be on the path. An
+  // object left out on the way out is one shared by two branches of the payload,
+  // not one that loops.
+  if (seen.has(value)) return CIRCULAR;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    const out = value.map((item) => redact(item, undefined, seen, depth + 1));
+    seen.delete(value);
+    return out;
+  }
+
+  if (value instanceof Map) {
+    const out: Record<string, unknown> = {};
+    for (const [entryKey, entryValue] of value) {
+      const k = String(entryKey);
+      out[k] = isRedactedKey(k) ? REDACTED : redact(entryValue, k, seen, depth + 1);
+    }
+    seen.delete(value);
+    return out;
+  }
+
+  if (value instanceof Set) {
+    const out = [...value].map((item) => redact(item, undefined, seen, depth + 1));
+    seen.delete(value);
+    return out;
+  }
+
+  const out = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+      k,
+      isRedactedKey(k) ? REDACTED : redact(v, k, seen, depth + 1),
+    ]),
+  );
+  seen.delete(value);
+  return out;
+}
+
+/**
+ * Where a redacted error record is forwarded after it reaches stdout.
+ *
+ * The sink is registered from outside rather than imported, because this module
+ * is in the client bundle: a static import of an error-reporting SDK would ship
+ * that SDK to every browser. A registration therefore cannot be undone and must
+ * only happen once, from the server-side runtime entry point.
+ */
+type ErrorTransport = (payload: Record<string, unknown>) => void;
+
+let transport: ErrorTransport | null = null;
+
+export function registerErrorTransport(fn: ErrorTransport): void {
+  transport = fn;
 }
 
 export const logger = {
@@ -112,23 +184,26 @@ export const logger = {
   },
 
   error(message: string, error?: unknown, context?: LogContext) {
-    console.error(
-      JSON.stringify(
-        redact({
-          timestamp: new Date().toISOString(),
-          level: "ERROR",
-          message,
-          // An Error's name/message/stack are not enumerable, so JSON.stringify
-          // would emit `{}` without this; the result is redacted below like
-          // everything else.
-          error:
-            error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : error,
-          ...context,
-        }),
-      ),
-    );
+    const record = redact({
+      timestamp: new Date().toISOString(),
+      level: "ERROR",
+      message,
+      // An Error's name/message/stack are not enumerable, so JSON.stringify
+      // would emit `{}` without this; the result is redacted below like
+      // everything else.
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : error,
+      ...context,
+    }) as Record<string, unknown>;
+
+    console.error(JSON.stringify(record));
+
+    // The already-redacted record, not the inputs: a transport that re-derived
+    // its payload would be a second path around the redaction above. Fire and
+    // forget — a failed report must not change what the caller sees.
+    transport?.(record);
   },
 
   debug(message: string, context?: LogContext) {

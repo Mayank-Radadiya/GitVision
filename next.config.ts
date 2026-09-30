@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -77,4 +78,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// T-020 — source-map upload so Sentry can symbolicate server stack traces.
+// `silent: true` keeps Sentry from writing to the console during the build.
+export default withSentryConfig(nextConfig, {
+  silent: true,
+});
