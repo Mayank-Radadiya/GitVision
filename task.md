@@ -410,13 +410,13 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## Self-Check
 
-- 7 fields present on all 59 active tasks (ID, Title, What, How, Dependencies, Effort/Priority, Source).
+- 7 fields present on all 58 active tasks (ID, Title, What, How, Dependencies, Effort/Priority, Source).
 - No duplicate IDs. New IDs start at T-063; highest pre-existing was T-062.
 - Every dependency resolves to a task in this board. No orphans.
 - Nothing exceeds XL. Largest estimate is 16h.
-- 59 active tasks — inside the 40–60 target. The V2/Future items are listed in a separate deferred section with no task IDs, so they do not inflate the active count.
+- 58 active tasks — inside the 40–60 target. The V2/Future items are listed in a separate deferred section with no task IDs, so they do not inflate the active count.
 - All 20 §2.3 rows appear in Defect Coverage with a task ID.
-- All 25 §5 features F-01…F-25 appear as active tasks. F-20 and F-24 are carried in full, including §8.1's shared auth header and §8.6's redaction walker.
+- All 25 §5 features F-01…F-25 are accounted for; F-12 has moved to DONE. F-20 and F-24 are carried in full, including §8.1's shared auth header and §8.6's redaction walker.
 - All 10 §14 Must-Haves are covered, including #9 Security Made Visible (T-088).
 - Every new task (T-063…T-089) carries a §-citation or a `status/*.md` citation.
 - All 10 required sections present, plus a deferred V2/Future section so §6.1 and §6.2 are on the record rather than silently dropped.
