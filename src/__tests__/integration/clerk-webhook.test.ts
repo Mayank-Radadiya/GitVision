@@ -1,3 +1,19 @@
+// Webhook tests mock a shared `state` object that the Svix verifier and the
+// Drizzle mock write to sequentially. Running them concurrently causes race
+// conditions where one test's state.failNext bleeds into another test's
+// verification window, producing flaky 500/200 mismatches under CI load.
+//
+// Isolation strategy applied here:
+//   1. Every `it` case carries { timeout: 20000 } — up from Vitest's 5 s
+//      default. This absorbs scheduling jitter on a busy GitHub Actions runner
+//      without masking genuine hangs (20 s is still well below the 6-minute
+//      job limit).
+//   2. The file is registered in vitest.config.ts under `sequence.concurrent:
+//      false` for integration tests so this describe block runs sequentially
+//      with respect to its siblings.
+//
+// Row 18 in gitvisionStrategy2.md §8.5 (clerk-webhook.test.ts flaky under
+// parallel load) is resolved by these two measures combined.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 type CapturedInsert = {
@@ -87,7 +103,11 @@ beforeEach(() => {
   state.failNext = null;
 });
 
-describe("Clerk webhook", () => {
+// describe.sequential instructs Vitest to run the cases inside this block one
+// at a time regardless of the --pool or --concurrent setting at the CLI level.
+// This is the correct fix for shared-state mocks: the `state` object is reset
+// in beforeEach, but only one test must touch it at a time.
+describe.sequential("Clerk webhook", () => {
   it("upserts on the primary key so an existing user is updated in place", async () => {
     (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
       type: "user.updated",
@@ -106,7 +126,7 @@ describe("Clerk webhook", () => {
     expect(state.insert.conflict?.target).toBeDefined();
     const target = state.insert.conflict?.target as { name: string } | undefined;
     expect(target?.name).toBe("id");
-  });
+  }, { timeout: 20000 });
 
   it("does not hand out credits on an update, only on insert", async () => {
     (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
@@ -124,7 +144,7 @@ describe("Clerk webhook", () => {
     // must never refill a user's balance.
     expect(state.insert.values?.credits).toBe(100);
     expect(state.insert.conflict?.set).not.toHaveProperty("credits");
-  });
+  }, { timeout: 20000 });
 
   it("returns 500 when the database write fails so Clerk retries", async () => {
     (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
@@ -140,7 +160,7 @@ describe("Clerk webhook", () => {
 
     // Silently returning 200 here is what made provisioning fail unnoticed.
     expect(res.status).toBe(500);
-  });
+  }, { timeout: 20000 });
 
   it("still returns 200 for events it does not handle", async () => {
     (globalThis as { __clerkEvent?: unknown }).__clerkEvent = {
@@ -150,5 +170,6 @@ describe("Clerk webhook", () => {
 
     const res = await invoke();
     expect(res.status).toBe(200);
-  });
+  }, { timeout: 20000 });
 });
+

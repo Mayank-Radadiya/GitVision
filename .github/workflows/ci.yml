@@ -56,6 +56,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Provision an ephemeral Neon branch so database-dependent test blocks
+      # (those gated on TEST_DATABASE_URL / hasTestDatabase) run in CI with a
+      # real Postgres-compatible endpoint rather than silently skipping.
+      #
+      # The step is guarded by `if: env.NEON_API_KEY != ''` so:
+      #   • Forks and PRs from external contributors (no secret access) fall
+      #     back to the local pgvector service container below — no red run.
+      #   • Internal PRs with the secret set get an isolated Neon branch that
+      #     is deleted automatically when the action completes.
+      #
+      # To activate: add NEON_API_KEY and NEON_PROJECT_ID to repository secrets
+      # (Settings → Secrets and variables → Actions). The branch is named after
+      # the GitHub run ID so parallel runs never collide.
+      - name: Create ephemeral Neon test branch
+        id: neon-branch
+        if: ${{ env.NEON_API_KEY != '' }}
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: ci-test-${{ github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
+      # Override TEST_DATABASE_URL with the Neon ephemeral branch URL when the
+      # create-branch step ran. Falls back to the service-container URL (set in
+      # the job-level `env` block) when the Neon step was skipped.
+      - name: Export Neon branch connection string
+        if: ${{ env.NEON_API_KEY != '' && steps.neon-branch.outputs.db_url != '' }}
+        run: echo "TEST_DATABASE_URL=${{ steps.neon-branch.outputs.db_url }}" >> "$GITHUB_ENV"
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
       # No `bun-version` here on purpose: setup-bun reads the
       # `packageManager` field from package.json, so bumping that one line
       # is what changes what CI installs. Setting `latest` here silently

@@ -49,13 +49,6 @@
   - **Effort/Priority:** M / 🔥 P0
   - **Source:** `status/p0-B.md:L34`, §12.1 D-1, §2.3 row 5
 
-- **T-038** — Record the Cross-Origin-Opener-Policy scope
-  - **What:** D-8 is listed as decided with zero content, so the COOP scope is unspecified and the decision that unblocks T-038 was never made.
-  - **How:** Read the current cross-origin isolation posture, then record D-8 with the chosen COOP value and the reasoning; `isolation: 'cross-origin'` opens `SharedArrayBuffer` for the embedding pipeline if it is ever needed in-browser.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / 🔥 P0
-  - **Source:** §12.1 D-8, `status/p0-t001.md:L13`, §2.3 row 5
-
 - **T-020** — Ship error tracking on the recorded transport
   - **What:** The logger redacts and truncates but nothing ships errors anywhere; there is no production observability. Its walker also handles only plain objects and arrays, so a `Map`, a `Date`, or a custom class instance reaching `extra` is serialized unredacted — a hole in the exact path that would ship errors off-box.
   - **How:** Depends on D-4 being recorded by F-11. Add `@sentry/nextjs` plus `instrumentation.ts` and structured JSON to stdout; the transport **must** call `serialize`/`redact` from `src/lib/logger.ts` or T-019's redaction is bypassed. Extend the redaction walker to recurse into `Map`, serialize `Date` as ISO, and expand class instances to their enumerable own properties rather than dropping them. Env-flag off in local and CI.
@@ -324,7 +317,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 2 | Dead dashboard payload on the hottest query | fixed | F-10 |
 | 3 | `enforceLimits` missing on embeddings GET + DELETE | fixed | F-20 |
 | 4 | No unique `(ownerId, githubUrl)` | fixed | F-25 |
-| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11 |
+| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11, T-038 |
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
@@ -589,6 +582,7 @@ in `## Independent verification (2026-09-30)`.
 | **T-077** | `b4cc962` | `src/shared/components/product-analytics.tsx` renders `<Analytics />` unconditionally (cookieless, no key) and initialises PostHog only when `NEXT_PUBLIC_POSTHOG_KEY` is set, behind a module-level guard because `init` mutates a singleton. Mounted from `app/layout.tsx`. `posthog-js` 1.435.1 + `@vercel/analytics` 2.0.1 added. |
 | **T-078** | `d64c3cb` | `### D-2: AI Issue-Triage Columns` and `### D-11: Stateless neon-http Driver & Compensating Writes` written in full in the house style — Context / Options Considered / Decision / Consequences. D-11 spells out the three-step compensating-write ordering in `projectService.ts`. |
 | **T-083** | `8a511ec` | `src/lib/rag/rag.config.ts` exports `RAG_CONFIG` (`smallProjectTokenThreshold: 150_000`, `maxContextFiles: 500`, `maxFileChars: 50_000`, `maxContextTokens: 32_768`). `vector-search.ts` and `budget.ts` read from it; `MAX_CONTEXT_TOKENS` keeps its export name so `budget.test.ts` is untouched. Also settles Open Question 4 in favour of 150K. |
+| **T-038** | `[T-038] Configure Cross-Origin-Opener-Policy header and record D-8` | COOP was already `same-origin` in code (`next.config.ts:62-65`, pinned by `security-headers.test.ts:16`) while D-8 recorded `same-origin-allow-popups` on a premise this repo falsifies: Clerk OAuth is a full redirect (`use-signIn.ts:63-67` → `authenticateWithRedirect`), and no `window.open` exists in `src/` or `app/`, so nothing reads `window.opener`. D-8 rewritten to `same-origin` with the popup rationale struck and the false `SharedArrayBuffer` claim corrected — SAB needs COOP *and* `Cross-Origin-Embedder-Policy: require-corp`, and no COEP is set. Docs only; no code or test changed. |
 
 **PARTIAL closed:**
 

@@ -17,7 +17,7 @@ Where a decision imposes an invariant, that invariant must be respected by all s
 | **D-5** | Report-Only Content Security Policy | Accepted | T-021, T-022 | Serve CSP in report-only mode with `/api/csp-report` collector until nonce support is wired. |
 | **D-6** | Retention Policy Scope & Guarantees | Accepted | T-024 | Align documentation with live system behaviour; avoid advertising unbuilt automatic sweeps. |
 | **D-7** | In-Memory & Concurrency Rate-Limit Ceiling | Accepted | T-057, T-058 | Three-dimensional rate limiting (scope, user, IP) in PostgreSQL/memory; accept provider limits without Redis overhead. |
-| **D-8** | Cross-Origin-Opener-Policy (COOP) Scope | **Accepted** | **T-038** | `same-origin-allow-popups` to preserve Clerk OAuth popup flows while isolating browsing context. |
+| **D-8** | Cross-Origin-Opener-Policy (COOP) Scope | **Accepted** | **T-038** | `same-origin` globally. Authentication is full-redirect, so no `window.opener` dependency exists to trade isolation away for. |
 | **D-9** | GitHub Remotes: HTTPS-Only | Accepted | T-041 | Enforce HTTPS remote URLs; document rejection of SSH/Enterprise remotes for MVP. |
 | **D-10** | Account Deletion Window | Draft | T-063, T-064 | Hard cascade on user deletion; evaluate soft-delete window for enterprise compliance in V2. |
 | **D-11** | Stateless `neon-http` Driver & Compensating Writes | Accepted | T-018, T-045 | Stay on `neon-http` for serverless scale; multi-step operations use explicit compensation latches instead of `db.transaction()`. |
@@ -204,34 +204,39 @@ Adopt `@sentry/nextjs` for exception tracking via `instrumentation.ts` and outpu
 - **Status:** Accepted
 - **Date:** 2026-09-30
 - **Unblocks:** **T-038**
-- **Impacted Files:** `src/lib/csp.ts`, `proxy.ts`, `next.config.ts`
+- **Impacted Files:** `next.config.ts`, `src/__tests__/integration/security-headers.test.ts`
 
 #### Context
-`Cross-Origin-Opener-Policy` (COOP) allows a document to disassociate its top-level browsing context group from other browsing contexts. Setting `Cross-Origin-Opener-Policy: same-origin` isolates the window, providing defence against Spectre-like cross-origin information leaks and unlocking features like `SharedArrayBuffer` (which could be utilized for high-performance in-browser client-side vector search or WASM processing).
+`Cross-Origin-Opener-Policy` (COOP) lets a document disassociate its top-level browsing context group from other browsing contexts. `same-origin` isolates the window, defending against cross-origin window hijacking and Spectre-like opener leaks.
 
-However, strict `same-origin` isolation severs `window.opener` references. In GitVision, user authentication leverages Clerk and GitHub OAuth flows, which open secondary popup windows or redirects to complete the OAuth handshake. When `same-origin` is enforced globally, popup windows cannot communicate back to the originating window, breaking the authentication flow and trapping users.
+The tradeoff is `window.opener`: under strict `same-origin` a cross-origin document opened by this one gets no back-reference. That only matters if some flow *relies* on the opener. An earlier draft of this record claimed GitVision's Clerk/GitHub OAuth "opens secondary popup windows" and therefore required `same-origin-allow-popups`. **That premise is false for this codebase.** Google OAuth is a full-redirect handshake — `handleGoogleSignIn` calls `signIn.authenticateWithRedirect({ strategy: "oauth_google", redirectUrl: "/sso-callback", redirectUrlComplete: "/dashboard" })` at `src/features/auth/components/sign-in/use-signIn.ts:63-67`, the sign-up equivalent uses the same redirect form at `use-signUp.ts:73-74`, and email/password sign-in is `signIn.create({ identifier, password })` at `use-signIn.ts:33-36`. No `window.open` exists in `src/` or `app/`. A redirect handshake never reads `window.opener`, so `same-origin` costs this app nothing.
+
+The same draft also claimed `same-origin` "unlocks `SharedArrayBuffer`." It does not, alone. `SharedArrayBuffer` requires COOP `same-origin` **and** `Cross-Origin-Embedder-Policy: require-corp`; this repo sets no COEP, so the header is currently worth isolation and nothing more.
 
 #### Options Considered
 
-1. **Option A — `Cross-Origin-Opener-Policy: same-origin`:**
+1. **Option A — `Cross-Origin-Opener-Policy: same-origin` (Chosen):**
    Enforce strict same-origin isolation globally.
-   - *Pros:* Maximum side-channel isolation; unlocks `SharedArrayBuffer`.
-   - *Cons:* Breaches OAuth authentication popups (Clerk/GitHub), breaking login. **Rejected.**
+   - *Pros:* Maximum opener isolation. No auth flow in this repo reads `window.opener`, so the cons previously listed against this option do not apply. Also the only value that can ever satisfy half of the cross-origin-isolation pair, so it is not a dead end if COEP is added later.
+   - *Cons:* Irreversible for a genuinely popup-based flow — if one is ever introduced, this header must change. **Accepted.**
 
 2. **Option B — Omit COOP (`unsafe-none`):**
    Do not set any COOP header.
    - *Pros:* Maximum backwards compatibility.
-   - *Cons:* Offers zero opener protection against cross-origin window hijacking or side-channel snooping. **Rejected.**
+   - *Cons:* Zero opener protection against cross-origin window hijacking or side-channel snooping, and it forfeits the option above. **Rejected.**
 
-3. **Option C — `Cross-Origin-Opener-Policy: same-origin-allow-popups` (Chosen):**
+3. **Option C — `Cross-Origin-Opener-Policy: same-origin-allow-popups`:**
    Isolate the top-level document from cross-origin openers, but permit opened popups to retain their relationship with the opener.
-   - *Pros:* Protects the application browsing context while preserving Clerk OAuth popup authentication workflows.
-   - *Cons:* Does not enable cross-origin isolation (`SharedArrayBuffer`), which requires `same-origin`. **Accepted.**
+   - *Pros:* Preserves `window.opener` for a popup flow.
+   - *Cons:* The only flow it would serve does not exist here, so it trades real isolation for hypothetical compatibility. It is also strictly weaker than Option A with no compensating benefit. **Rejected** — previously *chosen* on the false popup premise this record corrects.
 
 #### Decision
-Set `Cross-Origin-Opener-Policy: same-origin-allow-popups` across application routes. This maintains isolation against hostile cross-origin contexts while fully supporting Clerk popup-based OAuth login flows. 
+Set `Cross-Origin-Opener-Policy: same-origin` on `/:path*` in `next.config.ts` (the single global `headers()` rule), so every route carries it.
 
-If client-side processing requiring `SharedArrayBuffer` is introduced in the future, it must be contained in dedicated isolated Web Workers or scoped to specific sub-routes rather than degrading the global authentication boundary.
+#### Mandatory Invariants
+1. **No silent downgrade.** Changing this value to `same-origin-allow-popups` or removing it requires a new decision record. The exact value is pinned by `src/__tests__/integration/security-headers.test.ts`, which fails on any drift.
+2. **Popup flows are not free.** Introducing a `window.open`-based auth or payment flow invalidates this decision; that flow must either avoid the opener or reopen the decision first.
+3. **COEP is a separate decision.** `SharedArrayBuffer` is not available today. Enabling it requires adding `Cross-Origin-Embedder-Policy: require-corp`, which will break every third-party subresource until they are corrected or proxied — and must not be bundled into a COOP change.
 
 ---
 

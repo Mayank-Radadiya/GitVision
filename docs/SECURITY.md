@@ -169,6 +169,47 @@ stack, and a check that ordinary content is left untouched — plus
 `logger.test.ts:180-193`, which asserts every call site in the codebase goes
 through this logger rather than calling `console.*` directly.
 
+## Response headers: one rule, every route
+
+Every header below is declared once, in the single `headers()` rule of
+`next.config.ts:45-77`, scoped to `source: "/:path*"`. There is no second
+declaration site — not in `src/lib/csp.ts`, not in `proxy.ts` — so there is no
+route that can be served without them and no per-route drift to reconcile.
+
+| Header | Value |
+| --- | --- |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+
+`Cross-Origin-Opener-Policy: same-origin` severs the `window.opener` link to any
+document this page opens. That is safe here because no flow in the app reads the
+opener: Google OAuth is a full-redirect handshake
+(`signIn.authenticateWithRedirect({ strategy: "oauth_google", redirectUrl:
+"/sso-callback" })` at
+`src/features/auth/components/sign-in/use-signIn.ts:63-67`), email/password
+sign-in is `signIn.create({ identifier, password })` at `use-signIn.ts:33-36`,
+and no `window.open` call exists in `src/` or `app/`. A redirect never consults
+the opener, so the header costs this app nothing while denying a hostile page
+the reference it would need to navigate this one. The rationale, the rejected
+alternatives, and the invariants are recorded as D-8 in `docs/DECISIONS.md`.
+
+What the header does **not** do today is enable `SharedArrayBuffer`. That
+requires the pair — COOP `same-origin` *and* `Cross-Origin-Embedder-Policy:
+require-corp` — and no COEP header is set. Adding one is a separate decision,
+not a COOP change: `require-corp` will break every third-party subresource
+(ui-avatars, camo, Clerk's own assets) until they are proxied or corrected.
+
+Pinned by `src/__tests__/integration/security-headers.test.ts` — "serves every
+security header for all routes (/:path*) with its exact value" reads
+`nextConfig.headers()` back, finds the `/:path*` rule, and asserts each key/value
+pair in `EXPECTED_STATIC_HEADERS` (`:6-16`), where COOP is pinned at `:16`. The
+same suite asserts `X-XSS-Protection` is absent and checks the `CSP_DIRECTIVES`
+values separately.
+
 ## What is not defended here
 
 Stated plainly so nobody assumes otherwise:
