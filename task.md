@@ -47,13 +47,6 @@
   - **Effort/Priority:** S / ⚠️ P1
   - **Source:** §5.19, §2.3 rows 9 and 19
 
-- **F-21** — Correct the five AI-provider documentation lies
-  - **What:** `README.md:44,60,208`, `db/schema.ts:146`, `app/api/chat/route.ts:20`, and `.env.example` all claim Gemini produces embeddings. It does not — embeddings come from OpenRouter `qwen/qwen3-embedding-8b`.
-  - **How:** Rewrite the five sites to name `@openrouter/sdk` for embeddings and `gemini-2.0-flash-001` for chat. T-017 already pinned the chat model id; only the docs remain.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.21, §2.3 row 12
-
 - **F-05** — Replace hardcoded stats with real counts
   - **What:** Landing-page numbers are literals; no public stats procedure exists (`getPublicStats` has zero matches in `src` or `app`).
   - **How:** Add an unprotected tRPC `getPublicStats` doing `COUNT(*)` on projects, commits, and chat_messages, with `staleTime: 300_000`.
@@ -453,7 +446,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 9 | Native `confirm()` for project deletion | open | F-19 |
 | 10 | Issues N+1 — comments prefetched per row | open | T-066 |
 | 11 | Two live syntax highlighters (Shiki + rehype-highlight) | open | F-22 |
-| 12 | 5 docs say Gemini does embeddings; it is OpenRouter/qwen | open | F-21 |
+| 12 | 5 docs say Gemini does embeddings; it is OpenRouter/qwen | fixed | F-21 |
 | 13 | No re-sync — `delete` is the only project mutation | open | F-14 |
 | 14 | Citations not clickable; no `?file=` deep link | open | F-02 |
 | 15 | No settings/account page, no project settings, no chat UI | open | F-17, F-07 |
@@ -519,7 +512,7 @@ Dependencies: `none`, priority-sorted. All 20 of these can begin today with no o
 | Priority | Tasks |
 |---|---|
 | 🔥 P0 | **T-063** (undeclared radix dep — breaks clean install), **F-01** (`?url=`), **F-02** (clickable citations), **F-06** (delete fabricated claims), **F-11** (record 4 decisions — unblocks 3 tasks), **F-20** (rate limits + CSP + import rule), **F-25** (unique constraint), **T-033** (authed E2E harness — unblocks 4 tasks), **T-088** (`docs/SECURITY.md` — pure documentation, highest perceived-value per line) |
-| ⚠️ P1 | **F-09** (Ask About This File — backend intent class already exists), **F-19** (a11y batch), **F-21** (doc lies), **F-10** (dead dashboard code), **F-05** (real stats), **F-07** (chat management), **T-089** (shared `getGitHubAuthHeader()`), **T-066** (issues N+1), **T-065** (Shiki theme), **T-069** (prompt-injection fence), **T-068** (`rehype-raw` audit), **T-064** (stale route comment), **T-084** (reset `lane/p1-a`), **T-078** (reverse D-2), **T-083** (`RAG_CONFIG`) |
+| ⚠️ P1 | **F-09** (Ask About This File — backend intent class already exists), **F-19** (a11y batch), **F-10** (dead dashboard code), **F-05** (real stats), **F-07** (chat management), **T-089** (shared `getGitHubAuthHeader()`), **T-066** (issues N+1), **T-065** (Shiki theme), **T-069** (prompt-injection fence), **T-068** (`rehype-raw` audit), **T-064** (stale route comment), **T-084** (reset `lane/p1-a`), **T-078** (reverse D-2), **T-083** (`RAG_CONFIG`) |
 | P2 | **F-08** (⌘K palette), **T-077** (PostHog + Vercel Analytics) |
 
 Highest return per hour: **T-063** (unblocks every clean-install verification), **T-086** (turns existing unadvertised security work into a differentiator, zero code), **F-11** (unblocks three tasks), **F-09** (the whole retrieval path already exists — only the button is missing).
@@ -590,7 +583,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-47 tasks shipped across 10 lanes. Original IDs preserved.
+48 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -600,7 +593,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-D:** T-004 (`a9eed54`, gunzip stream had no error handler) · T-009 (`7464b8c`, two routes with zero production callers and no rate limiting) · **T-002 — skipped, already resolved at HEAD**
 
-**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client) · **F-25** (`ee86613`, `unique("projects_owner_id_github_url_unique")` on `projects(owner_id, github_url)` via migration `0005`, so a double-submit can no longer bill 10 credits twice; the 23505 is re-thrown at `createNewProject` as `PROJECT_ALREADY_EXISTS` instead of being buried in `details.originalError`, and `project.create` maps it to a `CONFLICT` "already added" — safe because the insert precedes `spendCredits`, so the duplicate never reaches the charge)
+**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client) · **F-25** (`ee86613`, `unique("projects_owner_id_github_url_unique")` on `projects(owner_id, github_url)` via migration `0005`, so a double-submit can no longer bill 10 credits twice; the 23505 is re-thrown at `createNewProject` as `PROJECT_ALREADY_EXISTS` instead of being buried in `details.originalError`, and `project.create` maps it to a `CONFLICT` "already added" — safe because the insert precedes `spendCredits`, so the duplicate never reaches the charge) · **F-21** (`7fdf90e`, every doc and comment that credited Gemini with embeddings now names `@openrouter/sdk` `qwen/qwen3-embedding-8b` (768-dim), and the chat model is named as `gemini-2.0-flash-001`; the two `.env.example` provider comments were wrong *and* swapped, and the README prerequisite list offered no OpenRouter key at all, so a reader following it could not have configured embedding generation; documentation and comments only, no logic or schema touched)
 
 **Lane p0-t001 (batch):** T-040 · T-041 · T-042 (`bun audit` added to CI) · T-043 (raw `console` routed through `logger`) · T-046 (404/400 not 500 from chat router) · T-047 (400 for malformed body; `await` was inside `safeParse`) · T-048 (user-chosen chat title no longer overwritten) · T-049 (`chat.delete` distinguishes deleted from never-existed) · T-050 (honest issue/comment pagination) · T-051 (`getFileContent` validated with `z.string().uuid()`) · T-053 (Zod 4 migration finished, 12 call sites) · T-054 (font/asset fix, 12 preloads → 1) · T-055 (composite + language indexes) · T-056 (compound commit cursor) · T-057 (IP-based rate-limit dimension) · T-059 (coverage thresholds — no provider was installed) · T-062 (LICENSE decision + architecture doc)
 
