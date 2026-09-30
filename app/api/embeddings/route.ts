@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Per-user cap on Gemini-backed embedding generation (5/10min), plus an
+    // Per-user cap on OpenRouter-backed embedding generation (5/10min), plus an
     // IP ceiling and the global daily backstop — see rate-limit.ts.
     const rl = await enforceLimits("embeddings", userId, req);
     if (!rl.allowed) {

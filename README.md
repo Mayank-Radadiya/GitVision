@@ -41,26 +41,26 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 ### 💬 Chat with Your Code
 
 - **Contextual Conversations** — Multiple chat sessions per project with persistent history
-- **Vector Search** — Queries are matched against 768-dimension Gemini embeddings using HNSW indexing
+- **Vector Search** — Queries are matched against 768-dimension embeddings (`qwen/qwen3-embedding-8b` via OpenRouter) using HNSW indexing
 - **Source Citations** — Responses reference specific files from your codebase
 
 ---
 
 ## 🏗️ Tech Stack
 
-| Layer               | Technology                                                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Framework**       | [Next.js 15](https://nextjs.org/) (App Router, Turbopack)                                                                        |
-| **Language**        | TypeScript 5                                                                                                                     |
-| **UI**              | React 19, [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [Framer Motion](https://motion.dev/) |
-| **Auth**            | [Clerk](https://clerk.com/)                                                                                                      |
-| **Database**        | [Neon](https://neon.tech/) (Serverless PostgreSQL) with [pgvector](https://github.com/pgvector/pgvector)                         |
-| **ORM**             | [Drizzle ORM](https://orm.drizzle.team/)                                                                                         |
-| **API**             | [tRPC](https://trpc.io/) (end-to-end typesafe APIs)                                                                              |
-| **AI**              | [Google Gemini](https://ai.google.dev/) (summaries, embeddings, chat), [Vercel AI SDK](https://sdk.vercel.ai/)                   |
-| **Background Jobs** | [Inngest](https://www.inngest.com/) (durable, event-driven functions)                                                            |
-| **GitHub API**      | [Octokit](https://github.com/octokit/octokit.js)                                                                                 |
-| **Validation**      | [Zod](https://zod.dev/)                                                                                                          |
+| Layer               | Technology                                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Framework**       | [Next.js 15](https://nextjs.org/) (App Router, Turbopack)                                                                                                                   |
+| **Language**        | TypeScript 5                                                                                                                                                                |
+| **UI**              | React 19, [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [Framer Motion](https://motion.dev/)                                            |
+| **Auth**            | [Clerk](https://clerk.com/)                                                                                                                                                 |
+| **Database**        | [Neon](https://neon.tech/) (Serverless PostgreSQL) with [pgvector](https://github.com/pgvector/pgvector)                                                                    |
+| **ORM**             | [Drizzle ORM](https://orm.drizzle.team/)                                                                                                                                    |
+| **API**             | [tRPC](https://trpc.io/) (end-to-end typesafe APIs)                                                                                                                         |
+| **AI**              | [Google Gemini](https://ai.google.dev/) (chat, query rewrite, commit summaries), [OpenRouter](https://openrouter.ai/) (embeddings), [Vercel AI SDK](https://sdk.vercel.ai/) |
+| **Background Jobs** | [Inngest](https://www.inngest.com/) (durable, event-driven functions)                                                                                                       |
+| **GitHub API**      | [Octokit](https://github.com/octokit/octokit.js)                                                                                                                            |
+| **Validation**      | [Zod](https://zod.dev/)                                                                                                                                                     |
 
 ---
 
@@ -106,7 +106,8 @@ GitVision syncs your GitHub repositories, generates AI-powered commit summaries,
 - **Neon** database (free tier works)
 - **Clerk** account for authentication
 - **GitHub Personal Access Token** — for repo syncing
-- **Google Gemini API Key** — for AI features
+- **Google Gemini API Key** — for chat responses and commit summaries
+- **OpenRouter API Key** — for embedding generation
 
 ### 1. Clone the repository
 
@@ -208,7 +209,7 @@ The app uses a relational schema with vector extensions:
 - **users** — Clerk-synced user profiles with credit system
 - **projects** — GitHub repo metadata, language breakdown, embedding status
 - **project_files** — Full repository file contents with SHA-256 hashing
-- **code_embeddings** — 768-dim Gemini vectors with HNSW cosine similarity index
+- **code_embeddings** — 768-dim `qwen/qwen3-embedding-8b` vectors (OpenRouter) with HNSW cosine similarity index
 - **commits** — Commit history with AI-generated summaries
 - **issues / issue_comments** — GitHub issues & PRs, and their comments
 - **project_chats / chat_messages** — Normalized chat history per project
@@ -232,7 +233,7 @@ GitVision uses **Clerk** for authentication with webhook-based user sync:
 2.  Files are chunked and embedded using qwen/qwen3-embedding-8b via OpenRouter (768 dims)
 3.  Embeddings are stored in Neon with pgvector HNSW indexes
 4.  User query → embed → cosine similarity search → top-k chunks
-5.  Top chunks + query are sent to Gemini as grounded context
+5.  Top chunks + query are sent to Gemini `gemini-2.0-flash-001` as grounded context
 6.  Streamed AI response with file-path citations
 ```
 

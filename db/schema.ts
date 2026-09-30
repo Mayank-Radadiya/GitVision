@@ -151,7 +151,7 @@ export const codeEmbeddings = pgTable(
     filePath: varchar("file_path", { length: 255 }).notNull(),
     chunkIndex: integer("chunk_index").notNull(),
     chunkContent: text("chunk_content").notNull(),
-    embedding: vector("embedding", { dimensions: 768 }).notNull(), // Gemini embedding-004 = 768 dims
+    embedding: vector("embedding", { dimensions: 768 }).notNull(), // qwen/qwen3-embedding-8b via @openrouter/sdk = 768 dims
     tokenCount: integer("token_count").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
