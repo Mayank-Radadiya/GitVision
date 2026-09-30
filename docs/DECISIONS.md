@@ -69,6 +69,63 @@ Make `users.email` nullable in migration `0005` and drop the `example@gmail.com`
 
 ---
 
+### D-2: AI Issue-Triage Columns
+
+| Field | Value |
+|---|---|
+| **Status** | Decided (Drop) |
+| **Date** | 2026-09-30 |
+| **Blocks / Relates To** | T-028 / F-13 |
+| **Impacted Files** | `db/schema.ts`, `src/features/dashboard/server/router/services/projectService.ts`, `src/lib/github/services/issues.ts` |
+
+**Context.** The `issues` table has carried three nullable AI-triage columns
+since the original schema — `ai_summary`, `ai_complexity`, `ai_tags` — with a
+comment declaring them the output of a deferred Gemini background job
+(`db/schema.ts:311`). That job was never built. What did ship was the
+*affordance*: both issue selects and the issue insert read and wrote those
+columns, so every dashboard payload carried three fields that were always
+`null`, and `needs-attention.tsx` looked like it was rendering triage output it
+never received. The affordance was advertised by comments and by the payload,
+never by the markup — `AttentionItem` in `dashboard.types.ts` never declared an
+AI field.
+
+**Options.**
+
+- **Option A — finish the feature.** Build the background job to populate the
+  columns, making the existing schema honest. REJECTED: it is a Gemini
+  inference dependency, an Inngest function, and a per-issue cost model, none of
+  which Phase 1 funded. It would also have made T-025/T-026/T-027 (the triage
+  render path) mandatory rather than optional.
+- **Option B — drop the affordance, keep the columns.** REJECTED as originally
+  written: deleting three nullable columns costs a migration plus a `.notes.md`
+  and buys nothing user-visible, since nothing reads them.
+- **Option C — drop the affordance, keep the columns, stop claiming them.**
+  **CHOSEN.** The columns stay (they are nullable, cost nothing, and a future
+  triage job can adopt them without a migration), but no query selects them, no
+  insert writes them, and the schema comment no longer promises a job that
+  doesn't exist.
+
+**Decision.** Option C. T-028 removed the three fields from both issue selects
+and from the insert, and rewrote the `db/schema.ts:311` comment to say "populated
+by a deferred Gemini background job" — present tense about a deferred job, not a
+claim that one is running. `db/schema.ts` itself needed no edit: the columns were
+already nullable. The tRPC output narrowed because `project.ts` declares no
+hand-written output types for `getNeedsAttention` / `getIssues`, so removing the
+fields from the service selects is what removes them from the wire.
+
+**Consequences.** The payload no longer carries three always-null fields, and
+`project-issues-shape.test.ts` (161 lines, `b0fcb1b`) pins the narrowed shape.
+F-13 may revive the columns *without* a migration, which is the only reason they
+were kept. T-025/T-026/T-027 are cancelled outright — they built the render path
+for an affordance this decision removed, so they are mutually exclusive with
+Option C rather than merely deferred.
+
+**Note.** The unrelated `ai_summary` in `src/lib/github/services/commits.ts` is
+the commit-summary LLM write against a *different* table and is out of scope for
+this record.
+
+---
+
 ### D-3: Decision Ledger Reconciliation — Indexing Truncation & Repository Caps
 
 - **Status:** Resolved / Reconciled
@@ -175,3 +232,88 @@ However, strict `same-origin` isolation severs `window.opener` references. In Gi
 Set `Cross-Origin-Opener-Policy: same-origin-allow-popups` across application routes. This maintains isolation against hostile cross-origin contexts while fully supporting Clerk popup-based OAuth login flows. 
 
 If client-side processing requiring `SharedArrayBuffer` is introduced in the future, it must be contained in dedicated isolated Web Workers or scoped to specific sub-routes rather than degrading the global authentication boundary.
+
+---
+
+### D-11: Stateless `neon-http` Driver & Compensating Writes
+
+- **Status:** Accepted
+- **Date:** 2026-09-30
+- **Relates To:** **T-018** (credit charge order), **T-045** (compensation latches)
+- **Impacted Files:** `src/lib/db` driver construction, `src/features/dashboard/server/router/services/projectService.ts`, `src/lib/credits.ts`
+
+#### Context
+Creating a project is a multi-step operation: validate the repo URL, `INSERT` the
+project row, deduct credits, and enqueue an Inngest ingestion job. On the
+`neon-http` driver there is no `db.transaction()` available — the HTTP protocol
+used for Neon serverless does not expose interactive transactions — so any pair
+of these steps that must both happen has to be reconciled by hand if the second
+one fails.
+
+The driver choice is deliberate. `neon-http` over WebSockets is what lets the
+app scale to zero on Vercel and avoid paying for a warm connection per serverless
+instance; the cost is that a `db.transaction()` call would pin a connection for
+the life of the transaction, which is exactly the thing the driver is chosen to
+avoid.
+
+#### Options Considered
+
+1. **Option A — `db.transaction()` around create:**
+   Wrap insert, charge, and enqueue in one transaction.
+   - *Pros:* The textbook answer. One round trip, automatic rollback, no
+     compensation code to get wrong.
+   - *Cons:* Requires the WebSockets driver. Rejected — it forfeits scale-to-zero
+     and reintroduces a connection cost per cold instance.
+
+2. **Option B — charge first, then insert:**
+   Deduct credits before creating the row, refund on insert failure.
+   - *Pros:* A user is never handed a project they cannot pay for, because the
+     charge is the gate.
+   - *Cons:* Still needs a refund path, and an unconditional charge-then-refund
+     burns a credit refund latch on a request that never needed one.
+
+3. **Option C — insert, then charge, with explicit compensation in every failure
+   branch (Chosen):**
+   Order the operations so the cheapest-to-undo step happens last, and write a
+   compensating action into each branch that can fail after the row exists.
+   - *Pros:* Stays on `neon-http`. The compensation is only exercised on genuine
+     failures, not on the happy path.
+   - *Cons:* Requires discipline — every new `await` after the `INSERT` needs a
+     compensating branch, and a reviewer has to know that rule.
+
+#### Decision
+Stay on `neon-http` and pay for Option C. In
+`projectService.ts`, `createNewProject`'s ordering is:
+
+1. `INSERT` the project row.
+2. `spendCredits(userId, PROJECT_CREATION_COST)` — a guarded
+   `UPDATE … WHERE credits >= ?` with `RETURNING`, so two concurrent requests
+   can never drive a balance negative. If it throws, delete the row and rethrow.
+   If it returns `null` (the guard rejected the deduction), delete the row and
+   fail `FORBIDDEN` — the read above it is only a fast-fail for the common case,
+   not the authority.
+3. `inngest.send(...)`. If it throws, delete the row **and** refund the credits.
+
+Step 3 compensating in both directions is the case that makes the ordering
+worth stating explicitly: by then both the row and the charge exist, so either
+one alone would strand the other.
+
+A duplicate `(owner_id, github_url)` is not this ADR's problem. The unique
+constraint raises `23505`, which `createNewProject` re-throws as
+`PROJECT_ALREADY_EXISTS`; because the `INSERT` precedes the charge, a conflict
+costs the user nothing — it fails before any credit is deducted, and the router
+maps it to `CONFLICT`.
+
+#### Consequences
+Every `await` after the `INSERT` is a place a compensation branch is now
+required. The comments in `projectService.ts` state this at the charge site so
+the rule is visible at the point of risk rather than only in this record.
+
+`db.transaction()` is not available on this driver, so no future change may
+introduce one under the assumption that it will work. If a transaction ever
+becomes genuinely necessary, that decision is a driver decision, not a local
+refactor — and it supersedes this record.
+
+The same reasoning applies elsewhere: `app/api/chat/route.ts` latches its
+credit refund with a per-request `refunded` flag rather than relying on a
+transaction to guarantee single-refund semantics.
