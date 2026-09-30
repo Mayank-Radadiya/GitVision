@@ -206,11 +206,11 @@ function CommitRow({
                 Generating Analysis...
               </span>
             </div>
-          ) : commit.AiSummary ? (
+          ) : commit.aiSummary ? (
             <div className="bg-primary/5 border-primary/20 flex gap-2 rounded-md border px-3 py-2.5">
               <Sparkles className="text-primary mt-0.5 h-3 w-3 shrink-0" />
               <p className="text-foreground/80 text-xs leading-relaxed font-medium">
-                {commit.AiSummary}
+                {commit.aiSummary}
               </p>
             </div>
           ) : (

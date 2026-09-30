@@ -27,7 +27,7 @@ export interface Commit {
   id: string;
   commitHash: string;
   commitMessage: string;
-  AiSummary: string | null;
+  aiSummary: string | null;
   authorName: string;
   authorEmail: string;
   authorAvatar?: string | null;

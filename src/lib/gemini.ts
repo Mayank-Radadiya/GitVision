@@ -105,7 +105,7 @@ Remember: Your summary should help developers understand this commit in 30 secon
   } catch (error: unknown) {
     // Log the specific cause, then let the failure propagate. This used to
     // return a friendly "😥 …" string, but a string that reads like a summary
-    // is indistinguishable from a real one, and it was persisted as `AiSummary`
+    // is indistinguishable from a real one, and it was persisted as `ai_summary`
     // while the caller kept the credit it had already spent. The sole caller
     // (`getAiSummaryOfCommit`) and its own caller (`generateAiSummary`) both
     // handle a throw: the first propagates it, the second refunds.

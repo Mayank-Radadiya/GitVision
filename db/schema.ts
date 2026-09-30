@@ -184,7 +184,7 @@ export const commitsTable = pgTable(
       .defaultRandom(),
     commitHash: varchar("commit_hash", { length: 255 }).notNull(),
     commitMessage: text("commit_message").notNull(),
-    AiSummary: text("ai_summary"),
+    aiSummary: text("ai_summary"),
     authorName: varchar("author_name", { length: 255 }).notNull(),
     authorEmail: varchar("author_email", { length: 255 }).notNull(),
     authorAvatar: varchar("author_avatar", { length: 255 }),

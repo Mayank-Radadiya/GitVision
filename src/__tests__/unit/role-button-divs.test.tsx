@@ -49,7 +49,7 @@ const commit: Commit = {
   id: "c1",
   commitHash: "abc1234def",
   commitMessage: "Add dark mode support",
-  AiSummary: null,
+  aiSummary: null,
   authorName: "Ada",
   authorEmail: "ada@example.com",
   authorAvatar: null,

@@ -253,7 +253,7 @@ export async function getAiSummaryOfCommit(
     // Persist the AI summary to the database
     await db
       .update(commitsTable)
-      .set({ AiSummary: aiSummary })
+      .set({ aiSummary })
       .where(eq(commitsTable.id, commitRecord.id));
 
     logger.info( `Updated AI summary for commit ${commitHashToUse}`);

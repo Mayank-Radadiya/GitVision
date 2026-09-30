@@ -284,7 +284,7 @@ function CommitRow({
               </span>
             )}
 
-            {commit.AiSummary && (
+            {commit.aiSummary && (
               <>
                 <div className="bg-border/80 h-1 w-1 rounded-full" />
                 <span className="flex items-center gap-1.5 rounded border border-violet-200 bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-600 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-400">
@@ -335,7 +335,7 @@ function CommitRow({
                     Analyzing commit payload…
                   </span>
                 </div>
-              ) : commit.AiSummary ? (
+              ) : commit.aiSummary ? (
                 <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm dark:border-violet-500/20 dark:bg-violet-500/10">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
                   <div>
@@ -343,7 +343,7 @@ function CommitRow({
                       GitVision Analysis
                     </p>
                     <p className="text-foreground/90 text-sm leading-relaxed font-medium">
-                      {commit.AiSummary}
+                      {commit.aiSummary}
                     </p>
                   </div>
                 </div>

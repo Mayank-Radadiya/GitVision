@@ -699,7 +699,7 @@ export function createProjectService() {
             projectId: commitsTable.projectId,
             projectName: projectTables.projectName,
             // For the pick-up card, not the activity list — stripped below.
-            hasSummary: sql<boolean>`${commitsTable.AiSummary} IS NOT NULL`,
+            hasSummary: sql<boolean>`${commitsTable.aiSummary} IS NOT NULL`,
           })
           .from(commitsTable)
           .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
