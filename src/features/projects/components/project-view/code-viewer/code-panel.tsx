@@ -10,13 +10,14 @@
  * - Copy-to-clipboard button
  * - "Ask About This File" — opens a project chat seeded with this path
  * - File path breadcrumb
- * - Theme-aware: defaults based on system dark/light mode
- * - Memoized highlighting to prevent re-renders
+ * - Theme-aware: module-scope singleton cache keyed off resolved next-themes mode
+ * - Zero flicker across file tree navigation with cached highlighter and HTML
  */
 
 import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import type { Highlighter, BundledLanguage, BundledTheme } from "shiki";
 import {
   Copy,
   Check,
@@ -28,6 +29,192 @@ import {
 import { trpc } from "@/src/lib/trpc/client";
 import { cn } from "@/shared/lib/utils";
 import { CODE_THEMES, type ThemeOption } from "./utils";
+
+// ─── Module-scope Shiki Highlighter & Theme Singletons ──────────────────────
+
+const STORAGE_KEY_PREFIX = "gitvision:shiki-theme:";
+const LEGACY_STORAGE_KEY = "gitvision-shiki-theme";
+
+// Default fallback themes keyed by next-themes mode
+const DEFAULT_THEMES: Record<"dark" | "light", string> = {
+  dark: "github-dark",
+  light: "github-light",
+};
+
+// Module-level memoized theme cache keyed off resolved next-themes value ("dark" | "light")
+const themeCache = new Map<"dark" | "light", string>([
+  ["dark", "github-dark"],
+  ["light", "github-light"],
+]);
+
+// Initialize cached preferences from localStorage if available
+function initThemeCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const savedDark = localStorage.getItem(`${STORAGE_KEY_PREFIX}dark`);
+    if (savedDark && CODE_THEMES.some((t) => t.id === savedDark)) {
+      themeCache.set("dark", savedDark);
+    }
+    const savedLight = localStorage.getItem(`${STORAGE_KEY_PREFIX}light`);
+    if (savedLight && CODE_THEMES.some((t) => t.id === savedLight)) {
+      themeCache.set("light", savedLight);
+    }
+    // Check legacy key as fallback
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const match = CODE_THEMES.find((t) => t.id === legacy);
+      if (match) {
+        themeCache.set(match.type, match.id);
+      }
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts (e.g. incognito)
+  }
+}
+initThemeCache();
+
+/** Retrieve the resolved Shiki theme for a given next-themes mode */
+function getResolvedShikiTheme(mode: "dark" | "light"): string {
+  return themeCache.get(mode) ?? DEFAULT_THEMES[mode];
+}
+
+/** Persist explicit user theme choice across file switches and reloads */
+function persistShikiTheme(themeId: string, currentMode: "dark" | "light"): void {
+  const match = CODE_THEMES.find((t) => t.id === themeId);
+  themeCache.set(currentMode, themeId);
+  if (match) {
+    themeCache.set(match.type, themeId);
+  }
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${currentMode}`, themeId);
+      if (match) {
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}${match.type}`, themeId);
+      }
+      localStorage.setItem(LEGACY_STORAGE_KEY, themeId);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+}
+
+// ─── Module-scope Highlighter Singleton ─────────────────────────────────────
+
+let highlighterSingleton: Highlighter | null = null;
+let highlighterPromise: Promise<Highlighter> | null = null;
+
+const PRELOADED_THEMES = [
+  "github-dark",
+  "github-light",
+  "one-dark-pro",
+  "dracula",
+  "nord",
+  "min-light",
+  "vitesse-dark",
+  "tokyo-night",
+] as const;
+
+const PRELOADED_LANGS = [
+  "typescript",
+  "tsx",
+  "javascript",
+  "jsx",
+  "json",
+  "markdown",
+  "css",
+  "html",
+  "python",
+  "bash",
+  "text",
+] as const;
+
+async function getOrInitHighlighter(): Promise<Highlighter> {
+  if (highlighterSingleton) return highlighterSingleton;
+  if (!highlighterPromise) {
+    highlighterPromise = import("shiki")
+      .then(async ({ getSingletonHighlighter }) => {
+        const instance = await getSingletonHighlighter({
+          themes: [...PRELOADED_THEMES],
+          langs: [...PRELOADED_LANGS],
+        });
+        highlighterSingleton = instance;
+        return instance;
+      })
+      .catch((err) => {
+        highlighterPromise = null;
+        throw err;
+      });
+  }
+  return highlighterPromise;
+}
+
+// Bounded LRU cache for highlighted HTML (theme::lang::content -> html)
+const MAX_HIGHLIGHT_CACHE = 100;
+const highlightCache = new Map<string, string>();
+
+function getHighlightCacheKey(theme: string, lang: string, content: string): string {
+  return `${theme}::${lang}::${content}`;
+}
+
+function getCachedHighlight(key: string): string | undefined {
+  return highlightCache.get(key);
+}
+
+function setCachedHighlight(key: string, html: string): void {
+  if (highlightCache.size >= MAX_HIGHLIGHT_CACHE) {
+    const oldest = highlightCache.keys().next().value;
+    if (oldest !== undefined) {
+      highlightCache.delete(oldest);
+    }
+  }
+  highlightCache.set(key, html);
+}
+
+async function highlightCode(
+  code: string,
+  lang: string,
+  theme: string,
+): Promise<string> {
+  const cacheKey = getHighlightCacheKey(theme, lang, code);
+  const cached = getCachedHighlight(cacheKey);
+  if (cached) return cached;
+
+  const highlighter = await getOrInitHighlighter();
+
+  const loadedThemes = highlighter.getLoadedThemes();
+  if (theme && !loadedThemes.includes(theme)) {
+    try {
+      await highlighter.loadTheme(theme as BundledTheme);
+    } catch {
+      // Fall back gracefully if theme cannot be loaded
+    }
+  }
+
+  const targetLang = lang || "text";
+  const loadedLangs = highlighter.getLoadedLanguages();
+  if (targetLang !== "text" && !loadedLangs.includes(targetLang)) {
+    try {
+      await highlighter.loadLanguage(targetLang as BundledLanguage);
+    } catch {
+      // Fall back to plain text if unsupported
+    }
+  }
+
+  const finalLang = highlighter.getLoadedLanguages().includes(targetLang)
+    ? targetLang
+    : "text";
+  const finalTheme = highlighter.getLoadedThemes().includes(theme)
+    ? theme
+    : "github-dark";
+
+  const html = highlighter.codeToHtml(code, {
+    lang: finalLang,
+    theme: finalTheme,
+  });
+
+  setCachedHighlight(cacheKey, html);
+  return html;
+}
 
 interface CodePanelProps {
   filePath: string;
@@ -46,8 +233,16 @@ function CodePanel({
   projectId,
   highlightLine,
 }: CodePanelProps) {
-  const { theme: systemTheme } = useTheme();
+  const { theme: systemTheme, resolvedTheme } = useTheme();
   const router = useRouter();
+
+  // Resolved mode: "dark" or "light", prioritizing resolvedTheme from next-themes
+  const effectiveMode: "dark" | "light" =
+    resolvedTheme === "light" || resolvedTheme === "dark"
+      ? resolvedTheme
+      : systemTheme === "dark"
+        ? "dark"
+        : "light";
 
   // F-09: open a fresh project chat pre-seeded with this file's path. The
   // seeded prompt matches the query classifier's file-specific pattern, so the
@@ -59,40 +254,65 @@ function CodePanel({
       );
     },
   });
-  const [highlightedHtml, setHighlightedHtml] = useState<string>("");
-  const [isHighlighting, setIsHighlighting] = useState(false);
+
+  // ─── Theme state — initialized from module cache keyed off resolved mode ─
+  const [selectedTheme, setSelectedTheme] = useState<string>(() =>
+    getResolvedShikiTheme(effectiveMode),
+  );
+
+  // Synchronous check if already in highlighted HTML cache
+  const initialCacheKey = getHighlightCacheKey(
+    selectedTheme,
+    language || "text",
+    content,
+  );
+  const [highlightedHtml, setHighlightedHtml] = useState<string>(
+    () => getCachedHighlight(initialCacheKey) || "",
+  );
+  const [isHighlighting, setIsHighlighting] = useState<boolean>(() => {
+    if (!content || getCachedHighlight(initialCacheKey)) return false;
+    return highlighterSingleton === null;
+  });
+
   const [copied, setCopied] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const codeAreaRef = useRef<HTMLDivElement>(null);
 
-  // ─── Theme state — default based on system theme ────────────────────────
-  const defaultTheme = systemTheme === "dark" ? "github-dark" : "github-light";
-  const [selectedTheme, setSelectedTheme] = useState(defaultTheme);
-
-  // Update default when system theme changes
+  // ─── Mode switch listener — only re-theme when next-themes mode flips ────
+  const prevModeRef = useRef(effectiveMode);
   useEffect(() => {
-    const newDefault = systemTheme === "dark" ? "github-dark" : "github-light";
-    setSelectedTheme(newDefault);
-  }, [systemTheme]);
+    if (prevModeRef.current !== effectiveMode) {
+      prevModeRef.current = effectiveMode;
+      // Re-resolve to cached theme for the new mode without overwriting user selections
+      setSelectedTheme(getResolvedShikiTheme(effectiveMode));
+    }
+  }, [effectiveMode]);
 
-  // ─── Shiki highlighting — lazy loaded ───────────────────────────────────
+  // ─── Shiki highlighting — re-uses module singleton and highlight cache ───
   useEffect(() => {
     let cancelled = false;
-    setIsHighlighting(true);
+    const cacheKey = getHighlightCacheKey(
+      selectedTheme,
+      language || "text",
+      content,
+    );
+    const cached = getCachedHighlight(cacheKey);
+
+    if (cached) {
+      setHighlightedHtml(cached);
+      setIsHighlighting(false);
+      return;
+    }
+
+    // Only show shimmer skeleton on cold start if highlighter singleton is not ready
+    if (highlighterSingleton === null) {
+      setIsHighlighting(true);
+    }
 
     async function highlight() {
       try {
-        const { codeToHtml } = await import("shiki");
-        const html = await codeToHtml(content, {
-          lang: language || "text",
-          theme: selectedTheme as Parameters<typeof codeToHtml>[1] extends {
-            theme: infer T;
-          }
-            ? T
-            : string,
-        });
-
+        const html = await highlightCode(content, language, selectedTheme);
         if (!cancelled) {
           setHighlightedHtml(html);
           setIsHighlighting(false);
@@ -136,6 +356,16 @@ function CodePanel({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [content]);
+
+  // ─── Explicit user theme selection ─────────────────────────────────────
+  const handleSelectTheme = useCallback(
+    (themeId: string) => {
+      setSelectedTheme(themeId);
+      persistShikiTheme(themeId, effectiveMode);
+      setShowThemeMenu(false);
+    },
+    [effectiveMode],
+  );
 
   // ─── Close theme menu on outside click ──────────────────────────────────
   useEffect(() => {
@@ -218,10 +448,7 @@ function CodePanel({
                   (t: ThemeOption) => (
                     <button
                       key={t.id}
-                      onClick={() => {
-                        setSelectedTheme(t.id);
-                        setShowThemeMenu(false);
-                      }}
+                      onClick={() => handleSelectTheme(t.id)}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-xs transition-colors",
                         selectedTheme === t.id
@@ -244,10 +471,7 @@ function CodePanel({
                   (t: ThemeOption) => (
                     <button
                       key={t.id}
-                      onClick={() => {
-                        setSelectedTheme(t.id);
-                        setShowThemeMenu(false);
-                      }}
+                      onClick={() => handleSelectTheme(t.id)}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-xs transition-colors",
                         selectedTheme === t.id
