@@ -14,6 +14,7 @@ export function NavLink({ item, isActive }: NavLinkProps) {
     <motion.div variants={childVariants}>
       <Link
         href={item.href}
+        aria-current={isActive ? "page" : undefined}
         className={cn(
           "relative cursor-pointer px-3 py-1.5 text-sm font-medium transition-colors duration-200",
           isActive

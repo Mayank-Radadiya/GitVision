@@ -106,6 +106,7 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
           <input
             type="text"
             placeholder="Search pull requests…"
+            aria-label="Search pull requests"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground/45 focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
@@ -116,6 +117,7 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
+              aria-pressed={activeFilter === f}
               className={cn(
                 "relative cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                 activeFilter === f

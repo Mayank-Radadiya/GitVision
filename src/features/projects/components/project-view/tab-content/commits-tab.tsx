@@ -172,8 +172,24 @@ function CommitRow({
       }`}
     >
       <div
-        className="flex cursor-pointer items-start gap-4 px-5 py-4"
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-controls={panelId}
         onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            if (
+              e.target !== e.currentTarget &&
+              (e.target as HTMLElement).tagName === "A"
+            ) {
+              return;
+            }
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="flex cursor-pointer items-start gap-4 px-5 py-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       >
         {/* Dynamic Icon / Avatar Block */}
         <div className="shrink-0 pt-0.5">

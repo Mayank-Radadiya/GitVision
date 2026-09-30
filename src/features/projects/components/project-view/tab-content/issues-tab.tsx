@@ -156,9 +156,24 @@ function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
 
       {/* Clickable issue row */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
         onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            if (
+              e.target !== e.currentTarget &&
+              (e.target as HTMLElement).tagName === "A"
+            ) {
+              return;
+            }
+            e.preventDefault();
+            onToggle();
+          }
+        }}
         className={cn(
-          "group cursor-pointer px-5 py-4 transition-all duration-200 select-none",
+          "group cursor-pointer px-5 py-4 transition-all duration-200 select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
           isExpanded
             ? "from-muted/40 via-muted/20 bg-linear-to-r to-transparent"
             : "hover:bg-muted/15",
@@ -321,6 +336,7 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
           <input
             type="text"
             placeholder="Search issues…"
+            aria-label="Search issues"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground/45 focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
@@ -331,6 +347,7 @@ function IssuesTab({ projectId, repoUrl }: IssuesTabProps) {
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
+              aria-pressed={activeFilter === f}
               className={cn(
                 "relative cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                 activeFilter === f

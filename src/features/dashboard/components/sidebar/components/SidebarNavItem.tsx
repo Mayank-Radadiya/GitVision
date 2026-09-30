@@ -60,7 +60,11 @@ export function SidebarNavItem({
 
   // The actual navigation link content
   const content = (
-    <Link href={item.href} className="block">
+    <Link
+      href={item.href}
+      className="block"
+      aria-current={isActive ? "page" : undefined}
+    >
       <div
         className={cn(
           "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",

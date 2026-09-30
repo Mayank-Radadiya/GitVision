@@ -134,6 +134,7 @@ function CodeViewerProjectGrid() {
             value={query}
             onChange={handleQueryChange}
             placeholder="Search projects…"
+            aria-label="Search projects"
             className="border-border/40 bg-card/50 text-foreground placeholder:text-muted-foreground/60 focus:ring-primary/20 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-10 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
           />
         </div>

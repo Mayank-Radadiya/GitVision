@@ -19,6 +19,7 @@ interface FieldProps {
   autoComplete?: string;
   disabled?: boolean;
   ariaInvalid?: boolean;
+  errorId?: string;
   actionButton?: ReactNode;
   helper?: ReactNode;
   registration: UseFormRegisterReturn;
@@ -33,11 +34,13 @@ export function Field({
   autoComplete,
   disabled,
   ariaInvalid,
+  errorId: customErrorId,
   actionButton,
   helper,
   registration,
 }: FieldProps) {
   const [focused, setFocused] = useState(false);
+  const errorId = ariaInvalid ? customErrorId || `${id}-error` : undefined;
 
   return (
     <div className="space-y-2">
@@ -61,6 +64,7 @@ export function Field({
           type={type}
           disabled={disabled}
           aria-invalid={ariaInvalid}
+          aria-describedby={errorId}
           aria-label={label}
           autoComplete={autoComplete}
           value={value}
@@ -81,7 +85,11 @@ export function Field({
         />
       </div>
 
-      {helper ? <div className="min-h-5">{helper}</div> : null}
+      {helper ? (
+        <div id={errorId} className="min-h-5">
+          {helper}
+        </div>
+      ) : null}
     </div>
   );
 }

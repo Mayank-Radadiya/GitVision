@@ -37,6 +37,9 @@ export function MobileMenu({
               <motion.div key={item.name} variants={mobileItemVariants}>
                 <Link
                   href={item.href}
+                  aria-current={
+                    activeSection === item.sectionId ? "page" : undefined
+                  }
                   className={cn(
                     "flex cursor-pointer items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                     activeSection === item.sectionId

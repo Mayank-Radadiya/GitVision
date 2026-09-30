@@ -30,6 +30,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import { trpc } from "@/src/lib/trpc/client";
 
 import { IndexingStatusBadge } from "./indexing-status-badge";
@@ -48,6 +58,7 @@ function ProjectOptionsDropdown({
 }) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
   const deleteMutation = trpc.project.delete.useMutation({
     onMutate: () => setIsDeleting(true),
     onSuccess: () => {
@@ -57,47 +68,76 @@ function ProjectOptionsDropdown({
     },
     onError: (err) => {
       setIsDeleting(false);
+      setIsAlertOpen(false);
       toast.error(err.message || "Failed to delete project");
     },
   });
 
   const handleDelete = () => {
-    if (
-      confirm(
-        `Are you sure you want to delete ${projectName}? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate({ projectId });
-    }
+    deleteMutation.mutate({ projectId });
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label="Project actions menu"
-          className="border-border/50 hover:bg-muted/50 h-8 w-8 p-0 transition-colors"
-        >
-          <MoreVertical className="text-muted-foreground h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="cursor-pointer text-red-500 hover:bg-red-500/10 hover:text-red-600 focus:bg-red-500/10 focus:text-red-600"
-        >
-          {isDeleting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="mr-2 h-4 w-4" />
-          )}
-          {isDeleting ? "Deleting..." : "Delete Project"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label="Project actions menu"
+            className="border-border/50 hover:bg-muted/50 h-8 w-8 p-0 transition-colors"
+          >
+            <MoreVertical className="text-muted-foreground h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setIsAlertOpen(true);
+            }}
+            onClick={() => setIsAlertOpen(true)}
+            disabled={isDeleting}
+            className="cursor-pointer text-red-500 hover:bg-red-500/10 hover:text-red-600 focus:bg-red-500/10 focus:text-red-600"
+          >
+            {isDeleting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
+            {isDeleting ? "Deleting..." : "Delete Project"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {projectName}? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Project"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
