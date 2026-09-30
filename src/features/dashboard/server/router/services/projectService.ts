@@ -30,70 +30,6 @@ import {
 // Shared Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface PickUpCard {
-  type: "chat" | "commit";
-  title: string;
-  description: string;
-  href: string;
-  projectName: string;
-}
-
-/** Row shape the "continue conversation" card needs from `project_chats`. */
-interface PickUpChatRow {
-  id: string;
-  title: string | null;
-  projectName: string | null;
-}
-
-/** Row shape the "recent commit" card needs from `commits`. */
-interface PickUpCommitRow {
-  id: string;
-  commitMessage: string;
-  projectId: string;
-  projectName: string;
-}
-
-/**
- * Build the pick-up cards from one chat row and one commit row.
- *
- * Shared so the standalone procedure and the consolidated dashboard read
- * cannot drift — the card's hrefs and its 60-character commit truncation are
- * the contract T-003 pinned a test against.
- */
-function buildPickUpCards(
-  lastChat: PickUpChatRow | undefined,
-  recentCommit: PickUpCommitRow | undefined,
-): PickUpCard[] {
-  const cards: PickUpCard[] = [];
-
-  if (lastChat) {
-    cards.push({
-      type: "chat",
-      title: "Continue Conversation",
-      description: lastChat.title || "Your last chat session",
-      // A chat lives at /chat/[chatId] whether or not it has a project —
-      // there is no /projects route in this app.
-      href: `/chat/${lastChat.id}`,
-      projectName: lastChat.projectName ?? "General",
-    });
-  }
-
-  if (recentCommit) {
-    const msg =
-      recentCommit.commitMessage.length > 60
-        ? recentCommit.commitMessage.slice(0, 57) + "..."
-        : recentCommit.commitMessage;
-    cards.push({
-      type: "commit",
-      title: "Recent Commit",
-      description: msg,
-      href: `/dashboard/user-project/${recentCommit.projectId}`,
-      projectName: recentCommit.projectName,
-    });
-  }
-
-  return cards;
-}
 
 /** A decoded keyset position: the last row served, by timestamp and id. */
 interface CursorPosition {
@@ -664,7 +600,7 @@ export function createProjectService() {
      * Neon HTTP transaction, so the whole widget is now one request.
      *
      * The projections below are deliberately duplicated with the standalone
-     * procedures (`getAllProjects`, `getRecentActivity`, ...). Each of those
+     * procedures (`getAllProjects`, ...). Each of those
      * is its own tRPC query and must stay independently callable, so the
      * duplication is the price of the consolidation — not an oversight.
      *
@@ -674,9 +610,6 @@ export function createProjectService() {
      *     is summed in JS from the project rows below, which are the same
      *     `WHERE owner_id = ?` rows.
      *   - getLanguageBreakdown is the same rows' `languages` JSONB.
-     *   - getPickUpWhereYouLeftOff's "recent commit" card is the first row of
-     *     the same `ORDER BY authorDate DESC` the activity list reads, so it
-     *     only needed `hasSummary` added to the projection.
      *   - getNeedsAttention's open-issue/open-PR counts become
      *     `FILTER (...) OVER ()` window counts on the rows it already
      *     fetches. A window function is evaluated over the whole partition
@@ -688,8 +621,7 @@ export function createProjectService() {
      * statements rather than being joined into something larger.
      *
      * ── Still the biggest remaining cost (T-029) ─────────────────────────────
-     * `getRecentActivity`'s `commit_message` column is unchanged, and T-029
-     * measured it as two thirds of this widget: it averages 1,092 bytes and
+     * The `commits` table `commit_message` column averages 1,092 bytes and
      * reaches 65,536, over a 72 ms network floor. EXPLAIN puts the database
      * side at 0.134 ms — this is wire width, not a slow plan. Capping the
      * column on the way out is the next lever and is deliberately not done
@@ -856,27 +788,6 @@ export function createProjectService() {
       };
     },
 
-    async getRecentActivity(userId: string, limit = 8) {
-      // Defensive bound — validated again here even if router already checks
-      const safeLimit = Math.min(limit, 50);
-
-      return db
-        .select({
-          id: commitsTable.id,
-          commitMessage: commitsTable.commitMessage,
-          authorName: commitsTable.authorName,
-          authorAvatar: commitsTable.authorAvatar,
-          authorDate: commitsTable.authorDate,
-          projectId: commitsTable.projectId,
-          projectName: projectTables.projectName,
-        })
-        .from(commitsTable)
-        .innerJoin(projectTables, eq(commitsTable.projectId, projectTables.id))
-        .where(eq(projectTables.ownerId, userId)) // ← tenant isolation via JOIN condition
-        .orderBy(desc(commitsTable.authorDate))
-        .limit(safeLimit);
-    },
-
     /**
      * Commits per day for the last `days`, for one owner.
      *
@@ -997,76 +908,6 @@ export function createProjectService() {
         }
         throw error;
       }
-    },
-
-    async getPickUpWhereYouLeftOff(
-      userId: string,
-    ): Promise<{ cards: PickUpCard[] }> {
-      const [lastChat, recentCommit] = await Promise.all([
-        db
-          .select({
-            id: projectChats.id,
-            title: projectChats.title,
-            projectId: projectChats.projectId,
-            projectName: projectTables.projectName,
-            updatedAt: projectChats.updatedAt,
-          })
-          .from(projectChats)
-          .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
-          .where(eq(projectChats.userId, userId))
-          .orderBy(desc(projectChats.updatedAt))
-          .limit(1),
-
-        db
-          .select({
-            id: commitsTable.id,
-            commitMessage: commitsTable.commitMessage,
-            projectId: commitsTable.projectId,
-            projectName: projectTables.projectName,
-            authorDate: commitsTable.authorDate,
-            hasSummary: sql<boolean>`${commitsTable.AiSummary} IS NOT NULL`,
-          })
-          .from(commitsTable)
-          .innerJoin(
-            projectTables,
-            eq(commitsTable.projectId, projectTables.id),
-          )
-          .where(eq(projectTables.ownerId, userId))
-          .orderBy(desc(commitsTable.authorDate))
-          .limit(1),
-      ]);
-
-      return { cards: buildPickUpCards(lastChat[0], recentCommit[0]) };
-
-      const cards: PickUpCard[] = [];
-
-      if (lastChat[0]) {
-        const c = lastChat[0];
-        cards.push({
-          type: "chat",
-          title: "Continue Conversation",
-          description: c.title || "Your last chat session",
-          href: `/chat/${c.id}`,
-          projectName: c.projectName ?? "General",
-        });
-      }
-
-      if (recentCommit[0]) {
-        const cm = recentCommit[0];
-        const msg =
-          cm.commitMessage.length > 60
-            ? cm.commitMessage.slice(0, 57) + "..."
-            : cm.commitMessage;
-        cards.push({
-          type: "commit",
-          title: "Recent Commit",
-          description: msg,
-          href: `/dashboard/user-project/${cm.projectId}`,
-          projectName: cm.projectName,
-        });
-      }
-
-      return { cards };
     },
 
     /**

@@ -21,9 +21,6 @@ export interface BudgetableItem {
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   [PINNED_GEMINI_FLASH]: 1_048_576,
-  "gemini-1.5-flash": 1_048_576,
-  "claude-3-5-sonnet": 200_000,
-  "gpt-4o": 128_000,
   default: 128_000,
 };
 

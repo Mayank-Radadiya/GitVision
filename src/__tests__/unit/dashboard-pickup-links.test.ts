@@ -31,6 +31,7 @@ function chain(rows: unknown[]) {
     "limit",
     "leftJoin",
     "innerJoin",
+    "groupBy",
   ]) {
     builder[method] = () => builder;
   }
@@ -48,6 +49,7 @@ vi.mock("@/db", async () => {
           return chain([]);
         },
       }),
+      batch: (queries: unknown[]) => Promise.all(queries),
     },
   };
 });
@@ -107,14 +109,7 @@ function realRoutePatterns(): RegExp[] {
 
 const ROUTES = realRoutePatterns();
 
-async function pickupCards() {
-  const { cards } = await createProjectService().getPickUpWhereYouLeftOff(
-    "user_1",
-  );
-  return cards;
-}
-
-describe("getPickUpWhereYouLeftOff hrefs", () => {
+describe("streamlined dashboard response", () => {
   it("has real routes to match against", () => {
     // A discovery bug here would make the test below pass vacuously.
     expect(ROUTES.some((r) => r.test("/chat/abc123"))).toBe(true);
@@ -123,64 +118,11 @@ describe("getPickUpWhereYouLeftOff hrefs", () => {
     );
   });
 
-  it("links the chat card to /chat/<chatId> even when it belongs to a project", async () => {
-    chatRows = [
-      {
-        id: "chat_1",
-        title: "Where is the auth middleware",
-        projectId: "proj_1",
-        projectName: "gitvision",
-        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-      },
-    ];
-    commitRows = [];
-
-    const [card] = await pickupCards();
-    expect(card.href).toBe("/chat/chat_1");
-  });
-
-  it("links the recent-commit card to the project page", async () => {
-    chatRows = [];
-    commitRows = [
-      {
-        id: "commit_1",
-        commitMessage: "fix: proxy allowlist",
-        projectId: "proj_1",
-        projectName: "gitvision",
-        authorDate: new Date("2026-01-01T00:00:00.000Z"),
-        hasSummary: true,
-      },
-    ];
-
-    const [card] = await pickupCards();
-    expect(card.href).toBe("/dashboard/user-project/proj_1");
-  });
-
-  it("only ever returns hrefs the router can serve", async () => {
-    chatRows = [
-      {
-        id: "chat_1",
-        title: "Where is the auth middleware",
-        projectId: "proj_1",
-        projectName: "gitvision",
-        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-      },
-    ];
-    commitRows = [
-      {
-        id: "commit_1",
-        commitMessage: "fix: proxy allowlist",
-        projectId: "proj_1",
-        projectName: "gitvision",
-        authorDate: new Date("2026-01-01T00:00:00.000Z"),
-        hasSummary: true,
-      },
-    ];
-
-    const cards = await pickupCards();
-    expect(cards).toHaveLength(2);
-    for (const card of cards) {
-      expect(ROUTES.some((route) => route.test(card.href))).toBe(true);
-    }
+  it("does not expose pickUp cards in the streamlined dashboard response", async () => {
+    const data = (await createProjectService().getDashboardData(
+      "user_1",
+    )) as Record<string, unknown>;
+    expect(data.pickUp).toBeUndefined();
+    expect(data.recentActivity).toBeUndefined();
   });
 });
