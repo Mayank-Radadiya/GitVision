@@ -16,6 +16,10 @@ import {
 import { Button } from "@/src/shared/components/ui/button";
 import { Badge } from "@/src/shared/components/ui/badge";
 import {
+  isTerminalStatus,
+  type IndexingProgressEvent,
+} from "@/src/lib/embedding-progress";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -131,7 +135,16 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
   const router = useRouter();
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [embeddingStates, setEmbeddingStates] = useState<
-    Record<string, { status: string; progress: number; error?: string | null }>
+    Record<
+      string,
+      {
+        status: string;
+        progress: number;
+        error?: string | null;
+        indexedFileCount?: number;
+        totalFileCount?: number;
+      }
+    >
   >({});
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
@@ -151,6 +164,14 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
     [embeddingStates],
   );
 
+  const getProjectCounts = useCallback(
+    (projectId: string) => ({
+      indexedFileCount: embeddingStates[projectId]?.indexedFileCount ?? 0,
+      totalFileCount: embeddingStates[projectId]?.totalFileCount ?? 0,
+    }),
+    [embeddingStates],
+  );
+
   const selectedProjectData = projects.find((p) => p.id === selectedProject);
   const currentStatus = selectedProject
     ? getProjectStatus(selectedProject)
@@ -160,6 +181,11 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
   const isEmbeddingReady =
     currentStatus === "completed" || currentStatus === "partial";
   const isProcessing = currentStatus === "processing";
+  // Live counters for the selected project; 0/0 hides the "N of M" line until
+  // the pipeline has actually discovered a file set.
+  const counts = selectedProject
+    ? getProjectCounts(selectedProject)
+    : { indexedFileCount: 0, totalFileCount: 0 };
 
   // Verify actual embedding status when a project is selected
   // (catches stale "completed" status when DB is empty)
@@ -178,6 +204,8 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
             status: data.status,
             progress: data.progress ?? 0,
             error: data.error,
+            indexedFileCount: data.indexedFileCount ?? 0,
+            totalFileCount: data.totalFileCount ?? 0,
           },
         }));
       } catch {
@@ -188,34 +216,74 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
     verifyStatus();
   }, [selectedProject]);
 
-  // Poll for embedding progress
+  // Live indexing progress over SSE.
+  //
+  // The server closes the stream on any terminal status (completed, partial or
+  // failed). On a transport error we read one snapshot so a truncated stream —
+  // a proxy timeout, or the platform's function-duration cap on a long run —
+  // never leaves a frozen bar behind. EventSource reconnects on its own by
+  // default, which would silently re-open a connection we already gave up on,
+  // so we close it ourselves in onerror instead.
   useEffect(() => {
     if (!generatingFor) return;
+    const projectId = generatingFor;
 
-    const pollInterval = setInterval(async () => {
+    const readSnapshot = async () => {
       try {
-        const res = await fetch(`/api/embeddings?projectId=${generatingFor}`);
+        const res = await fetch(`/api/embeddings?projectId=${projectId}`);
         if (!res.ok) return;
         const data = await res.json();
 
         setEmbeddingStates((prev) => ({
           ...prev,
-          [generatingFor]: {
+          [projectId]: {
             status: data.status,
             progress: data.progress ?? 0,
             error: data.error,
+            indexedFileCount: data.indexedFileCount ?? 0,
+            totalFileCount: data.totalFileCount ?? 0,
           },
         }));
-
-        if (data.status === "completed" || data.status === "failed") {
-          setGeneratingFor(null);
-        }
       } catch {
-        // Ignore polling errors
+        // Ignore — the Retry button covers a dead snapshot.
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(pollInterval);
+    const source = new EventSource(
+      `/api/embeddings/progress?projectId=${projectId}`,
+    );
+
+    source.onmessage = (message) => {
+      let event: IndexingProgressEvent;
+      try {
+        event = JSON.parse(message.data) as IndexingProgressEvent;
+      } catch {
+        return;
+      }
+
+      setEmbeddingStates((prev) => ({
+        ...prev,
+        [projectId]: {
+          status: event.status,
+          progress: event.percentage ?? 0,
+          error: event.error,
+          indexedFileCount: event.indexedFileCount ?? 0,
+          totalFileCount: event.totalFileCount ?? 0,
+        },
+      }));
+
+      if (isTerminalStatus(event.status)) {
+        source.close();
+        setGeneratingFor(null);
+      }
+    };
+
+    source.onerror = () => {
+      source.close();
+      void readSnapshot();
+    };
+
+    return () => source.close();
   }, [generatingFor]);
 
   const startEmbeddingGeneration = async (projectId: string) => {
@@ -390,6 +458,12 @@ export function ChatLanding({ projects, chats }: ChatLandingProps) {
                           }}
                         />
                       </div>
+                      {counts.totalFileCount > 0 && (
+                        <p className="text-muted-foreground font-mono text-xs">
+                          {counts.indexedFileCount} of {counts.totalFileCount}{" "}
+                          files embedded
+                        </p>
+                      )}
                     </div>
                   )}
 

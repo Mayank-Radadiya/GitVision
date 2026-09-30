@@ -71,6 +71,13 @@
       "when": 1790774804982,
       "tag": "0009_clear_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790774804982,
+      "tag": "0010_indexing_progress_counts",
+      "breakpoints": true
     }
   ]
 }

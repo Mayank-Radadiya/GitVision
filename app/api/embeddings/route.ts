@@ -156,6 +156,8 @@ export async function GET(req: Request) {
           status: "pending",
           progress: 0,
           error: null,
+          indexedFileCount: 0,
+          totalFileCount: 0,
         });
       }
     }
@@ -164,6 +166,10 @@ export async function GET(req: Request) {
       status: project.embeddingStatus,
       progress: project.embeddingProgress,
       error: project.embeddingError,
+      // Live counters, so a client that missed the SSE stream (or never opened
+      // one) still renders "N of M" instead of parsing the error prose.
+      indexedFileCount: project.indexedFileCount,
+      totalFileCount: project.totalFileCount,
     });
   } catch (error) {
     if (error instanceof ProjectAccessError) {

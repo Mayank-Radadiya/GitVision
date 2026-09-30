@@ -197,6 +197,18 @@ describe("generateEmbeddings Prepare", () => {
   });
 });
 
+/**
+ * `totalFileCount` is zeroed by the claim, set to the real denominator by
+ * Prepare, and never touched again — Finalize only republishes the numerator.
+ * So read the last write that carries it, not the first.
+ */
+const publishedTotal = () => {
+  for (let i = updates.length - 1; i >= 0; i--) {
+    if ("totalFileCount" in updates[i]) return updates[i].totalFileCount;
+  }
+  return undefined;
+};
+
 describe("generateEmbeddings truncation", () => {
   it("marks the project partial, not completed, when the project has more files than the cap", async () => {
     // Two files come back from the bounded read, but the project has 1200.
@@ -212,6 +224,11 @@ describe("generateEmbeddings truncation", () => {
     expect(final.embeddingStatus).toBe("partial");
     expect(final.embeddingError).toContain("2 of 1200");
     expect(result).toMatchObject({ success: true, truncated: true });
+
+    // The counts the UI reads instead of parsing the prose above. The run
+    // embedded both selected files out of the project's 1200.
+    expect(final.indexedFileCount).toBe(2);
+    expect(publishedTotal()).toBe(1200);
   });
 
   it("still marks a fully covered project completed", async () => {
@@ -223,6 +240,8 @@ describe("generateEmbeddings truncation", () => {
     const result = await run();
 
     expect(updates.at(-1)!.embeddingStatus).toBe("completed");
+    expect(updates.at(-1)!.indexedFileCount).toBe(2);
+    expect(publishedTotal()).toBe(2);
     expect(result).toMatchObject({ truncated: false });
   });
 
@@ -233,6 +252,9 @@ describe("generateEmbeddings truncation", () => {
 
     // f2 errors by default, so the failure is the more urgent signal.
     expect(updates.at(-1)!.embeddingStatus).toBe("failed");
+    // One of two files embedded — the counter reflects success, not attempts.
+    expect(updates.at(-1)!.indexedFileCount).toBe(1);
+    expect(publishedTotal()).toBe(1200);
     expect(result).toMatchObject({ success: false });
   });
 });

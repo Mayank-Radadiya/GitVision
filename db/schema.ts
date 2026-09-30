@@ -81,6 +81,18 @@ export const projectTables = pgTable(
       .default("pending"), // Values: 'pending' | 'processing' | 'completed' | 'partial' | 'failed'
     embeddingError: text("embedding_error"), // Store error message if failed
     embeddingProgress: integer("embedding_progress").notNull().default(0), // Track progress (0-100)
+    /**
+     * Live indexing counters, written by the embedding pipeline so the UI can
+     * render real progress instead of regex-parsing prose out of `embeddingError`.
+     *
+     * NOTE `totalFiles` above is a different quantity: it is the file count
+     * GitHub reported for the repo at import time. `totalFileCount` is the
+     * number of files the current embedding run actually considered, and
+     * `indexedFileCount` is how many it has embedded so far. A capped run
+     * (see MAX_EMBEDDING_FILES) legitimately reports e.g. 500 of 1200.
+     */
+    indexedFileCount: integer("indexed_file_count").notNull().default(0),
+    totalFileCount: integer("total_file_count").notNull().default(0),
     lastEmbeddingAttempt: timestamp("last_embedding_attempt"), // Track when last attempted
     estimatedTokens: integer("estimated_tokens"), // Total token count across all embeddings — used for project size gate (null = unknown, treat as large)
     createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -50,9 +50,10 @@ import { expect, test, type Page } from "@playwright/test";
  * embedded-file count: `totalFiles` is written by `getRepositoryFiles`
  * (`src/lib/github/services/files.ts:68`) at creation time, before the Inngest
  * job runs. The readiness assertion above is what proves the index itself;
- * this is what proves the payload. There is no `indexedFileCount` column in
- * the schema to assert against — `db/schema.ts:79-83` has only
- * `embeddingStatus` / `embeddingError` / `embeddingProgress`.
+ * this is what proves the payload. The `indexedFileCount` / `totalFileCount`
+ * columns are asserted directly in `src/__tests__/unit/inngest-embeddings.test.ts`;
+ * this fixture is under the cap, so both would read 1/1 and prove nothing about
+ * truncation.
  *
  * ## Prerequisites
  *

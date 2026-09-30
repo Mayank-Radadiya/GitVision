@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   MoreVertical,
   Trash2,
+  RefreshCw,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
@@ -238,7 +239,8 @@ interface ProjectHeaderProps {
   onOpenCodeViewer: () => void;
   embeddingStatus: string | null | undefined;
   totalFiles: number | null | undefined;
-  embeddingError: string | null | undefined;
+  indexedFileCount?: number | null;
+  totalFileCount?: number | null;
 }
 
 function extractOwnerRepo(url: string) {
@@ -266,7 +268,8 @@ function ProjectHeader({
   onOpenCodeViewer,
   embeddingStatus,
   totalFiles,
-  embeddingError,
+  indexedFileCount,
+  totalFileCount,
 }: ProjectHeaderProps) {
   const router = useRouter();
   const cleanUrl = githubUrl?.replace(/\.git$/, "") || "";
@@ -324,7 +327,8 @@ function ProjectHeader({
                   <IndexingStatusBadge
                     embeddingStatus={embeddingStatus}
                     totalFiles={totalFiles}
-                    embeddingError={embeddingError}
+                    indexedFileCount={indexedFileCount}
+                    totalFileCount={totalFileCount}
                   />
 
                   {/* Project Name */}

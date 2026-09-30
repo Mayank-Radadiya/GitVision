@@ -138,7 +138,8 @@ export default function ProjectPage() {
             onOpenCodeViewer={handleOpenCodeViewer}
             embeddingStatus={project?.embeddingStatus}
             totalFiles={project?.totalFiles}
-            embeddingError={project?.embeddingError}
+            indexedFileCount={project?.indexedFileCount}
+            totalFileCount={project?.totalFileCount}
           />
 
           {/* Sub-navigation tabs */}

@@ -1,56 +1,88 @@
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { IndexingStatusBadge } from "@/src/features/projects/components/project-view/indexing-status-badge";
 
-import {
-  IndexingStatusBadge,
-  parseIndexedCounts,
-} from "@/src/features/projects/components/project-view/indexing-status-badge";
-
-const partialError = (indexed: number, total: number) =>
-  `Indexed ${indexed} of ${total} files — the repository exceeds the 500-file embedding cap, so the remaining ${total - indexed} files are not searchable.`;
-
-describe("parseIndexedCounts", () => {
-  it("reads the indexed and total counts out of the truncation message", () => {
-    expect(parseIndexedCounts(partialError(500, 1200))).toEqual({ indexed: 500, total: 1200 });
-  });
-
-  it("returns null for any other message", () => {
-    expect(parseIndexedCounts("Embedding job failed after all retries: boom")).toBeNull();
-    expect(parseIndexedCounts(null)).toBeNull();
-    expect(parseIndexedCounts(undefined)).toBeNull();
-  });
-});
-
+// A capped run writes real counters, so the badge reads numbers. The old
+// version regex-scraped "Indexed N of M files" out of `embeddingError`; the
+// prose is still stored (the failed-state copy needs it) but nothing parses it
+// here any more.
 describe("IndexingStatusBadge", () => {
-  it("shows how much of the project is searchable when the index is partial", () => {
+  it("renders the pipeline's own counts for a partial index", () => {
     render(
       <IndexingStatusBadge
         embeddingStatus="partial"
         totalFiles={1200}
-        embeddingError={partialError(500, 1200)}
+        indexedFileCount={500}
+        totalFileCount={1200}
       />,
     );
 
-    expect(screen.getByText("Partial index — indexed 500 of 1200 files")).toBeDefined();
-    expect(screen.queryByText("AI Synced")).toBeNull();
+    expect(
+      screen.getByText("Partial index — indexed 500 of 1200 files"),
+    ).toBeInTheDocument();
   });
 
-  it("falls back to the stored file count when the truncation message is missing", () => {
-    render(<IndexingStatusBadge embeddingStatus="partial" totalFiles={1200} embeddingError={null} />);
-
-    expect(screen.getByText("Partial index — 1200 files not indexed")).toBeDefined();
-  });
-
-  it("still says AI Synced for a fully indexed project", () => {
+  it("prefers the run denominator over the GitHub-reported file count", () => {
     render(
       <IndexingStatusBadge
-        embeddingStatus="completed"
-        totalFiles={42}
-        embeddingError={null}
+        embeddingStatus="partial"
+        totalFiles={3000}
+        indexedFileCount={500}
+        totalFileCount={1200}
       />,
     );
 
-    expect(screen.getByText("AI Synced")).toBeDefined();
-    expect(screen.queryByText(/Partial index/)).toBeNull();
+    expect(
+      screen.getByText("Partial index — indexed 500 of 1200 files"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Partial index — indexed 500 of 3000 files"),
+    ).not.toBeInTheDocument();
   });
+
+  it("falls back to the GitHub-reported count when the run wrote none", () => {
+    render(
+      <IndexingStatusBadge
+        embeddingStatus="partial"
+        totalFiles={1200}
+        indexedFileCount={null}
+        totalFileCount={null}
+      />,
+    );
+
+    expect(
+      screen.getByText("Partial index — indexed 0 of 1200 files"),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to a count-free message when no denominator is known", () => {
+    render(
+      <IndexingStatusBadge
+        embeddingStatus="partial"
+        totalFiles={null}
+        indexedFileCount={null}
+        totalFileCount={0}
+      />,
+    );
+
+    expect(
+      screen.getByText("Partial index — some files not indexed"),
+    ).toBeInTheDocument();
+  });
+
+  it.each(["completed", "pending", "processing", "failed", null])(
+    "shows the synced badge for status %s",
+    (status) => {
+      render(
+        <IndexingStatusBadge
+          embeddingStatus={status}
+          totalFiles={1200}
+          indexedFileCount={500}
+          totalFileCount={1200}
+        />,
+      );
+
+      expect(screen.getByText("AI Synced")).toBeInTheDocument();
+    },
+  );
 });

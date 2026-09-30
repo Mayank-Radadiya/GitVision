@@ -5,8 +5,12 @@ import {
   codeEmbeddings,
   rateLimitsTable,
 } from "@/db/schema";
-import { eq, and, ne, sql, sum, lt, asc } from "drizzle-orm";
-import { getRepositoryFiles, syncIssuesAndComments } from "../github";
+import { eq, and, ne, sql, sum, lt, asc, isNull, or, gt, inArray } from "drizzle-orm";
+import {
+  getRepositoryFiles,
+  syncIssuesAndComments,
+} from "../github";
+import { parseGitHubUrl } from "../github/utils";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 import { logger } from "@/src/lib/logger";
@@ -149,6 +153,10 @@ export const generateEmbeddings = inngest.createFunction(
           embeddingStatus: "processing",
           embeddingProgress: 0,
           embeddingError: null,
+          // Zero the counters up front: a re-run must never show the previous
+          // run's counts while the new run is still discovering its files.
+          indexedFileCount: 0,
+          totalFileCount: 0,
           lastEmbeddingAttempt: new Date(),
           updatedAt: new Date(),
         })
@@ -200,7 +208,18 @@ export const generateEmbeddings = inngest.createFunction(
         .from(projectFiles)
         .where(eq(projectFiles.projectId, projectId));
 
-      return { claimed: true, files: allFiles, total: Number(countRow?.total ?? 0) };
+      const total = Number(countRow?.total ?? 0);
+
+      // Publish the denominator so the SSE stream can render "N of M" while
+      // the batches are still running. `totalFileCount` is the uncapped
+      // project file count — the same number Finalize uses to decide whether
+      // the run was capped.
+      await db
+        .update(projectTables)
+        .set({ totalFileCount: total, updatedAt: new Date() })
+        .where(eq(projectTables.id, projectId));
+
+      return { claimed: true, files: allFiles, total };
     });
 
     if (!prepared.claimed) {
@@ -261,18 +280,31 @@ export const generateEmbeddings = inngest.createFunction(
           }
 
           // Update progress
+          const attempted = Math.min(i + BATCH_SIZE, files.length);
           const progress = Math.min(
             Math.round(((i + BATCH_SIZE) / files.length) * 100),
             100,
           );
+          // Files attempted so far, minus every one that failed. `errors` holds
+          // batches 1..N-1 (pushed after each step resolves) and `batchErrors`
+          // holds the current batch, so this stays monotonic. Finalize
+          // overwrites it with the authoritative count when the run ends.
+          const indexed = Math.max(
+            0,
+            attempted - errors.length - batchErrors.length,
+          );
 
           await db
             .update(projectTables)
-            .set({ embeddingProgress: progress, updatedAt: new Date() })
+            .set({
+              embeddingProgress: progress,
+              indexedFileCount: indexed,
+              updatedAt: new Date(),
+            })
             .where(eq(projectTables.id, projectId));
 
           logger.info(
-            `[Inngest] Batch ${batchIndex + 1}: ${Math.min(i + BATCH_SIZE, files.length)}/${files.length} files (${progress}%)`,
+            `[Inngest] Batch ${batchIndex + 1}: ${attempted}/${files.length} files (${progress}%)`,
           );
 
           return { batchChunks, batchEmbeddings, batchErrors };
@@ -294,6 +326,9 @@ export const generateEmbeddings = inngest.createFunction(
 
       const actualCount = countResult?.count ?? 0;
       const selectedFiles = files.length;
+      // Authoritative final count. The batch loop publishes a running estimate;
+      // this is the number the UI keeps once the run ends.
+      const indexedFiles = Math.max(0, selectedFiles - errors.length);
 
       if (actualCount === 0) {
         const errorMsg = `Embedding generation produced 0 embeddings from ${files.length} files. ${
@@ -308,6 +343,7 @@ export const generateEmbeddings = inngest.createFunction(
             embeddingStatus: "failed",
             embeddingError: errorMsg,
             embeddingProgress: 0,
+            indexedFileCount: 0,
             updatedAt: new Date(),
           })
           .where(eq(projectTables.id, projectId));
@@ -338,6 +374,7 @@ export const generateEmbeddings = inngest.createFunction(
             embeddingStatus: "failed",
             embeddingError: errorMsg,
             embeddingProgress: 100,
+            indexedFileCount: indexedFiles,
             estimatedTokens,
             updatedAt: new Date(),
           })
@@ -365,6 +402,7 @@ export const generateEmbeddings = inngest.createFunction(
             embeddingStatus: "partial",
             embeddingProgress: 100,
             embeddingError: truncatedMsg,
+            indexedFileCount: indexedFiles,
             estimatedTokens,
             updatedAt: new Date(),
           })
@@ -384,6 +422,7 @@ export const generateEmbeddings = inngest.createFunction(
           embeddingStatus: "completed",
           embeddingProgress: 100,
           embeddingError: null,
+          indexedFileCount: indexedFiles,
           estimatedTokens,
           updatedAt: new Date(),
         })
@@ -516,3 +555,16 @@ export const dailyCreditGrant = inngest.createFunction(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// 5. Re-sync Project — incremental file refresh + delta re-embedding (F-14)
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-streams the tarball and reconciles files by content hash.
+ *
+ * Deliberately does NOT fire `embeddings/generate`. That function loads the
+ * MAX_EMBEDDING_FILES *shortest* files, so a changed 200KB file would fall
+ * outside the cap and stay permanently un-embedded — the delta has to be the
+ * exact set of changed ids, uncapped.
+ */
