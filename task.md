@@ -42,13 +42,6 @@
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
-- **T-005** — Unblock email-less Clerk users
-  - **What:** Users with no email address are silently skipped by the Clerk webhook, authenticate successfully, and hit an empty product forever. `users.email` also defaults to `example@gmail.com` on a **unique** column, so a second default row collides.
-  - **How:** Depends on D-1 being recorded by F-11. Recommendation on record: make `users.email` nullable in migration `0005` and drop the default — refusing creation breaks OAuth-only users, a placeholder collides.
-  - **Dependencies:** F-11
-  - **Effort/Priority:** M / 🔥 P0
-  - **Source:** `status/p0-B.md:L34`, §12.1 D-1, §2.3 row 5
-
 - **T-020** — Ship error tracking on the recorded transport
   - **What:** The logger redacts and truncates but nothing ships errors anywhere; there is no production observability. Its walker also handles only plain objects and arrays, so a `Map`, a `Date`, or a custom class instance reaching `extra` is serialized unredacted — a hole in the exact path that would ship errors off-box.
   - **How:** Depends on D-4 being recorded by F-11. Add `@sentry/nextjs` plus `instrumentation.ts` and structured JSON to stdout; the transport **must** call `serialize`/`redact` from `src/lib/logger.ts` or T-019's redaction is bypassed. Extend the redaction walker to recurse into `Map`, serialize `Date` as ISO, and expand class instances to their enumerable own properties rather than dropping them. Env-flag off in local and CI.
@@ -317,7 +310,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 2 | Dead dashboard payload on the hottest query | fixed | F-10 |
 | 3 | `enforceLimits` missing on embeddings GET + DELETE | fixed | F-20 |
 | 4 | No unique `(ownerId, githubUrl)` | fixed | F-25 |
-| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11, T-038 |
+| 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11, T-038, T-005 |
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
@@ -471,7 +464,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
-**Lane p0-B:** T-003 (`ac0a564`, both dead `/projects/...` hrefs fixed, `dashboard-pickup-links.test.ts` pins them) · T-007 (`de5bf7c`, credit now spent before the LLM call and never refunded on failure)
+**Lane p0-B:** T-003 (`ac0a564`, both dead `/projects/...` hrefs fixed, `dashboard-pickup-links.test.ts` pins them) · T-007 (`de5bf7c`, credit now spent before the LLM call and never refunded on failure) · T-005 (`84c8948`, `users.email` nullable with the `example@gmail.com` default dropped per D-1; the Clerk webhook resolves the primary address and upserts `null` instead of skipping, and `projectService` lazy-provisioning stores `null` instead of `""`)
 
 **Lane p0-C:** T-008 (`b6924a6`, CI `bun-version: latest` overrode the `packageManager` pin) · T-010 (`158df20`, missing `GITHUB_TOKEN` 500ed every tRPC call; module-scope `octokit` → `getOctokit()`) · T-001 (`477b1f4`, DB was never dumped; D-12 recorded)
 
