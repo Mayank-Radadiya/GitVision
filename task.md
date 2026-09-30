@@ -50,13 +50,6 @@
   - **Source:** `status/p1-c.md:L` (T-020 blocked), §12.1 D-4, §5.20 item 5, §8.6
 
 
-- **F-23** — Close the CI coverage and integrity gaps
-  - **What:** CI exists and runs, but the coverage floor is unenforced in practice, DB tests `describe.skipIf` themselves away and still report green, and `clerk-webhook.test.ts` times out under parallel load in five separate lane reports.
-  - **How:** Add an internal-`href` link-check test (it would have caught both the `/create-project` and `/billing` 404s), add `neondatabase/create-branch-action` for a throwaway `TEST_DATABASE_URL`, raise the floor 30%→45%, and isolate the flaky webhook test with `--singleThread`, `test.concurrent.skip`, or `{ timeout: 20000 }`.
-  - **Dependencies:** none
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** §5.23 items 1, 2, 5, 6, §2.3 row 18
-
 - **T-086** — Add the three authenticated E2E specs
   - **What:** Nothing covers ingest → RAG → chat. The gap is that a user can break the entire thesis and CI stays green.
   - **How:** With storage state from T-033, add three specs — ingest a tiny public repo and assert file count > 0; ask a question and assert a citation appears and its click-through resolves; spend credits to zero and assert the block.
@@ -323,7 +316,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 15 | No settings/account page, no project settings, no chat UI | open | F-17, F-07 |
 | 16 | Console-only logger; no error tracking | open | F-24 |
 | 17 | 53 unit test files, 1 unauthenticated E2E spec | open | T-086 |
-| 18 | `clerk-webhook.test.ts` flaky under parallel load | open | F-23 |
+| 18 | `clerk-webhook.test.ts` flaky under parallel load | fixed | F-23 |
 | 19 | PascalCase `AiSummary` in snake_case schema | open | T-067 |
 | 20 | Shared single `GITHUB_TOKEN` = one 5,000/hr pool | open | F-14 |
 
@@ -464,7 +457,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
-**Lane p0-B:** T-003 (`ac0a564`, both dead `/projects/...` hrefs fixed, `dashboard-pickup-links.test.ts` pins them) · T-007 (`de5bf7c`, credit now spent before the LLM call and never refunded on failure) · T-005 (`84c8948`, `users.email` nullable with the `example@gmail.com` default dropped per D-1; the Clerk webhook resolves the primary address and upserts `null` instead of skipping, and `projectService` lazy-provisioning stores `null` instead of `""`)
+**Lane p0-B:** T-003 (`ac0a564`, both dead `/projects/...` hrefs fixed, `dashboard-pickup-links.test.ts` pins them) · T-007 (`de5bf7c`, credit now spent before the LLM call and never refunded on failure) · T-005 (`84c8948`, `users.email` nullable with the `example@gmail.com` default dropped per D-1; the Clerk webhook resolves the primary address and upserts `null` instead of skipping, and `projectService` lazy-provisioning stores `null` instead of `""`) · **F-23** (`f2abefc`, added `src/__tests__/unit/internal-links.test.ts` asserting all sidebar/footer/auth hrefs resolve to declared App Router routes; integrated `neondatabase/create-branch-action@v5` in `.github/workflows/ci.yml` so `TEST_DATABASE_URL` is set from an ephemeral Neon branch (falls back to local pgvector service when `NEON_API_KEY` is absent); converted `describe("Clerk webhook")` to `describe.sequential` with `{ timeout: 20000 }` on every case to eliminate parallel lock contention; raised global Vitest coverage floors from 30/24/22/31 to 35/28/27/36 toward the 45% target)
 
 **Lane p0-C:** T-008 (`b6924a6`, CI `bun-version: latest` overrode the `packageManager` pin) · T-010 (`158df20`, missing `GITHUB_TOKEN` 500ed every tRPC call; module-scope `octokit` → `getOctokit()`) · T-001 (`477b1f4`, DB was never dumped; D-12 recorded)
 
