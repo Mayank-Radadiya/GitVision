@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import Provider from "@/shared/providers/app-provider";
+import ProductAnalytics from "@/shared/components/product-analytics";
 
 // Three families, one preload. This was seven with four preloads, which is the
 // worst of both: every family competes for the same connections as the CSS and
@@ -99,6 +100,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen antialiased bg-background text-foreground">
         <Provider>{children}</Provider>
+        <ProductAnalytics />
       </body>
     </html>
   );

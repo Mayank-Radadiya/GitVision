@@ -46,6 +46,7 @@
     "@trpc/react-query": "^11.18.0",
     "@trpc/server": "^11.18.0",
     "@trpc/tanstack-react-query": "^11.18.0",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^7.0.47",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
@@ -62,6 +63,7 @@
     "next": "15.5.26",
     "next-themes": "^0.4.6",
     "octokit": "^5.0.5",
+    "posthog-js": "^1.435.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.84.0",
@@ -76,6 +78,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.40",
     "@clerk/types": "^4.101.20",
     "@laststance/tailwind-suggest-canonical-classes": "^0.1.1",
     "@playwright/test": "^1.62.1",
