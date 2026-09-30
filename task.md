@@ -17,7 +17,7 @@
 - Next migration number is `0005`; `0000`–`0004` exist. None of `credit_ledger`, `sourceType`, `briefing`, `tsvector`, `indexedFileCount`, `lastSyncedAt` are in `db/schema.ts`.
 - Two live defects the strategy doc never caught: `@radix-ui/react-select` is imported but undeclared in `package.json`/`bun.lock`, and `use-create-project.tsx:9` documents a route that does not exist.
 - No test database available in this environment; three `describe.skipIf(!hasTestDatabase)` blocks never execute locally.
-- `e2e/` is one unauthenticated `smoke.spec.ts`; T-033's recorded `@clerk/testing` design was never committed.
+- `e2e/` authenticates once through `e2e/global-setup.ts` (`@clerk/testing`) and every spec loads the resulting storage state; T-033 shipped.
 - 271h estimated across 3 phases; 31 S, 18 M, 1 L, 10 XL, 0 >XL. V2 and `[Future]` items are deferred out of the MVP pass.
 
 ---
@@ -377,7 +377,7 @@ Dependencies: `none`, priority-sorted. All 22 of these can begin today with no o
 
 | Priority | Tasks |
 |---|---|
-| 🔥 P0 | **T-063** (undeclared radix dep — breaks clean install), **F-01** (`?url=`), **F-02** (clickable citations), **F-06** (delete fabricated claims), **F-11** (record 4 decisions — unblocks 3 tasks), **F-20** (rate limits + CSP + import rule), **F-25** (unique constraint), **T-033** (authed E2E harness — unblocks 4 tasks), **T-088** (`docs/SECURITY.md` — pure documentation, highest perceived-value per line) |
+| 🔥 P0 | **T-063** (undeclared radix dep — breaks clean install), **F-01** (`?url=`), **F-02** (clickable citations), **F-06** (delete fabricated claims), **F-11** (record 4 decisions — unblocks 3 tasks), **F-20** (rate limits + CSP + import rule), **F-25** (unique constraint), **T-088** (`docs/SECURITY.md` — pure documentation, highest perceived-value per line) |
 | ⚠️ P1 | **F-19** (a11y batch), **F-10** (dead dashboard code), **F-05** (real stats), **F-07** (chat management), **T-089** (shared `getGitHubAuthHeader()`), **T-066** (issues N+1), **T-069** (prompt-injection fence), **T-068** (`rehype-raw` audit), **T-084** (reset `lane/p1-a`), **T-078** (reverse D-2), **T-083** (`RAG_CONFIG`) |
 | P2 | **F-08** (⌘K palette), **T-077** (PostHog + Vercel Analytics) |
 
@@ -564,7 +564,7 @@ in `## Independent verification (2026-09-30)`.
 
 | Task | Commit | What shipped |
 |---|---|---|
-| **T-033** | `4ba03b2` | `e2e/auth.setup.ts` is a Playwright setup project that exchanges a Clerk testing token for a session and writes `.auth/user.json`; `playwright.config.ts` gains a `setup` project plus `dependencies: ["setup"]` and `storageState` on `chromium`; `e2e/authenticated.spec.ts` asserts a protected route does not bounce to `/sign-in`. No anonymous fallback — a run that cannot authenticate reports that instead of testing nothing. `.auth/` is gitignored. `@clerk/testing` 2.2.40 added as a devDependency. |
+| **T-033** | `4ba03b2`, then `[T-033] Stand up authenticated E2E harness via @clerk/testing` | `e2e/global-setup.ts` exchanges a Clerk testing token for a session and writes `e2e/.auth/user.json`; `playwright.config.ts` wires `globalSetup` plus `storageState` on `chromium`; `e2e/auth.spec.ts` asserts a protected route renders for a signed-in user *and* redirects to `/sign-in` for a signed-out one. The guard refuses any `CLERK_SECRET_KEY` that is not `sk_test_` before calling out. No anonymous fallback — a run that cannot authenticate reports that instead of testing nothing. `e2e/.auth/` is gitignored. `@clerk/testing` 2.2.40 added as a devDependency. |
 | **T-077** | `b4cc962` | `src/shared/components/product-analytics.tsx` renders `<Analytics />` unconditionally (cookieless, no key) and initialises PostHog only when `NEXT_PUBLIC_POSTHOG_KEY` is set, behind a module-level guard because `init` mutates a singleton. Mounted from `app/layout.tsx`. `posthog-js` 1.435.1 + `@vercel/analytics` 2.0.1 added. |
 | **T-078** | `d64c3cb` | `### D-2: AI Issue-Triage Columns` and `### D-11: Stateless neon-http Driver & Compensating Writes` written in full in the house style — Context / Options Considered / Decision / Consequences. D-11 spells out the three-step compensating-write ordering in `projectService.ts`. |
 | **T-083** | `8a511ec` | `src/lib/rag/rag.config.ts` exports `RAG_CONFIG` (`smallProjectTokenThreshold: 150_000`, `maxContextFiles: 500`, `maxFileChars: 50_000`, `maxContextTokens: 32_768`). `vector-search.ts` and `budget.ts` read from it; `MAX_CONTEXT_TOKENS` keeps its export name so `budget.test.ts` is untouched. Also settles Open Question 4 in favour of 150K. |

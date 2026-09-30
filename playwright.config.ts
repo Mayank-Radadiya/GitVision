@@ -34,21 +34,17 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
+  // T-033. Authenticates once and writes `e2e/.auth/user.json`; the project
+  // below loads that state, so the signed-in specs cannot start without a
+  // session. There is no `skip` path on purpose — see `e2e/global-setup.ts`
+  // for why a silent anonymous fallback is the defect.
+  globalSetup: require.resolve("./e2e/global-setup"),
   projects: [
-    // T-033. Authenticates once and writes `.auth/user.json`; every project
-    // below declares `dependencies: ["setup"]`, so the signed-in specs cannot
-    // start without a session. There is no `skip` path on purpose — see
-    // `e2e/auth.setup.ts` for why a silent anonymous fallback is the defect.
-    {
-      name: "setup",
-      testMatch: /auth\.setup\.ts/,
-    },
     {
       name: "chromium",
-      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: ".auth/user.json",
+        storageState: "e2e/.auth/user.json",
       },
     },
   ],

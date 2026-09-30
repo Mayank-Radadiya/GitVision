@@ -1,5 +1,7 @@
-import { test as setup, expect } from "@playwright/test";
+import { chromium, expect, type FullConfig } from "@playwright/test";
 import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 
 /**
  * T-033 — authenticated E2E harness.
@@ -14,19 +16,18 @@ import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
  * the right reason. Every one of T-033's downstream tasks (T-034, T-035,
  * T-036, T-087) was blocked on that.
  *
- * This is a Playwright *setup project*. It runs once, authenticates a fixture
- * user, and writes a `storageState` file that `playwright.config.ts` points
- * the `chromium` project at via `dependencies: ["setup"]`. So
- * `bun run test:e2e` cannot reach an authenticated spec without this having
- * succeeded first.
+ * This is the Playwright `globalSetup` hook. It runs once per `test:e2e`,
+ * authenticates a fixture user, and writes a `storageState` file that
+ * `playwright.config.ts` points the `chromium` project at, so no signed-in
+ * spec can execute without a session.
  *
  * ## Credentials
  *
  * `clerkSetup` reads `CLERK_SECRET_KEY` and the publishable key from the
- * environment, exchanges them for a short-lived testing token, and refuses a
- * *production* secret key outright — which is the behaviour we want, because a
- * test run must never mint a session against a live instance. `.env.example`
- * documents the three names.
+ * environment and exchanges them for a short-lived testing token. The guard
+ * below additionally refuses anything that is not an `sk_test_` key *before*
+ * we call out, so a production instance is never contacted even to be told no.
+ * `.env.example` documents the three names.
  *
  * There is deliberately no anonymous fallback. If this file cannot
  * authenticate, the run must report that it could not test the signed-in
@@ -35,7 +36,7 @@ import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
  * `smoke.spec.ts`'s green tick was hiding.
  */
 
-const AUTH_STATE_PATH = ".auth/user.json";
+const AUTH_STATE_PATH = path.join(__dirname, ".auth", "user.json");
 
 function credentialHelp(name: string, hint: string): Error {
   return new Error(
@@ -51,15 +52,16 @@ function credentialHelp(name: string, hint: string): Error {
   );
 }
 
-setup("authenticate a Clerk fixture user", async ({ page }) => {
+export default async function globalSetup(config: FullConfig) {
   const publishableKey =
     process.env.CLERK_TESTING_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  if (!process.env.CLERK_SECRET_KEY) {
-    throw credentialHelp(
-      "CLERK_SECRET_KEY",
-      "Clerk dashboard → API Keys → Secret key (a test/dev instance; a production key is rejected by clerkSetup)."
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey?.startsWith("sk_test_")) {
+    throw new Error(
+      "E2E setup refused: CLERK_SECRET_KEY must be a valid sk_test_ key. " +
+        "A production key is refused on purpose — a test run must never mint a session against a live instance."
     );
   }
   if (!publishableKey) {
@@ -73,19 +75,33 @@ setup("authenticate a Clerk fixture user", async ({ page }) => {
   // attaches it to every Frontend API call, so the app boots already signed
   // in rather than rendering a sign-in screen we then have to click through.
   await clerkSetup({ publishableKey });
-  await setupClerkTestingToken({ page });
 
-  await page.goto("/");
-  await page.context().storageState({ path: AUTH_STATE_PATH });
+  // globalSetup has no page fixture, so drive a context by hand.
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({
+      baseURL: config.projects[0]?.use?.baseURL,
+    });
+    const page = await context.newPage();
+    await setupClerkTestingToken({ page });
+    await page.goto("/");
 
-  // A token that never landed is worse than no token: every downstream spec
-  // would load and then assert against /sign-in. Prove Clerk actually holds a
-  // session before writing the state out.
-  const signedIn = await page.evaluate(() =>
-    Object.keys(window.localStorage).some((k) => k.toLowerCase().includes("clerk"))
-  );
-  expect(
-    signedIn,
-    "Clerk wrote no session to localStorage — the testing token was not accepted."
-  ).toBe(true);
-});
+    // A token that never landed is worse than no token: every downstream spec
+    // would load and then assert against /sign-in. Prove Clerk actually holds a
+    // session before writing the state out.
+    const signedIn = await page.evaluate(() =>
+      Object.keys(window.localStorage).some((k) =>
+        k.toLowerCase().includes("clerk"),
+      ),
+    );
+    expect(
+      signedIn,
+      "Clerk wrote no session to localStorage — the testing token was not accepted.",
+    ).toBe(true);
+
+    mkdirSync(path.dirname(AUTH_STATE_PATH), { recursive: true });
+    await context.storageState({ path: AUTH_STATE_PATH });
+  } finally {
+    await browser.close();
+  }
+}
