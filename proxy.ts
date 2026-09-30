@@ -29,6 +29,12 @@ const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
   // An uptime monitor has no session. The handler is read-only and returns no
   // customer data — see the "signed-out reachability" test.
   /^\/api\/health\/?$/,
+  // The landing page's public counters (F-05) are aggregate `COUNT(*)`s that
+  // name no user and no repository, but the hero fetches them from the browser
+  // so they hydrate rather than arriving pre-rendered. Narrow to this one
+  // procedure, never `/api/trpc` as a whole: a wildcard here would silently
+  // publish every other procedure to signed-out callers the day one is added.
+  /^\/api\/trpc\/project\.getPublicStats\/?$/,
 ];
 
 function isPublicRoute(req: { nextUrl?: { pathname: string }; url?: string }): boolean {

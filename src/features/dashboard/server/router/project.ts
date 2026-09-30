@@ -231,10 +231,11 @@ export const projectRouter = createTRPCRouter({
    * `services/projectService.ts:611` — if the driver ever switches, the
    * landing page should show `1,204` and not `[object Object]`.
    *
-   * Reachable server-side only, via `caller`/`prefetch` in
-   * `lib/trpc/server.tsx`. `proxy.ts` protects the whole `/api/trpc` prefix, so
-   * a signed-out browser cannot call it over HTTP. See `publicProcedure` in
-   * `lib/trpc/init.ts` for why per-procedure allowlisting is not available.
+   * Prefetched server-side in `app/page.tsx` so the numbers are in the HTML
+   * for the first paint, and re-fetched by the browser for hydration.
+   * `proxy.ts` allowlists exactly this one tRPC path — not the `/api/trpc`
+   * prefix — so the hero can call it signed out while every other procedure
+   * stays behind `auth.protect()`.
    */
   getPublicStats: publicProcedure.query(async () => {
     const [projects, commits, messages] = await Promise.all([

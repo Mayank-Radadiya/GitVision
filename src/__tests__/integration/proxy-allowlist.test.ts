@@ -63,6 +63,11 @@ const PUBLIC = [
   "/api/webhooks/clerk",
   "/api/inngest",
   "/api/health",
+  // F-05: the landing hero's aggregate counters are the one tRPC procedure a
+  // signed-out browser may call. The allowlist names this path explicitly
+  // rather than the `/api/trpc` prefix, so `/api/trpc/project.getAll` below
+  // stays private — that pairing is the point of the test.
+  "/api/trpc/project.getPublicStats",
 ];
 
 /** Routes that must never be reachable without a session. */
