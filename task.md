@@ -365,7 +365,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 1. **Private repos** — GitHub App, public-only, or a Clerk-OAuth read-only middle path? (Blocks any private-repo work; also an anti-persona boundary in §3.4.)
 2. **Actual buyer** — the individual onboarding developer, or the team lead / hiring manager? (§3.1 lists P1 and P2 as both 🔥 primary, which is a targeting conflict.)
 3. **Intent classifier** — LLM fallback below 0.75 confidence, add `architecture` and `bug-analysis` classes, LRU-cache the rewrite, or add `history` (required by §7.1)? Partially resolved by T-072 and T-073; the 0.75-fallback question is not.
-4. **Small-project dump threshold** — 24K or 150K? `feature-1.md` and `feature-2.md` disagree. → T-083.
+4. **Small-project dump threshold** — 24K or 150K? `feature-1.md` and `feature-2.md` disagree. → **Answered: 150_000**, settled by T-083 (`8a511ec`) in `src/lib/rag/rag.config.ts` as `smallProjectTokenThreshold`. 24K was the docs' figure; the code shipped 150K and the dump is cut by `RAG_CONFIG.maxContextTokens` anyway, so a smaller threshold only buys the pathological case of a huge repo that is cheaply estimated and then truncated mid-file.
 5. **`halfvec(768)`** — accept the recall cost, or stay on `vector(768)`? The doc says measure with F-18 first rather than guess.
 6. **History-aware RAG** — opt-in toggle, or raise `PROJECT_CREATION_COST` to cover it? T-070 implements the toggle; the pricing question is unanswered.
 7. **Two-repo cap** — is it enough for multi-repo RAG?
