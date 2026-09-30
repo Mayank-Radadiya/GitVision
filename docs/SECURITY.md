@@ -25,13 +25,14 @@ RAG citation. Dropping it at the door is cheaper and stricter than sanitising it
 downstream in three places.
 
 Symlinks are dropped by the same pass: only entries whose `type` is `file` are
-ingested (`files.ts:168-172`), so a symlink pointing at `/etc/passwd` or at the
+ingested (`files.ts:159-166`), so a symlink pointing at `/etc/passwd` or at the
 parent directory never becomes a stored document.
 
 Volume is bounded too. `GITHUB_CONFIG.MAX_FILES_PER_REPO` caps the entry count
-and `GITHUB_CONFIG.MAX_FILE_BYTES` caps each file, checked once against the tar
-header and again as bytes stream past the limit, so a small header with an
-endless body cannot exhaust memory (`files.ts:178-194`).
+and `GITHUB_CONFIG.MAX_FILE_BYTES` caps each file — checked once against the tar
+header (`files.ts:169`, `:173`) and again as bytes stream past the limit
+(`files.ts:185`, logged at `files.ts:236`) — so a small header with an endless
+body cannot exhaust memory.
 
 Pinned by `src/__tests__/unit/github-tarball-stream.test.ts:197-257` —
 "drops an entry that climbs out of the repo with `..`", "drops a `..` that is
@@ -84,15 +85,15 @@ defence in depth. If a future caller forgets the `gte`, the constraint refuses
 the write instead of minting negative credit.
 
 Refunds run the other way — `SET credits = credits + cost` with `RETURNING`
-(`src/lib/credits.ts:58-71`) — and
+(`refundCredits`, `src/lib/credits.ts:58-71`) — and
 are latched at the call site. The AI SDK can report a single aborted stream
 through more than one channel (`onError` and the stream-settling path of
-`onFinish`), so `app/api/chat/route.ts:465-473` wraps the refund in a
+`onFinish`), so `app/api/chat/route.ts:486-489` wraps the refund in a
 `refundOnce` closure guarded by a `let refunded = false` flag. Without the latch a
 failed turn refunds twice and the meter leaks credits. The latch is invoked from
-`onError` (`route.ts:479`) and from `onFinish`
-(`route.ts:626`), and a failed refund is logged rather than swallowed
-(`route.ts:472`).
+`onError` (`route.ts:498`) and from `onFinish`
+(`route.ts:640`), and a failed refund is logged rather than swallowed
+(`route.ts:490`).
 
 Pinned by `src/__tests__/integration/credits-check-and-indexes.test.ts:24-32`
 for the constraint itself — a negative balance is rejected, zero is allowed, a
@@ -109,12 +110,12 @@ one budget; a botnet behind one address gets one budget for all of them.
 
 | Dimension | Question it answers |
 | --- | --- |
-| `user` (`src/lib/rate-limit.ts:63`) | Is this account being fair to other accounts? |
+| `user` (`src/lib/rate-limit.ts:64`) | Is this account being fair to other accounts? |
 | `ip` | Is this address costing us too much? |
 | `daily` | Are we solvent today, across everyone? |
 
 Each metered scope carries a per-user and a per-IP limit in the table at
-`src/lib/rate-limit.ts:80`; the user limit is the tighter one and the IP limit
+`src/lib/rate-limit.ts:79-82`; the user limit is the tighter one and the IP limit
 is the cost ceiling. The IP limit is deliberately looser because offices,
 universities, and carrier NATs share a single address — a strict IP limit would
 lock out an entire building. The user limit is never the looser of the pair,
