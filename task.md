@@ -308,15 +308,15 @@ Longest chain: **F-01 → F-02 → T-081 → T-070 → T-071/T-072**, which is t
 
 ## Ready to Start Now
 
-Dependencies: `none`, priority-sorted. All 22 of these can begin today with no other task finished.
+Dependencies: `none`, priority-sorted. All 19 of these can begin today with no other task finished.
 
-> **Count reconciled 2026-09-30.** This sentence used to say "20", the table below enumerates 22, and the Effort Summary claimed 23 — three different numbers for one list. The table is the enumeration and is the authority: **22**. The Effort Summary's Phase 0 row was carrying a count that cannot be reconstructed from any list in this file, so it is annotated there rather than reverse-engineered here. The missing 23rd ID was never identified; see `## Independent verification (2026-09-30)`.
+> **Count reconciled 2026-09-30, recounted 2026-09-30.** This sentence used to say "20", the table below was claimed to enumerate 22, and the Effort Summary claimed 23 — three different numbers for one list. The table is the enumeration and is the authority. Counting the bolded IDs in the three rows below now gives **19**: 8 in P0, 10 in P1, 1 in P2. The claim of 22 was itself wrong, and two DONE tasks have since been struck from the rows: T-077 (`b4cc962`) from P2, then T-083 (`8a511ec`) from P1 — listing a finished task as startable contradicted the DONE table, which already carried both. **10 of the 19 rows are still stale this way** and each needs its own task to confirm the commit before it is struck: **F-01**, **F-02**, **F-05**, **F-06**, **F-08**, **F-20**, **F-25**, **T-069**, **T-078**, **T-084** — plus **T-088**, which the `## Remediation pass` table records as shipped at `c224029` with no DONE-table row at all. The Effort Summary's Phase 0 row is carrying a count that cannot be reconstructed from any list in this file, so it is annotated there rather than reverse-engineered here; it is wrong for the same reason and by more than one. The missing 23rd ID was never identified; see `## Independent verification (2026-09-30)`.
 
 | Priority | Tasks |
 |---|---|
 | 🔥 P0 | **T-063** (undeclared radix dep — breaks clean install), **F-01** (`?url=`), **F-02** (clickable citations), **F-06** (delete fabricated claims), **F-11** (record 4 decisions — unblocks 3 tasks), **F-20** (rate limits + CSP + import rule), **F-25** (unique constraint), **T-088** (`docs/SECURITY.md` — pure documentation, highest perceived-value per line) |
-| ⚠️ P1 | **F-19** (a11y batch), **F-10** (dead dashboard code), **F-05** (real stats), **F-07** (chat management), **T-089** (shared `getGitHubAuthHeader()`), **T-066** (issues N+1), **T-069** (prompt-injection fence), **T-068** (`rehype-raw` audit), **T-084** (reset `lane/p1-a`), **T-078** (reverse D-2), **T-083** (`RAG_CONFIG`) |
-| P2 | **F-08** (⌘K palette), **T-077** (PostHog + Vercel Analytics) |
+| ⚠️ P1 | **F-19** (a11y batch), **F-10** (dead dashboard code), **F-05** (real stats), **F-07** (chat management), **T-089** (shared `getGitHubAuthHeader()`), **T-066** (issues N+1), **T-069** (prompt-injection fence), **T-068** (`rehype-raw` audit), **T-084** (reset `lane/p1-a`), **T-078** (reverse D-2) |
+| P2 | **F-08** (⌘K palette) |
 
 Highest return per hour: **T-063** (unblocks every clean-install verification), **T-086** (turns existing unadvertised security work into a differentiator, zero code), **F-11** (unblocks three tasks).
 
