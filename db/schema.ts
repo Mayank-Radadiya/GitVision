@@ -41,7 +41,6 @@ export const usersTable = pgTable("users", {
   // are exempt from uniqueness in Postgres, so many email-less users coexist.
   email: varchar("email", { length: 255 }).unique(),
   credits: integer("credits").notNull().default(100),
-  isProUser: boolean("is_pro_user").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

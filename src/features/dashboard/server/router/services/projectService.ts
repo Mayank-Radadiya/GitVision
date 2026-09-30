@@ -155,7 +155,6 @@ export function createProjectService() {
               email,
               name,
               credits: currentCredits,
-              isProUser: false,
             })
             .onConflictDoNothing();
         } else {

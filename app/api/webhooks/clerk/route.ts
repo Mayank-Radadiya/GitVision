@@ -74,7 +74,6 @@ export async function POST(req: Request) {
           email,
           name,
           credits: 100,
-          isProUser: false,
         })
         .onConflictDoUpdate({
           target: usersTable.id,
