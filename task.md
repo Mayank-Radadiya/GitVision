@@ -49,13 +49,6 @@
   - **Effort/Priority:** M / ⚠️ P1
   - **Source:** §5.23 item 3, §2.3 row 17
 
-- **T-087** — Add an `axe-core` accessibility gate
-  - **What:** ARIA defects ship undetected; `aria-pressed`/`aria-current` are absent entirely and no automated check would have caught it.
-  - **How:** Add `@axe-core/playwright` runs over `/dashboard`, `/chat/[id]`, and `/code-viewer/[id]`, failing on serious violations.
-  - **Dependencies:** T-033
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.23 item 4
-
 - **T-034** — E2E-spec the ingestion pipeline
   - **What:** Ingestion is the product's front door and has zero browser coverage.
   - **How:** Blocked behind T-033's storage state; assert a tiny public repo reaches a completed index with a non-zero file count.
@@ -561,6 +554,7 @@ in `## Independent verification (2026-09-30)`.
 | **T-078** | `d64c3cb` | `### D-2: AI Issue-Triage Columns` and `### D-11: Stateless neon-http Driver & Compensating Writes` written in full in the house style — Context / Options Considered / Decision / Consequences. D-11 spells out the three-step compensating-write ordering in `projectService.ts`. |
 | **T-083** | `8a511ec` | `src/lib/rag/rag.config.ts` exports `RAG_CONFIG` (`smallProjectTokenThreshold: 150_000`, `maxContextFiles: 500`, `maxFileChars: 50_000`, `maxContextTokens: 32_768`). `vector-search.ts` and `budget.ts` read from it; `MAX_CONTEXT_TOKENS` keeps its export name so `budget.test.ts` is untouched. Also settles Open Question 4 in favour of 150K. |
 | **T-038** | `[T-038] Configure Cross-Origin-Opener-Policy header and record D-8` | COOP was already `same-origin` in code (`next.config.ts:62-65`, pinned by `security-headers.test.ts:16`) while D-8 recorded `same-origin-allow-popups` on a premise this repo falsifies: Clerk OAuth is a full redirect (`use-signIn.ts:63-67` → `authenticateWithRedirect`), and no `window.open` exists in `src/` or `app/`, so nothing reads `window.opener`. D-8 rewritten to `same-origin` with the popup rationale struck and the false `SharedArrayBuffer` claim corrected — SAB needs COOP *and* `Cross-Origin-Embedder-Policy: require-corp`, and no COEP is set. Docs only; no code or test changed. |
+| **T-087** | `530d8a6` | `e2e/accessibility.spec.ts` audits `/`, `/sign-in` (signed-out `storageState`) and `/dashboard`, `/chat`, `/code-viewer` (the T-033 session) with `withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa"])`, failing on `critical`/`serious` impacts with rule id, help text, remediation URL, and node selectors in the assertion message. Substitutes the `/chat` and `/code-viewer` list routes for the `/chat/[id]` and `/code-viewer/[id]` named above, which need seeded database rows T-033 does not create. `@axe-core/playwright` 4.13.0 added as a devDependency. |
 
 **PARTIAL closed:**
 
