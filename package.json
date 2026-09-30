@@ -79,6 +79,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@clerk/testing": "^2.2.40",
     "@clerk/types": "^4.101.20",
     "@laststance/tailwind-suggest-canonical-classes": "^0.1.1",
