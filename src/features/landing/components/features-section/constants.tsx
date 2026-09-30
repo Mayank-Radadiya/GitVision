@@ -44,7 +44,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Visual Analytics",
     description:
-      "Beautiful visualizations of contributor activity, code velocity, and development trends over time.",
+      "A commit activity chart for the last seven days, a language breakdown of your tech stack, and per-project counts for stars, forks, commits, and contributors.",
     icon: BarChart3Icon,
     accent: "text-amber-500",
     accentBg: "bg-amber-500/10",
