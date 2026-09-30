@@ -40,14 +40,6 @@
   - **Effort/Priority:** S / ⚠️ P1
   - **Source:** §5.22, §2.3 row 10
 
-- **F-08** — Ship the ⌘K command palette
-  - **What:** No palette exists; `cmdk` and `CommandDialog` have zero matches in `package.json` and `src`.
-  - **How:** Add shadcn `Command` (cmdk) fed from already-cached tRPC queries, so the palette issues zero new requests.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / P2
-  - **Source:** §5.8
-
-
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
 - **T-005** — Unblock email-less Clerk users
@@ -533,7 +525,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Noted but not fixed:** `0003_commits_project_id_author_date_idx.sql` exists, so T-031's recipe *was* applied despite the task being closed as "skipped, with evidence."
 
-**Already shipped:** T-063 (`5bf6a89`) — `@radix-ui/react-select` declared in `package.json` + `bun.lock`; clean installs typecheck clean. · **F-07** (`1769417`, per-chat actions menu — inline rename via new `chat.rename`, delete confirm via `chat.delete`, client-side Markdown export with citations — on the room header and Recent rows, plus a banner from `getById.hasMoreMessages` when history hits the 300-message cap; not run, per the Phase 0 rule)
+**Already shipped:** T-063 (`5bf6a89`) — `@radix-ui/react-select` declared in `package.json` + `bun.lock`; clean installs typecheck clean. · **F-07** (`1769417`, per-chat actions menu — inline rename via new `chat.rename`, delete confirm via `chat.delete`, client-side Markdown export with citations — on the room header and Recent rows, plus a banner from `getById.hasMoreMessages` when history hits the 300-message cap; not run, per the Phase 0 rule) · **F-08** (`4376ceb`, ⌘K palette — shadcn `Command` over cmdk, mounted once by `DashboardShell` so it covers every route under `app/(main)/`; navigation items lifted from `PRIMARY_NAVIGATION` rather than retyped, projects merged from `project.getAll` and `project.getDashboardData` on `id`, and both reads `enabled: false` so the palette can never issue a request of its own; a Keyboard Shortcuts group documents ⌘K, ⌘B, ⌘↵, 1/2/3 and Esc. `CommandDialog` composes Radix around cmdk's root rather than using `Command.Dialog`, whose hardcoded `Dialog.Content` carries no title — an `aria-dialog-name` failure. Per-chat items are not included: `chat.getAll` is server-caller-only at `app/(main)/chat/page.tsx:14` and never hydrates the client cache, so no chat list can be shown without a request; a Chat link to `/chat` is there instead. Not run, per the Phase 0 rule)
 
 **Lane docs:** T-088 (`c1c8071`, wrote `docs/SECURITY.md` covering the tarball path-traversal and symlink defence, 404-not-403 ownership, atomic credit spending with the DB-level `CHECK` and the latched refund, three-dimensional rate limiting, and nine-key log redaction — each linked to the suite that pins it; linked from the README) · **F-11** (`74da0d6`, recorded blocking decisions D-1, D-3, D-4, and D-8 with full context, trade-offs, and invariants in `docs/DECISIONS.md`, unblocking T-005, T-020, and T-038)
 
