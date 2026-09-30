@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { User, Bot, Copy, Check, FileText } from "lucide-react";
@@ -19,6 +20,9 @@ interface ChatMessageProps {
   content: string;
   relatedFiles?: string[];
   isStreaming?: boolean;
+  // Project the cited files belong to. Absent for general chats, where
+  // badges stay inert text because there is no viewer to link into.
+  projectId?: string | null;
 }
 
 function ThinkingIndicator() {
@@ -45,11 +49,64 @@ function ThinkingIndicator() {
   );
 }
 
+/**
+ * Citation badge — a cited file from `relatedFiles`.
+ *
+ * Links into the code viewer when the chat belongs to a project. General
+ * chats carry no projectId, so the badge stays inert text: there is no
+ * viewer route it could point at.
+ *
+ * The RAG payload is paths only (no line numbers), so the link carries
+ * `?file=` alone. The viewer already reads `&line=` for when T-070 starts
+ * producing typed citations with line numbers.
+ */
+function CitationBadge({
+  file,
+  projectId,
+}: {
+  file: string;
+  projectId?: string | null;
+}) {
+  const badge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-border/50 bg-muted/30 text-muted-foreground gap-1 font-mono text-[10px]",
+        projectId ? "cursor-pointer hover:text-foreground" : "cursor-default",
+      )}
+    >
+      <FileText className="h-2.5 w-2.5" />
+      {file.split("/").pop()}
+    </Badge>
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {projectId ? (
+          <Link
+            href={`/code-viewer/${projectId}?file=${encodeURIComponent(file)}`}
+            aria-label={`View ${file} in code viewer`}
+          >
+            {badge}
+          </Link>
+        ) : (
+          badge
+        )}
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        <p className="font-mono text-xs">{file}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function ChatMessage({
   role,
   content,
   relatedFiles,
   isStreaming,
+  projectId,
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = role === "user";
@@ -270,20 +327,7 @@ export function ChatMessage({
             <TooltipProvider>
               <div className="flex flex-wrap gap-1">
                 {relatedFiles.map((file) => (
-                  <Tooltip key={file}>
-                    <TooltipTrigger asChild>
-                      <Badge
-                        variant="outline"
-                        className="border-border/50 bg-muted/30 text-muted-foreground cursor-default gap-1 font-mono text-[10px]"
-                      >
-                        <FileText className="h-2.5 w-2.5" />
-                        {file.split("/").pop()}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p className="font-mono text-xs">{file}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <CitationBadge key={file} file={file} projectId={projectId} />
                 ))}
               </div>
             </TooltipProvider>

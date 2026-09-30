@@ -8,6 +8,7 @@
  */
 
 import { useParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import {
   ExternalLink,
@@ -143,12 +144,18 @@ export default function CodeViewerDetailPage() {
       </motion.div>
 
       {/* Code Viewer (Shiki) */}
+      {/* Suspense covers CodeViewer's useSearchParams (?file=/?line= deep
+          links) so the route never de-opts during static rendering. */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
       >
-        <CodeViewer projectId={projectId} />
+        <Suspense
+          fallback={<Skeleton className="h-[70vh] w-full rounded-xl" />}
+        >
+          <CodeViewer projectId={projectId} />
+        </Suspense>
       </motion.div>
     </div>
   );

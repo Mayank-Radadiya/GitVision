@@ -97,8 +97,12 @@ function DirectoryNode({
   onActivePath,
   onSelect,
 }: DirectoryNodeProps) {
-  // Auto-expand first level
-  const [isOpen, setIsOpen] = useState(depth < 1);
+  // Auto-expand first level, plus every ancestor of the selected file so a
+  // ?file= deep link into a nested path renders its row instead of
+  // selecting a node hidden inside a collapsed folder.
+  const [isOpen, setIsOpen] = useState(
+    depth < 1 || selectedPath?.startsWith(node.path + "/") === true,
+  );
 
   const toggle = useCallback(() => {
     // Toggling takes the tab stop with it, so collapsing a subtree never
@@ -251,10 +255,11 @@ function TreeNodeComponent({
 function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Roving tabindex: one row is in the tab order, so the tree is a single tab
-  // stop and the arrow keys move within it.
-  const [activePath, setActivePath] = useState<string | null>(
-    () => selectedPath ?? tree[0]?.path ?? null,
-  );
+  // stop and the arrow keys move within it. The stop follows the selection
+  // until the user moves it, so a ?file= deep link lands the tab stop on
+  // the linked file instead of the root.
+  const [activePath, setActivePath] = useState<string | null>(null);
+  const tabStop = activePath ?? selectedPath ?? tree[0]?.path ?? null;
 
   // Collapsed subtrees are unmounted, so the rendered order is the visible one.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -336,7 +341,7 @@ function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
           node={node}
           depth={0}
           selectedPath={selectedPath}
-          activePath={activePath}
+          activePath={tabStop}
           onActivePath={setActivePath}
           onSelect={onSelect}
         />

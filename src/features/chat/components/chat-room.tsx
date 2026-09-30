@@ -371,6 +371,7 @@ export function ChatRoom({
                       role={m.role as "user" | "assistant"}
                       content={getMessageText(m)}
                       relatedFiles={getRelatedFiles(m.id, isLiveAssistantMsg)}
+                      projectId={projectId}
                       isStreaming={
                         isLastMsg && isStreaming && m.role === "assistant"
                       }

@@ -9,6 +9,7 @@
  */
 
 import { memo, useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Code,
@@ -41,6 +42,26 @@ function CodeViewer({ projectId }: CodeViewerProps) {
   const files: FileEntry[] = useMemo(() => data?.files ?? [], [data?.files]);
   const tree = useMemo(() => buildFileTree(files), [files]);
 
+  // ─── Deep link: ?file=<path>&line=<n> from chat citation badges ─────────
+  // Pure derivation, no effect: the param wins until the user picks a file,
+  // and an unknown path falls through to the default below instead of
+  // blanking the panel.
+  const searchParams = useSearchParams();
+  const fileParam = searchParams.get("file");
+  const lineParam = searchParams.get("line");
+
+  const requestedPath = useMemo(() => {
+    // The RAG index and the file list may disagree on a leading "./".
+    const normalized = fileParam?.replace(/^\.\//, "") ?? "";
+    if (!normalized) return null;
+    return files.some((f) => f.path === normalized) ? normalized : null;
+  }, [fileParam, files]);
+
+  const requestedLine = useMemo(() => {
+    const n = Number(lineParam);
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+  }, [lineParam]);
+
   // Auto-select best initial file (README.md → first file)
   const autoSelectedPath = useMemo(() => {
     if (files.length === 0) return null;
@@ -48,7 +69,14 @@ function CodeViewer({ projectId }: CodeViewerProps) {
     return readme?.path || files[0].path;
   }, [files]);
 
-  const activePath = selectedPath || autoSelectedPath;
+  const activePath = selectedPath || requestedPath || autoSelectedPath;
+
+  // The line param only describes the deep-linked file: once the user
+  // clicks elsewhere it stops applying to the panel.
+  const activeLine =
+    activePath !== null && activePath === requestedPath
+      ? requestedLine
+      : undefined;
 
   // Get content for selected file
   const selectedFile = useMemo(
@@ -179,6 +207,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
                 filePath={selectedFile.path}
                 content={fileContent || ""}
                 language={selectedFile.language}
+                highlightLine={activeLine}
               />
             ) : (
               /* Empty state */

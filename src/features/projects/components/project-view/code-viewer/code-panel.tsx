@@ -23,15 +23,23 @@ interface CodePanelProps {
   filePath: string;
   content: string;
   language: string;
+  // 1-based line to scroll to and tint, from the viewer's ?line= deep link.
+  highlightLine?: number;
 }
 
-function CodePanel({ filePath, content = "", language }: CodePanelProps) {
+function CodePanel({
+  filePath,
+  content = "",
+  language,
+  highlightLine,
+}: CodePanelProps) {
   const { theme: systemTheme } = useTheme();
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [isHighlighting, setIsHighlighting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const codeAreaRef = useRef<HTMLDivElement>(null);
 
   // ─── Theme state — default based on system theme ────────────────────────
   const defaultTheme = systemTheme === "dark" ? "github-dark" : "github-light";
@@ -80,6 +88,22 @@ function CodePanel({ filePath, content = "", language }: CodePanelProps) {
       cancelled = true;
     };
   }, [content, language, selectedTheme]);
+
+  // ─── Deep-link line targeting (?line=) ────────────────────────────────────
+  useEffect(() => {
+    if (!highlightLine || isHighlighting) return;
+    // Shiki wraps each rendered line in <span class="line"> (the counter CSS
+    // below keys off it). The raw-text fallback has no such spans, so an
+    // unknown line or an unhighlightable file is a silent no-op.
+    const lineEl = codeAreaRef.current?.querySelectorAll(".line")[
+      highlightLine - 1
+    ];
+    if (!(lineEl instanceof HTMLElement)) return;
+    // bg-primary/10 is a literal elsewhere in the tree, so Tailwind emits it.
+    lineEl.classList.add("bg-primary/10");
+    lineEl.scrollIntoView({ block: "center" });
+    return () => lineEl.classList.remove("bg-primary/10");
+  }, [highlightedHtml, highlightLine, filePath, isHighlighting]);
 
   // ─── Copy to clipboard ─────────────────────────────────────────────────
   const handleCopy = useCallback(async () => {
@@ -223,7 +247,7 @@ function CodePanel({ filePath, content = "", language }: CodePanelProps) {
       </div>
 
       {/* Code Area */}
-      <div className="bg-muted/20 relative flex-1 overflow-auto">
+      <div ref={codeAreaRef} className="bg-muted/20 relative flex-1 overflow-auto">
         {isHighlighting ? (
           /* Shimmer loading while Shiki processes */
           <div className="space-y-2 p-4">
