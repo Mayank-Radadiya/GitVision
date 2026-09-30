@@ -3,13 +3,16 @@ type Captured = { query: string; params: unknown[] };
 
 const captured: Captured[] = [];
 let rows: unknown[][] = [];
+// The sparse half issues a second, distinct query. Keyed off the SQL so the
+// dense list and the FTS list can disagree — that disagreement is what RRF eats.
+let sparseRows: unknown[][] = [];
 
 vi.mock("@/db", async () => {
   const { drizzle } = await import("drizzle-orm/pg-proxy");
   return {
     db: drizzle(async (query: string, params: unknown[]) => {
       captured.push({ query, params });
-      return { rows };
+      return { rows: query.includes("websearch_to_tsquery") ? sparseRows : rows };
     }),
   };
 });
@@ -30,11 +33,12 @@ function makeRow(filePath: string, similarity: number) {
 beforeEach(() => {
   captured.length = 0;
   rows = [];
+  sparseRows = [];
 });
 
 describe("searchSimilarCode", () => {
   it("orders by the raw cosine distance operator and keeps the threshold out of the WHERE clause", async () => {
-    await searchSimilarCode("project-1", embedding, 8, 0.7);
+    await searchSimilarCode("project-1", embedding, "auth", 8, 0.7);
 
     const { query } = captured[0]!;
     const where = query.slice(query.indexOf("where"), query.indexOf("order by"));
@@ -47,7 +51,7 @@ describe("searchSimilarCode", () => {
   });
 
   it("over-fetches a candidate pool larger than the requested limit", async () => {
-    await searchSimilarCode("project-1", embedding, 8, 0.7);
+    await searchSimilarCode("project-1", embedding, "auth", 8, 0.7);
 
     expect(captured[0]!.params.at(-1)).toBe(32);
   });
@@ -60,9 +64,24 @@ describe("searchSimilarCode", () => {
       makeRow("d.ts", 0.42),
     ] as unknown[][];
 
-    const results = await searchSimilarCode("project-1", embedding, 8, 0.7);
+    const results = await searchSimilarCode("project-1", embedding, "auth", 8, 0.7);
 
     expect(results.map((r) => r.filePath)).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("runs a GIN-backed full-text half and fuses it with the dense half", async () => {
+    rows = [makeRow("a.ts", 0.92), makeRow("b.ts", 0.71)] as unknown[][];
+    sparseRows = [makeRow("b.ts", 0.4), makeRow("e.ts", 0.33)] as unknown[][];
+
+    const results = await searchSimilarCode("project-1", embedding, "auth", 8, 0.7);
+
+    const sparseQuery = captured.at(-1)!.query;
+    expect(sparseQuery).toContain("websearch_to_tsquery");
+    expect(sparseQuery).toContain("ts_rank");
+    // b.ts is in both lists, so RRF gives it both contributions and it wins.
+    // e.ts is below the cosine floor yet still survives — that is the whole point
+    // of the sparse half: exact identifiers are lexically close, not semantically.
+    expect(results.map((r) => r.filePath)).toEqual(["b.ts", "a.ts", "e.ts"]);
   });
 });
 

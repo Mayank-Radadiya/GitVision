@@ -92,6 +92,13 @@
       "when": 1790780387386,
       "tag": "0012_normal_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790781285407,
+      "tag": "0013_clear_lightspeed",
+      "breakpoints": true
     }
   ]
 }

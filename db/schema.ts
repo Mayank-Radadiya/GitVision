@@ -34,6 +34,14 @@ const vector = customType<{
   },
 });
 
+// Drizzle pg-core has no built-in tsvector. Only used as a GENERATED column
+// that is never read back into JS, so the driver converters are identity.
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
+
 export const usersTable = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull().default("unknown"),
@@ -173,6 +181,13 @@ export const codeEmbeddings = pgTable(
     chunkContent: text("chunk_content").notNull(),
     embedding: vector("embedding", { dimensions: 768 }).notNull(), // qwen/qwen3-embedding-8b via @openrouter/sdk = 768 dims
     tokenCount: integer("token_count").notNull(),
+    // Sparse half of hybrid retrieval. STORED so the GIN index below can be
+    // used at all — a plain (non-stored) generated column cannot be indexed.
+    // The 'english' config is passed as a literal, which is what makes
+    // to_tsvector(...) immutable and therefore legal in GENERATED ALWAYS AS.
+    chunkContentTsv: tsvector("chunk_content_tsv").generatedAlwaysAs(
+      sql`to_tsvector('english', ${sql.raw("chunk_content")})`,
+    ),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -184,6 +199,13 @@ export const codeEmbeddings = pgTable(
       embeddingIdx: index("embeddings_vector_idx").using(
         "hnsw",
         table.embedding.op("vector_cosine_ops"),
+      ),
+      // Sparse half of hybrid retrieval. Dense HNSW search misses exact
+      // identifiers (function names, error codes, env var names); this index
+      // is what lets websearch_to_tsquery find them without a table scan.
+      chunkContentTsvIdx: index("code_embeddings_chunk_content_tsv_idx").using(
+        "gin",
+        table.chunkContentTsv,
       ),
       // searchSimilarCodeInFile narrows to a single file before ranking
       // (vector-search.ts:258-278); without this it scans every chunk in the

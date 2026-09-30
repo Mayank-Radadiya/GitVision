@@ -19,18 +19,54 @@ export interface SearchResult {
   similarity: number;
 }
 
+/** Reciprocal Rank Fusion constant. The paper's k; 60 is the published default. */
+const RRF_K = 60;
+
 /**
- * Search for similar code chunks using cosine similarity
+ * Merge ranked lists with Reciprocal Rank Fusion: score(d) = sum over lists of
+ * 1 / (k + rank). Ranking is by position, not by any score, so cosine scores
+ * and FTS rank scores never have to be put on a common scale.
+ */
+function reciprocalRankFusion(lists: SearchResult[][]): SearchResult[] {
+  const merged = new Map<string, { result: SearchResult; score: number }>();
+  for (const list of lists) {
+    list.forEach((result, index) => {
+      const contribution = 1 / (RRF_K + index + 1);
+      const existing = merged.get(result.id);
+      if (existing) {
+        existing.score += contribution;
+        return;
+      }
+      merged.set(result.id, { result, score: contribution });
+    });
+  }
+  return [...merged.values()]
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.result);
+}
+
+/**
+ * Hybrid search: dense cosine similarity fused with PostgreSQL full-text search.
+ *
+ * Dense alone misses exact technical identifiers — a function name, a Postgres
+ * error code, a package name — because the chunk embedding of a one-token query
+ * lands nowhere near the chunk embedding of the file it lives in. The sparse half
+ * is a GIN-indexed `websearch_to_tsquery` lookup on `chunk_content_tsv`, which
+ * finds those chunks lexically.
  *
  * @param projectId - Project to search within
  * @param queryEmbedding - Vector embedding of the search query
- * @param limit - Maximum number of results (default: 8)
- * @param minSimilarity - Minimum similarity threshold 0-1 (default: 0.7)
- * @returns Array of matching code chunks with similarity scores
+ * @param query - Raw query text, for the sparse half. Omit to run dense only.
+ * @param limit - Target result count; the return is the candidate budget (see below)
+ * @param minSimilarity - Dense-only cosine floor 0-1 (default: 0.7)
+ * @returns Fused candidates ordered by RRF score. `similarity` stays the true
+ *   cosine value, because reRankResults and formatRetrievedContext both read it
+ *   as a 0-1 relevance number.
  */
 export async function searchSimilarCode(
   projectId: string,
   queryEmbedding: number[],
+  query?: string,
   limit: number = 8,
   minSimilarity: number = 0.7,
 ): Promise<SearchResult[]> {
@@ -51,23 +87,53 @@ export async function searchSimilarCode(
     const similarity = sql<number>`1 - (${distance})`;
     const candidatePool = Math.max(limit * 4, 32);
 
-    const results = await db
-      .select({
-        id: codeEmbeddings.id,
-        filePath: codeEmbeddings.filePath,
-        chunkContent: codeEmbeddings.chunkContent,
-        chunkIndex: codeEmbeddings.chunkIndex,
-        tokenCount: codeEmbeddings.tokenCount,
-        similarity: similarity,
-      })
+    const columns = {
+      id: codeEmbeddings.id,
+      filePath: codeEmbeddings.filePath,
+      chunkContent: codeEmbeddings.chunkContent,
+      chunkIndex: codeEmbeddings.chunkIndex,
+      tokenCount: codeEmbeddings.tokenCount,
+      similarity: similarity,
+    };
+
+    const denseResults = await db
+      .select(columns)
       .from(codeEmbeddings)
       .where(eq(codeEmbeddings.projectId, projectId))
       .orderBy(asc(distance))
       .limit(candidatePool);
 
-    return results
-      .filter((result) => Number(result.similarity) >= minSimilarity)
-      .slice(0, limit);
+    const dense = denseResults.filter(
+      (result) => Number(result.similarity) >= minSimilarity,
+    );
+
+    if (!query) {
+      return dense.slice(0, limit);
+    }
+
+    // `websearch_to_tsquery` over `plainto_tsquery` because it never throws on
+    // user text: quotes, `-`, `:`, `or` are operator-ish to the plain parser.
+    const tsQuery = sql`websearch_to_tsquery('english', ${query})`;
+
+    const sparseResults = await db
+      .select(columns)
+      .from(codeEmbeddings)
+      .where(
+        and(
+          eq(codeEmbeddings.projectId, projectId),
+          sql`${codeEmbeddings.chunkContentTsv} @@ ${tsQuery}`,
+        ),
+      )
+      .orderBy(sql`desc(ts_rank(${codeEmbeddings.chunkContentTsv}, ${tsQuery}))`)
+      .limit(candidatePool);
+
+    // `minSimilarity` gates the dense list only. A sparse-only hit is by
+    // definition a low-cosine chunk — usually exactly the identifier lookup the
+    // dense half dropped — so flooring the merged output on cosine would delete
+    // the rows this function exists to recover.
+    // ponytail: sparse hits are admitted on FTS match alone; add a ts_rank
+    // floor or a cross-encoder pre-filter if lexical noise shows up in practice.
+    return reciprocalRankFusion([dense, sparseResults]).slice(0, candidatePool);
   } catch (error) {
     logger.error("Error searching similar code", error);
     throw new Error(

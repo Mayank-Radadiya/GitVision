@@ -253,6 +253,7 @@ async function retrieveContext(
   const rawResults = await searchSimilarCode(
     projectId,
     queryEmbedding,
+    standaloneQuery,
     12,
     0.45,
   );

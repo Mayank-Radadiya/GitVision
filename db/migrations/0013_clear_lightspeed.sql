@@ -1,0 +1,2 @@
+ALTER TABLE "code_embeddings" ADD COLUMN "chunk_content_tsv" "tsvector" GENERATED ALWAYS AS (to_tsvector('english', chunk_content)) STORED;--> statement-breakpoint
+CREATE INDEX "code_embeddings_chunk_content_tsv_idx" ON "code_embeddings" USING gin ("chunk_content_tsv");
