@@ -63,26 +63,12 @@
   - **Effort/Priority:** M / ⚠️ P1
   - **Source:** `status/p1-b.md:L` (T-022 blocked), §8.6
 
-- **T-082** — Thread a per-request CSP nonce
-  - **What:** The policy deliberately allows `'unsafe-inline'`/`'unsafe-eval'` in `script-src` and `'unsafe-inline'` in `style-src` because Next.js ships inline bootstrap scripts and Shiki injects inline `<style>`. That is the reason T-022 cannot be promoted.
-  - **How:** Generate a nonce per request in `proxy.ts`, thread it into the Next.js script/style attributes, and drop the two `'unsafe-*'` entries.
-  - **Dependencies:** none
-  - **Effort/Priority:** XL / ⚠️ P1
-  - **Source:** `status/p1-b.md:L` (T-022 unblock path), §8.6
-
 - **F-04** — Add the credit ledger and claim flow
   - **What:** There is no way back in once credits run out, and no honest record of why a balance changed.
   - **How:** Migration `0005` creating `credit_ledger` (`userId`, `delta`, `reason`, unique `refId`, `createdAt`); an Inngest daily-grant cron; a "Claim credits" sidebar button limited to 50 per 24h via a `credits.claim` key at 1/86400s per user. The unique `refId` is what makes `refundCredits` idempotent. No Stripe yet.
   - **Dependencies:** none
   - **Effort/Priority:** L / 🔥 P0
   - **Source:** §5.4
-
-- **T-085** — Decide `isProUser`: wire the tier or drop the column
-  - **What:** `db/schema.ts:44` declares `isProUser` and it is written `false` at `projectService.ts:220` and `app/api/webhooks/clerk/route.ts:72` — with **no read site anywhere** in the codebase. It is either dead schema or an unwired paywall.
-  - **How:** Decide which. If wired, gate the credit paths on it; if not, drop the column in migration `0005` and remove both writes. Either answer removes the dead field.
-  - **Dependencies:** F-04
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** §2.3 row 8, §11 Phase 1 Day 7
 
 - **F-24** — Wire observability end to end
   - **What:** Console-only output means no production signal; a failed ingestion is invisible.
@@ -277,7 +263,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | fixed | F-11, T-038, T-005 |
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
-| 8 | `isProUser` defined and written, never read | open | T-085 |
+| 8 | `isProUser` defined and written, never read | fixed | T-085 (column dropped, migration `0007`) |
 | 9 | Native `confirm()` for project deletion | fixed | F-19 |
 | 10 | Issues N+1 — comments prefetched per row | fixed | T-066 |
 | 11 | Two live syntax highlighters (Shiki + rehype-highlight) | open | F-22 |
@@ -449,7 +435,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p1-e:** T-032 (`9746a25`, suite boots its own server, `bun run test:e2e` passes cold) · **T-034** (`b0282b8`, `e2e/ingestion.spec.ts` — submits `octocat/Hello-World` through the real `/create-project` form on the T-033 storage state, then reads the terminal embedding state from `/chat` asserting `Ready for codebase chat`, which is the only surface that distinguishes `completed`/`partial` from `processing` and `failed`: `indexing-status-badge.tsx:26` branches *only* on `partial`, so `pending`, `processing` and `failed` all render the same green `AI Synced` and the project page could never prove the index ran; the non-zero count comes from `code-viewer/index.tsx:135`'s `N files`, parsed and asserted `> 0`, and the `projectId` is read off the dashboard card's href rather than hardcoded, with cleanup through the actions menu so a re-run is not blocked by the unique `(owner_id, github_url)` index; requires `bun run inngest` running by hand, since `playwright.config.ts` boots only `bun run dev`. Note the hash is real but the commit *label* is not: the file landed inside `b0282b8`, which a concurrent agent had already committed under `[T-086]` alongside the T-035 and T-036 specs before this task could open its own commit) · **T-035** (`43a6f1f`, `e2e/rag-chat.spec.ts` — asks a grounded question on a self-discovered indexed project, waits for the stream to finish via the `role="log"` transcript's `aria-busy` true→false (`chat-room.tsx:390`), then asserts the citation link href shape, that neither `Failed to load project` nor `Resource Not Found` rendered (the viewer route has no `notFound()`, so a bad id still returns 200), and that the selected file row's `data-path` (`file-tree.tsx:183-186`) equals the cited path — the decisive step, because `code-viewer/index.tsx:66-72` silently falls back to a README/first-file auto-selection when `?file=` matches nothing, so rendering the tree would pass on a citation pointing at a file that does not exist. **Ships `test.fixme`-gated**, and the gate is the finding, not a hedge: `app/api/chat/route.ts:523`'s small-dump fast path never assigns `relatedFiles` (declared `[]` at `:485`, written only on the RAG branch at `:568`), so `:601-606` emits no `data-sources` and `chat-message.tsx:326` renders zero badges; and the data behind that gate contradicts itself — every project reports `embedding_status='completed'` with `estimated_tokens=0` and an empty `code_embeddings` table, and `isSmallProject(0)` is `0 < 150_000`, so the path fires for both. Reachable only after the dump path populates `relatedFiles` or real embeddings exist; delete the `test.fixme` then. Also corrects a real locator bug in the T-086 draft: the picker was found by `getByRole("combobox", { name: /Select a project for codebase chat/i })`, but `SelectTrigger` carries no `aria-label` (`chat-landing.tsx:308-310`) and its accessible name comes from the `SelectValue` child — placeholder before a project is picked, project name after — so the re-open loop resolved to nothing on iteration 2+)
 
-**Lane p1-f:** T-086 (`b0282b8`, three authenticated specs on the T-033 storage state — ingestion proves the code viewer's file count is > 0, the RAG spec asserts the citation badge's click-through resolves to the cited path in the viewer breadcrumb rather than a README auto-selection fallback, and the credits spec zeroes the balance test-side to prove both the create and chat gates explain themselves)
+**Lane p1-f:** **T-085** (`8174b42`, `isProUser` decided: dropped, not wired — the flag was declared in `db/schema.ts`, hardcoded to `false` in the Clerk-user upsert and the Clerk webhook insert, and read nowhere, so it was dead schema rather than an unwired paywall; migration `0007` drops the column and both writes are gone, with no behavioral change because nothing consumed the value) · T-086 (`b0282b8`, three authenticated specs on the T-033 storage state — ingestion proves the code viewer's file count is > 0, the RAG spec asserts the citation badge's click-through resolves to the cited path in the viewer breadcrumb rather than a README auto-selection fallback, and the credits spec zeroes the balance test-side to prove both the create and chat gates explain themselves)
 
 **Lane p2-a:** T-037 (`9907918`, one `ProjectAccessError` ownership check repo-wide; `verifyOwnership` deleted, 8 call sites repointed) · T-045 (`1c74f99`, upsert-then-prune over delete-then-repull) · T-050 (`a092b7e`, compound keyset pagination) · T-051 (`d35790a`) · T-055 (`4ca4d93`, `chats_user_id_updated_at_idx` + `project_files_language_idx`) · T-056 (`af8f5e2`, ordered `(author_date DESC, id DESC)`)
 
@@ -465,11 +451,11 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## Self-Check
 
-- 7 fields present on all 60 active tasks (ID, Title, What, How, Dependencies, Effort/Priority, Source).
+- 7 fields present on all 59 active tasks (ID, Title, What, How, Dependencies, Effort/Priority, Source).
 - No duplicate IDs. New IDs start at T-063; highest pre-existing was T-062.
 - Every dependency resolves to a task in this board. No orphans.
 - Nothing exceeds XL. Largest estimate is 16h.
-- 60 active tasks — at the top of the 40–60 target. The V2/Future items are listed in a separate deferred section with no task IDs, so they do not inflate the active count.
+- 59 active tasks — inside the 40–60 target. The V2/Future items are listed in a separate deferred section with no task IDs, so they do not inflate the active count.
 - All 20 §2.3 rows appear in Defect Coverage with a task ID.
 - All 25 §5 features F-01…F-25 appear as active tasks. F-20 and F-24 are carried in full, including §8.1's shared auth header and §8.6's redaction walker.
 - All 10 §14 Must-Haves are covered, including #9 Security Made Visible (T-088).
