@@ -155,6 +155,7 @@ export default function ProjectPage() {
               <TabPanel tab="overview">
                 {isLoading ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <BentoCard className="h-72 animate-pulse sm:col-span-2" />
                     <BentoCard className="h-64 animate-pulse" />
                     <BentoCard className="h-64 animate-pulse" />
                     <BentoCard className="h-96 animate-pulse sm:col-span-2" />
@@ -166,6 +167,8 @@ export default function ProjectPage() {
                     commits={commits}
                     totalContributors={project?.totalContributors ?? 0}
                     languages={project?.languages ?? []}
+                    briefing={project?.briefing ?? null}
+                    embeddingStatus={project?.embeddingStatus ?? null}
                   />
                 )}
               </TabPanel>

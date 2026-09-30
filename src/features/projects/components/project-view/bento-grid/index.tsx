@@ -4,16 +4,18 @@
  * Bento Grid v3 — Overview tab layout.
  *
  * Layout (lg):
+ *   Row 0: [Repo Briefing (full width)]
  *   Row 1: [Tech Stack (1 col)] | [Contributors (1 col)]
  *   Row 2: [Project Pulse (full width)]
  */
 
 import { memo } from "react";
 import type { Commit } from "@/features/projects/types/project.types";
-import type { LanguageEntry } from "@/db/schema";
+import type { LanguageEntry, RepoBriefing } from "@/db/schema";
 import ProjectPulseWidget from "./project-pulse-widget";
 import ContributorWidget from "./contributor-widget";
 import TechStackWidget from "./tech-stack-widget";
+import RepoBriefingCard from "./repo-briefing-card";
 
 // ─── Shared Bento Card Shell ─────────────────────────────────────────────────
 
@@ -43,6 +45,10 @@ interface BentoGridProps {
   totalContributors: number;
   /** Real per-project language breakdown (projects.languages JSONB). */
   languages: LanguageEntry[];
+  /** Plain-language briefing (projects.briefing JSONB). Null until generated. */
+  briefing: RepoBriefing | null | undefined;
+  /** Disambiguates a null briefing: still indexing, or genuinely absent. */
+  embeddingStatus: string | null | undefined;
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -53,9 +59,16 @@ function BentoGrid({
   commits,
   totalContributors,
   languages,
+  briefing,
+  embeddingStatus,
 }: BentoGridProps) {
   return (
     <div className="space-y-4">
+      {/* Row 0: Repo Briefing — full width, first thing the user reads */}
+      <BentoCard>
+        <RepoBriefingCard briefing={briefing} embeddingStatus={embeddingStatus} />
+      </BentoCard>
+
       {/* Row 1: Tech Stack (1 col) + Contributors (1 col) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <BentoCard>

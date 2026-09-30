@@ -83,6 +83,17 @@ export const projectTables = pgTable(
      * Null until fetched. Empty array means the repo has no detectable languages.
      */
     languages: jsonb("languages").$type<LanguageEntry[]>().default([]),
+    /**
+     * Plain-language briefing of what this repository actually is (F-15),
+     * synthesised by Gemini after indexing finishes. Rendered at the top of the
+     * Overview tab.
+     *
+     * Null means "not generated yet" — which covers three different things the
+     * UI has to tell apart: the post-index step has not run, it ran and the LLM
+     * call failed, or it ran and produced nothing worth showing. The UI uses
+     * `embeddingStatus` alongside this column to pick the right message.
+     */
+    briefing: jsonb("briefing").$type<RepoBriefing>(),
     // Embedding status tracking for deferred RAG processing
     embeddingStatus: varchar("embedding_status", { length: 20 })
       .notNull()
@@ -327,6 +338,34 @@ export interface LanguageEntry {
   color: string | null;
   size: number; // bytes as reported by GitHub
   percentage: number; // 0–100, rounded to 1 dp
+}
+
+/**
+ * Shape of the `briefing` JSONB column on `projectTables`, produced by
+ * `generateRepoBriefing` after indexing (F-15).
+ *
+ * Deliberately a hand-written interface rather than the Zod schema from the
+ * generator: `db/schema.ts` must not import from `src/features/**`, and the
+ * column is read by the Overview card, which only needs the fields it renders.
+ */
+export interface RepoBriefing {
+  /** One-paragraph plain-language answer to "what is this project?". */
+  summary: string;
+  /** Lighter restatement of the pitch, shown as the card's description. */
+  description: string;
+  /** Framework/language names detected from manifests and file extensions. */
+  techStack: string[];
+  keyComponents: RepoBriefingComponent[];
+  /** How the pieces fit together, in prose. */
+  architecture: string;
+}
+
+export interface RepoBriefingComponent {
+  name: string;
+  /** What this part is responsible for. */
+  role: string;
+  /** Repo-relative paths that evidence the component, when known. */
+  paths: string[];
 }
 
 export const issuesTable = pgTable(

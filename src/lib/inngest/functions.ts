@@ -14,6 +14,7 @@ import {
 import { parseGitHubUrl } from "../github/utils";
 import { inngest } from "./client";
 import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
+import { generateRepoBriefing } from "@/src/features/rag/services/rag/briefing-generator";
 import { logger } from "@/src/lib/logger";
 import { grantDailyCredits, DAILY_CREDIT_GRANT } from "../credits";
 
@@ -436,6 +437,45 @@ export const generateEmbeddings = inngest.createFunction(
       return { success: true, embeddings: actualCount, truncated: false };
     });
 
+    // Step 4: Synthesize the plain-language briefing shown at the top of the
+    // Overview tab (F-15). Deliberately last, so it only ever describes a repo
+    // whose files are already indexed.
+    //
+    // This step is allowed to be worthless. `generateRepoBriefing` returns null
+    // instead of throwing on a missing API key, a zero-file repo, a quota
+    // error, a timeout or a malformed response, and a null briefing is a
+    // renderable state on the card. So nothing here can fail the ingestion —
+    // the project's embeddings are already committed by Finalize, and marking
+    // the row `failed` over a missing summary would be a lie.
+    const briefing = await step.run("Generate Briefing", async () => {
+      if (!finalResult.success) {
+        // Indexing failed or came up empty. Describing an unindexed repo would
+        // be describing something the user cannot search.
+        logger.warn(
+          `[Inngest] Skipping briefing for ${projectId}: index did not complete successfully`,
+        );
+        return { generated: false };
+      }
+
+      const result = await generateRepoBriefing(projectId);
+
+      if (!result) {
+        logger.warn(`[Inngest] No briefing generated for ${projectId}`);
+        return { generated: false };
+      }
+
+      await db
+        .update(projectTables)
+        .set({ briefing: result, updatedAt: new Date() })
+        .where(eq(projectTables.id, projectId));
+
+      logger.info(
+        `[Inngest] ✅ Briefing generated for ${projectId}: ${result.techStack.length} tech entries, ${result.keyComponents.length} components`,
+      );
+
+      return { generated: true };
+    });
+
     return {
       success: finalResult.success,
       projectId,
@@ -445,6 +485,7 @@ export const generateEmbeddings = inngest.createFunction(
       totalChunks,
       totalEmbeddings,
       errors: errors.length,
+      briefingGenerated: briefing.generated,
     };
   },
 );

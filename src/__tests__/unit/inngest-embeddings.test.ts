@@ -69,6 +69,17 @@ vi.mock("@/src/features/rag/services/rag-ingestion", () => ({
 
 vi.mock("@/src/lib/github", () => ({ getRepositoryFiles: vi.fn(), syncIssuesAndComments: vi.fn() }));
 
+// The briefing step (F-15) runs after Finalize. Mocked so no test reaches
+// Gemini, and so the default `null` leaves `updates.at(-1)` pointing at the
+// Finalize write — which is what the assertions below inspect.
+const { briefing } = vi.hoisted(() => ({
+  briefing: { value: null as Record<string, unknown> | null },
+}));
+
+vi.mock("@/src/features/rag/services/rag/briefing-generator", () => ({
+  generateRepoBriefing: vi.fn(async () => briefing.value),
+}));
+
 const { logs } = vi.hoisted(() => ({ logs: { error: [] as string[] } }));
 
 vi.mock("@/src/lib/logger", () => ({
@@ -117,6 +128,7 @@ beforeEach(() => {
     { fileId: "f1", filePath: "a.ts", chunksProcessed: 2, embeddingsGenerated: 2, skipped: false },
     { fileId: "f2", filePath: "b.ts", chunksProcessed: 1, embeddingsGenerated: 0, skipped: false, error: "Embedding provider returned 0 of 1 chunks" },
   ];
+  briefing.value = null;
 });
 
 describe("generateEmbeddings finalize", () => {
@@ -256,5 +268,53 @@ describe("generateEmbeddings truncation", () => {
     expect(updates.at(-1)!.indexedFileCount).toBe(1);
     expect(publishedTotal()).toBe(1200);
     expect(result).toMatchObject({ success: false });
+  });
+});
+
+describe("generateEmbeddings briefing step (F-15)", () => {
+  const BRIEFING = {
+    summary: "A RAG chat app over indexed GitHub repositories.",
+    description: "RAG chat over GitHub repositories.",
+    techStack: ["Next.js", "Drizzle ORM"],
+    keyComponents: [{ name: "Ingestion", role: "Indexes files.", paths: ["src/lib/inngest"] }],
+    architecture: "Ingest, embed, retrieve.",
+  };
+
+  /** All files embed cleanly, so Finalize succeeds and the step is allowed to run. */
+  function allHealthy() {
+    fileResults = [
+      { fileId: "f1", filePath: "a.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+      { fileId: "f2", filePath: "b.ts", chunksProcessed: 1, embeddingsGenerated: 1, skipped: false },
+    ];
+  }
+
+  it("persists the briefing onto the project row", async () => {
+    allHealthy();
+    briefing.value = BRIEFING;
+
+    const result = await run();
+
+    expect(result).toMatchObject({ briefingGenerated: true });
+    expect(updates.at(-1)).toMatchObject({ briefing: BRIEFING });
+  });
+
+  it("skips generation when indexing failed, so no repo is described half-indexed", async () => {
+    // f2 errors by default, so Finalize marks the row failed.
+    const result = await run();
+
+    expect(result).toMatchObject({ success: false, briefingGenerated: false });
+    expect(updates.some((u) => "briefing" in u)).toBe(false);
+  });
+
+  it("still reports the index completed when the generator returns null", async () => {
+    allHealthy();
+    briefing.value = null;
+
+    const result = await run();
+
+    expect(result).toMatchObject({ success: true, briefingGenerated: false });
+    // The card renders an empty state; nothing about the index changes.
+    expect(updates.at(-1)!.embeddingStatus).toBe("completed");
+    expect(updates.some((u) => "briefing" in u)).toBe(false);
   });
 });
