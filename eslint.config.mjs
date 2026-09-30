@@ -49,6 +49,25 @@ const eslintConfig = [
           ],
         },
       ],
+      // F-20: the axios ban above stops a service module reaching around the
+      // shared client, but it says nothing about a service module that builds
+      // its own `Authorization` header. Two of those and the token silently
+      // bypasses `client.ts`'s redaction, retry and error taxonomy — so the
+      // header itself is banned here. `client.ts` is the only place allowed to
+      // build one, and it lives outside this `files` scope.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/Bearer\\s/]",
+          message:
+            "Do not build an Authorization header here. Use getGitHubAuthHeader() from src/lib/github/client.ts.",
+        },
+        {
+          selector: "TemplateLiteral > TemplateElement[value.raw=/Bearer\\s/]",
+          message:
+            "Do not build an Authorization header here. Use getGitHubAuthHeader() from src/lib/github/client.ts.",
+        },
+      ],
     },
   },
   {

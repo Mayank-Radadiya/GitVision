@@ -215,3 +215,57 @@ describe("limit table", () => {
     ]);
   });
 });
+
+// F-20 — the platform-header ordering is a security property, not a style
+// choice: `x-forwarded-for` is append-only and therefore caller-controlled,
+// while Vercel and Cloudflare overwrite their header outright. Reading the
+// wrong one first would let a client pick its own rate-limit bucket.
+//
+// The two existing header tests each set only one platform header, so the
+// relative order between them was never exercised — a mutation that swapped
+// the `??` operands kept this file fully green.
+describe("F-20 — platform header precedence", () => {
+  function reqWith(headers: Record<string, string>): Request {
+    return new Request("https://example.test/api/trpc/project.create", {
+      headers,
+    });
+  }
+
+  it("prefers x-vercel-forwarded-for over cf-connecting-ip", () => {
+    expect(
+      clientIp(
+        reqWith({
+          "x-vercel-forwarded-for": "203.0.113.7",
+          "cf-connecting-ip": "198.51.100.9",
+        }),
+      ),
+    ).toBe("203.0.113.7");
+  });
+
+  it("falls back to cf-connecting-ip when Vercel does not set its header", () => {
+    expect(
+      clientIp(
+        reqWith({ "cf-connecting-ip": "198.51.100.9" }),
+      ),
+    ).toBe("198.51.100.9");
+  });
+
+  it("ignores a caller-supplied x-forwarded-for when a platform header exists", () => {
+    // The client can put whatever it likes in x-forwarded-for. The platform
+    // header is the one that cannot be forged, so it must win outright.
+    expect(
+      clientIp(
+        reqWith({
+          "x-forwarded-for": "1.2.3.4, 5.6.7.8",
+          "x-vercel-forwarded-for": "203.0.113.7",
+        }),
+      ),
+    ).toBe("203.0.113.7");
+  });
+
+  it("falls back to the last x-forwarded-for hop only when no platform header exists", () => {
+    expect(clientIp(reqWith({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe(
+      "5.6.7.8",
+    );
+  });
+});
