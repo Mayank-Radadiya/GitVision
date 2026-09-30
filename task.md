@@ -353,7 +353,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
 | 9 | Native `confirm()` for project deletion | fixed | F-19 |
-| 10 | Issues N+1 — comments prefetched per row | open | T-066 |
+| 10 | Issues N+1 — comments prefetched per row | fixed | T-066 |
 | 11 | Two live syntax highlighters (Shiki + rehype-highlight) | open | F-22 |
 | 12 | 5 docs say Gemini does embeddings; it is OpenRouter/qwen | fixed | F-21 |
 | 13 | No re-sync — `delete` is the only project mutation | open | F-14 |
@@ -544,3 +544,50 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 - Every new task (T-063…T-089) carries a §-citation or a `status/*.md` citation.
 - All 10 required sections present, plus a deferred V2/Future section so §6.1 and §6.2 are on the record rather than silently dropped.
 - Every claim is either quoted from the source documents or verified by grep against the live tree. No "I believe", no "should be".
+
+---
+
+## Independent verification (2026-09-30)
+
+An independent audit re-verified the Phase 0 set against live code at `5b4f5b9` rather than against
+commit messages. Full report: `phase0-verification-report.md` (untracked).
+
+**Verdict: Phase 0 is NOT complete.** 8 PASS · 10 PARTIAL · 4 FAIL · 0 whole-task NOT VERIFIABLE.
+
+- **4 FAIL, no remediation attempted** — missing features, not regressions, and therefore out of
+  scope for the fix pass: T-033 (`@clerk/testing` absent, `e2e/` holds only `smoke.spec.ts`),
+  T-077 (`posthog` and `@vercel/analytics` absent from `package.json`), T-078 (D-2 and D-11 are
+  still one-line table rows in `docs/DECISIONS.md`, with no full sections), T-083 (no `RAG_CONFIG`
+  exists; the thresholds are still module-local in `vector-search.ts:291,:298` and `budget.ts:34`).
+- **10 PARTIAL** — F-01 (no `<Suspense>` around the create-project form), F-02 (citation badge is
+  never rendered under test), F-05 (server-prefetch only; `proxy.ts` gives `/api/trpc` no public
+  pattern), F-06 (`pricing-section/constants.ts:63,65,82,101` still advertise repo allowances and
+  7/30/90-day retention that no code implements), F-08 (see below — now fixed), F-20 (CSP is
+  `reportOnly`, the eslint rule bans `axios` rather than inline `Bearer`), F-25 (uses `unique()` not
+  `uniqueIndex()`; deleting the constraint leaves the suite green), T-069 (a literal `</context>` in a
+  file is deliberately not escaped), T-084 (`lane/p2-a` does not exist in this clone, so half the task
+  is NOT VERIFIABLE), T-088 (six of ~15 `file:line` citations point at the wrong lines and one names
+  a function absent from the file it cites).
+- **The 23rd Phase 0 task ID does not exist in any available source.** The "Ready to Start Now" table
+  enumerates 22 IDs; the Effort Summary at :456-459 claims 23. No substitute was invented.
+- **`gitvisionStrategy2.md` does not exist** (`find . -iname "*gitvision*"` → zero results), so every
+  §-citation above and in the Defect Coverage table could only be checked against live code.
+
+### Regressions found and fixed (branch `verify/phase0-fixes`)
+
+| Commit | Task | Fix |
+|---|---|---|
+| `f3d3266` | F-08 | `CommandDialog` destructured `title`/`description` that its props type never declared, so `tsc --noEmit` and `next build` both failed at HEAD — **the app did not compile**. Declared both on the props intersection. |
+| `7df7a52` | F-03 | `chat-get-by-id-join.test.ts`'s mock counter lived inside the hoisted `vi.mock` factory and ran cumulatively across tests; F-03's third select pushed the second test onto an even select, so `vitest run` exited 1. Hoisted the counter next to `leftJoins` and reset it in `beforeEach`. Test-only change. |
+
+After both commits: `bun install` clean, `bun run typecheck` exit 0, `bun run lint` 0 errors / 4
+warnings, `bun run test` 393 passed / 23 skipped / **0 failed**, `bun run build` succeeds. The one
+remaining suite failure is `project-router-rate-limits.test.ts`, which is not skip-guarded and dies
+at import without `DATABASE_URL` (`db/index.ts:5` builds the Neon client at module scope) — an
+environment limitation, not a code defect, but it should be guarded like its siblings.
+
+### Coverage gaps worth closing
+
+F-02, F-06 and F-25 are mutation-invisible: breaking the citation href, the `comingSoon` branch or the
+`unique(owner_id, github_url)` constraint all leave the suite fully green. Three of the six
+mutation-eligible 🔥P0 tasks have no regression protection at all.
