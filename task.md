@@ -42,6 +42,13 @@
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
+- **T-090** — Small-project path never populates `relatedFiles`, so no citation ever renders
+  - **What:** The product's thesis is "ask about a repo and get an answer that points at the code", and that pointer is dead for every project this account holds. `app/api/chat/route.ts:523`'s `isSmallProject()` fast path builds a system prompt from the full file dump but never assigns `relatedFiles` — it is declared `[]` at `:485` and written only on the RAG branch at `:560-566`. Line 600 gates the `data-sources` stream part on `relatedFiles.length > 0`, so the fast path emits no sources, `chat-room.tsx` never sets `relatedFiles`, and `chat-message.tsx:326` renders zero `CitationBadge`s. The user gets a well-grounded answer and no citations, and nothing in the UI can tell the difference. The data compounds it: every project reporting `embedding_status = 'completed'` has `estimated_tokens = 0` with an empty `code_embeddings` table, and `isSmallProject(0)` is `0 < 150_000`, so the fast path is the only path taken.
+  - **How:** Have `getAllProjectFilesForContext` return the paths it actually dumped and assign them to `relatedFiles` on that branch, so the existing `data-sources` gate carries them without touching the retrieval branch. Then investigate why ingestion writes `embedding_status = 'completed'` while leaving `estimated_tokens` null and `code_embeddings` empty — a status that says "indexed" over a table with no rows is a second lie. Delete the `test.fixme` in `e2e/rag-chat.spec.ts` once real citations render.
+  - **Dependencies:** T-035 (gated on this)
+  - **Effort/Priority:** S / ⚠️ P0
+  - **Source:** found while verifying T-086; evidence in `task.md` Lane p1-e T-035 entry
+
 - **T-036** — E2E-spec the credit exhaustion block
   - **What:** There is no way back in once credits run out — signup grants 100, a project costs 10, a chat 1, a commit summary 1 — and no test proves the block actually fires.
   - **How:** Blocked behind T-034 and T-035; drain the balance and assert the request is refused and the UI explains why.
