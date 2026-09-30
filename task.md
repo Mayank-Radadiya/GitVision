@@ -26,13 +26,6 @@
 
 ### Phase 0 — Make It True (Week 1) — est. 23h (19 S, 1 M)
 
-- **F-20** — Close the four security and rate-limit gaps
-  - **What:** `enforceLimits` runs only inside `POST` at `app/api/embeddings/route.ts:22`; `GET` (L103) and `DELETE` (L169) are unrated. `src/lib/csp.ts:34` still allowlists the dead `https://via.placeholder.com`. GitHub Bearer headers are hand-rolled. Retrieved content is unfenced.
-  - **How:** Add `enforceLimits("embeddings", …)` to GET/DELETE; delete the CSP entry **and** the assertion at `src/__tests__/integration/security-headers.test.ts:59`; add a `no-restricted-imports` rule to `eslint.config.mjs` and drop the header at `src/lib/github/services/files.ts:64`.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / 🔥 P0
-  - **Source:** §5.20, §2.3 rows 3 and 7
-
 - **F-25** — Add the unique `(ownerId, githubUrl)` constraint
   - **What:** `db/schema.ts` contains zero `uniqueIndex` declarations, so a double-submit creates two project rows and charges 20 credits.
   - **How:** Migration `0005` adding `uniqueIndex("projects_owner_id_github_url_unique").on(table.ownerId, table.githubUrl)`, regenerate with `bun run db:generate`, and translate the constraint violation into a friendly "already added" error in `project.create`.
@@ -465,11 +458,11 @@ All 20 rows of §2.3, each re-verified against the live tree.
 |---|---|---|---|
 | 1 | `?url=` param pushed but never read | fixed | F-01 |
 | 2 | Dead dashboard payload on the hottest query | open | F-10 |
-| 3 | `enforceLimits` missing on embeddings GET + DELETE | open | F-20 |
+| 3 | `enforceLimits` missing on embeddings GET + DELETE | fixed | F-20 |
 | 4 | No unique `(ownerId, githubUrl)` | open | F-25 |
 | 5 | 4 decisions recorded with no content (D-1, D-3, D-4, D-8) | open | F-11 |
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
-| 7 | Stale CSP allowlist entry `via.placeholder.com` | open | F-20 |
+| 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
 | 9 | Native `confirm()` for project deletion | open | F-19 |
 | 10 | Issues N+1 — comments prefetched per row | open | T-066 |
@@ -611,7 +604,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-44 tasks shipped across 10 lanes. Original IDs preserved.
+45 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -621,7 +614,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-D:** T-004 (`a9eed54`, gunzip stream had no error handler) · T-009 (`7464b8c`, two routes with zero production callers and no rate limiting) · **T-002 — skipped, already resolved at HEAD**
 
-**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it)
+**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client)
 
 **Lane p0-t001 (batch):** T-040 · T-041 · T-042 (`bun audit` added to CI) · T-043 (raw `console` routed through `logger`) · T-046 (404/400 not 500 from chat router) · T-047 (400 for malformed body; `await` was inside `safeParse`) · T-048 (user-chosen chat title no longer overwritten) · T-049 (`chat.delete` distinguishes deleted from never-existed) · T-050 (honest issue/comment pagination) · T-051 (`getFileContent` validated with `z.string().uuid()`) · T-053 (Zod 4 migration finished, 12 call sites) · T-054 (font/asset fix, 12 preloads → 1) · T-055 (composite + language indexes) · T-056 (compound commit cursor) · T-057 (IP-based rate-limit dimension) · T-059 (coverage thresholds — no provider was installed) · T-062 (LICENSE decision + architecture doc)
 
