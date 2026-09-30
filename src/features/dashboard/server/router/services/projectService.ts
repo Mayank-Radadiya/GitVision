@@ -138,7 +138,9 @@ export function createProjectService() {
           const { clerkClient } = await import("@clerk/nextjs/server");
           const client = await clerkClient();
           const clerkUser = await client.users.getUser(userId);
-          const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+          // D-1: null, not "". An empty string on a unique column collides
+          // for the second email-less user.
+          const email = clerkUser.emailAddresses[0]?.emailAddress ?? null;
           const name =
             [clerkUser.firstName, clerkUser.lastName]
               .filter(Boolean)

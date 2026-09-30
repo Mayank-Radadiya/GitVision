@@ -51,35 +51,39 @@ export async function POST(req: Request) {
 
   try {
     if (eventType === "user.created" || eventType === "user.updated") {
-      const { id, email_addresses, first_name, last_name } = evt.data;
-      const email = email_addresses?.[0]?.email_address;
+      const { id, email_addresses, first_name, last_name, primary_email_address_id } = evt.data;
+      // D-1: no email is a valid state, so fall back to null rather than
+      // skipping the user. NULL is exempt from the unique constraint.
+      const email =
+        email_addresses?.find((e) => e.id === primary_email_address_id)
+          ?.email_address ??
+        email_addresses?.[0]?.email_address ??
+        null;
       const name =
         [first_name, last_name].filter(Boolean).join(" ") || "unknown";
 
-      if (email) {
-        // Conflict on the PRIMARY KEY (Clerk's user id), not on email.
-        // Email is mutable, so a user who changes their address would
-        // otherwise fail the unique-email constraint and be inserted twice.
-        // credits are set on insert only — a replayed webhook must never
-        // refill a balance.
-        await db
-          .insert(usersTable)
-          .values({
-            id,
-            email,
+      // Conflict on the PRIMARY KEY (Clerk's user id), not on email.
+      // Email is mutable, so a user who changes their address would
+      // otherwise fail the unique-email constraint and be inserted twice.
+      // credits are set on insert only — a replayed webhook must never
+      // refill a balance.
+      await db
+        .insert(usersTable)
+        .values({
+          id,
+          email,
+          name,
+          credits: 100,
+          isProUser: false,
+        })
+        .onConflictDoUpdate({
+          target: usersTable.id,
+          set: {
             name,
-            credits: 100,
-            isProUser: false,
-          })
-          .onConflictDoUpdate({
-            target: usersTable.id,
-            set: {
-              name,
-              email,
-              updatedAt: new Date(),
-            },
-          });
-      }
+            email,
+            updatedAt: new Date(),
+          },
+        });
     } else if (eventType === "user.deleted") {
       // Cascade removes the user's projects, files, chats, and embeddings.
       const deletedId = (evt.data as { id?: string }).id;

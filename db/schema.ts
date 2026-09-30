@@ -36,10 +36,10 @@ const vector = customType<{
 export const usersTable = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull().default("unknown"),
-  email: varchar("email", { length: 255 })
-    .notNull()
-    .unique()
-    .default("example@gmail.com"),
+  // Nullable per D-1: Clerk OAuth users can have no email address. A shared
+  // placeholder default collides on the unique constraint (23505), and NULLs
+  // are exempt from uniqueness in Postgres, so many email-less users coexist.
+  email: varchar("email", { length: 255 }).unique(),
   credits: integer("credits").notNull().default(100),
   isProUser: boolean("is_pro_user").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
