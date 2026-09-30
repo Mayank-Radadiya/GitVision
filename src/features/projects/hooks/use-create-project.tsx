@@ -5,8 +5,6 @@
  * - Cache invalidation (dashboard + project list)
  * - Toast notifications (success/error)
  * - Auto-redirect to dashboard on success
- *
- * Replaces the old axios.post("/api/project/createProject") call.
  */
 
 import { useRouter } from "next/navigation";
