@@ -131,8 +131,8 @@ interface IssueRowProps {
 }
 
 function IssueRow({ issue, repoUrl, isExpanded, onToggle }: IssueRowProps) {
-  // Prefetch comments in the background so they appear instantly when expanded
-  useIssueComments(issue.id);
+  // Lazy-load comments only when row is expanded to eliminate N+1 queries
+  useIssueComments(issue.id, { enabled: isExpanded });
 
   const githubUrl = repoUrl
     ? `${repoUrl.replace(/\.git$/, "")}/issues/${issue.issueNumber}`

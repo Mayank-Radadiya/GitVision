@@ -98,13 +98,20 @@ export function useProjectIssues(projectId: string, isPullRequest: boolean) {
 
 /**
  * Fetches comments for a specific issue.
- * Only fetches when issueId is truthy (expand on demand).
+ * Only fetches when issueId is truthy and query is enabled (expand on demand).
  * Stale time: 2 minutes.
  */
-export function useIssueComments(issueId: string | null) {
+export function useIssueComments(
+  issueId: string | null,
+  options?: { enabled?: boolean },
+) {
   return trpc.project.getIssueComments.useQuery(
     { issueId: issueId! },
-    { enabled: !!issueId, staleTime: 2 * 60 * 1000 },
+    {
+      staleTime: 2 * 60 * 1000,
+      ...options,
+      enabled: (options?.enabled ?? true) && !!issueId,
+    },
   );
 }
 
