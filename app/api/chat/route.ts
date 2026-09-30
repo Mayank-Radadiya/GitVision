@@ -415,7 +415,7 @@ export async function POST(req: Request) {
 
     // Enforce the credit budget — atomic spend, 402 when exhausted.
     // Spent after validation so invalid requests don't burn credits.
-    const remaining = await spendCredits(userId, CHAT_TURN_COST);
+    const remaining = await spendCredits(userId, CHAT_TURN_COST, "chat_turn");
     if (remaining === null) {
       return new Response(
         JSON.stringify({
@@ -464,7 +464,7 @@ export async function POST(req: Request) {
       if (refunded) return;
       refunded = true;
       try {
-        await refundCredits(userId, CHAT_TURN_COST);
+        await refundCredits(userId, CHAT_TURN_COST, "chat_turn");
       } catch (error) {
         logger.error("[Chat] Credit refund failed", error);
       }

@@ -57,6 +57,13 @@
       "when": 1790759614278,
       "tag": "0007_true_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790761022180,
+      "tag": "0008_clever_taskmaster",
+      "breakpoints": true
     }
   ]
 }

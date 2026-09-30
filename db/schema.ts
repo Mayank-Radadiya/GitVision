@@ -385,3 +385,62 @@ export const issueCommentsTable = pgTable(
     };
   },
 );
+
+/**
+ * Why a balance moved. Typed at the column so a misspelled reason is a
+ * compile error rather than a row nobody can explain later. Kept in sync by
+ * hand with the call sites in `src/lib/credits.ts`.
+ */
+export type CreditReason =
+  | "signup_grant"
+  | "project_creation"
+  | "commit_summary"
+  | "chat_turn";
+
+/**
+ * Append-only ledger of every credit movement. `users.credits` is still the
+ * authority on the current balance; this table is the audit trail that makes
+ * the balance explainable — without it a user who drops from 100 to 0 has no
+ * way to find out what they spent it on, and neither do we.
+ *
+ * Invariant: `sum(delta)` over a user's rows equals their balance, provided
+ * every grant and every spend writes a row in the same statement that moves the
+ * balance. That is why `spendCredits` and `grantCredits` are single-statement
+ * CTEs rather than an UPDATE followed by an INSERT.
+ *
+ * `balance_after` is denormalised deliberately: a ledger you have to replay to
+ * answer "what did I have yesterday" is a ledger nobody queries.
+ */
+export const creditTransactions = pgTable(
+  "credit_transactions",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
+    // Cascades so deleting a Clerk user takes their ledger with them. The
+    // `user.deleted` handler in the webhook already relies on this for the
+    // rest of the user's rows.
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    reason: varchar("reason", { length: 64 })
+      .$type<CreditReason>()
+      .notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      // One index, not two. It leads with `user_id` so it also serves the
+      // "every row for this user" filter, and it is built ascending: a btree
+      // scans backwards, so it serves the `ORDER BY created_at DESC, id DESC`
+      // that the history read uses without a per-column DESC marker.
+      userIdCreatedAtIdIdx: index("credit_transactions_user_id_created_at_id_idx").on(
+        table.userId,
+        table.createdAt,
+        table.id,
+      ),
+    };
+  },
+);

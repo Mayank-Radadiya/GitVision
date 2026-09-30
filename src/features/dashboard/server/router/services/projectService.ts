@@ -191,7 +191,11 @@ export function createProjectService() {
         // concurrent requests can never drive the balance negative.
         let chargedBalance: number | null = null;
         try {
-          chargedBalance = await spendCredits(userId, PROJECT_CREATION_COST);
+          chargedBalance = await spendCredits(
+            userId,
+            PROJECT_CREATION_COST,
+            "project_creation",
+          );
         } catch (chargeError) {
           // The charge never went through, so there is nothing to give back —
           // but the project row is already in the database, so drop it.
@@ -234,7 +238,11 @@ export function createProjectService() {
           await db
             .delete(projectTables)
             .where(eq(projectTables.id, projectId));
-          await refundCredits(userId, PROJECT_CREATION_COST);
+          await refundCredits(
+            userId,
+            PROJECT_CREATION_COST,
+            "project_creation",
+          );
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message:
@@ -883,7 +891,11 @@ export function createProjectService() {
       // Each call is a real Gemini request. Ownership alone does not bound it —
       // a user could walk every commit in their project for free — so charge
       // before doing the work, using the same atomic primitive as chat.
-      const remaining = await spendCredits(userId, COMMIT_SUMMARY_COST);
+      const remaining = await spendCredits(
+        userId,
+        COMMIT_SUMMARY_COST,
+        "commit_summary",
+      );
       if (remaining === null) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -903,7 +915,7 @@ export function createProjectService() {
         // produced has to be paid back, or a provider outage silently charges
         // every user for a failure.
         try {
-          await refundCredits(userId, COMMIT_SUMMARY_COST);
+          await refundCredits(userId, COMMIT_SUMMARY_COST, "commit_summary");
         } catch (refundError) {
           logger.error("Commit summary credit refund failed", refundError);
         }

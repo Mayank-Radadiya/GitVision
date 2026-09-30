@@ -6,6 +6,7 @@ import { usersTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logger } from "@/src/lib/logger";
+import { grantCredits, SIGNUP_CREDIT_GRANT } from "@/src/lib/credits";
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -65,26 +66,64 @@ export async function POST(req: Request) {
       // Conflict on the PRIMARY KEY (Clerk's user id), not on email.
       // Email is mutable, so a user who changes their address would
       // otherwise fail the unique-email constraint and be inserted twice.
-      // credits are set on insert only — a replayed webhook must never
-      // refill a balance.
-      await db
-        .insert(usersTable)
-        .values({
-          id,
-          email,
-          name,
-          credits: 100,
-        })
-        .onConflictDoUpdate({
-          target: usersTable.id,
-          set: {
-            name,
+      if (eventType === "user.created") {
+        // DO UPDATE is not an option on this branch, even though it is on
+        // `user.updated`: `ON CONFLICT DO UPDATE ... RETURNING` returns a row on
+        // both the insert and the update path, so it cannot tell us whether
+        // this delivery created the user. DO NOTHING returns nothing on
+        // conflict, which is the signal needed to avoid granting the signup
+        // credits twice.
+        //
+        // Inserted at zero and granted below rather than inserted at 100: the
+        // grant is what writes the ledger row, and `sum(delta)` over a user's
+        // ledger has to equal their balance. Writing the balance in the INSERT
+        // and the ledger row afterwards would leave every signup account short
+        // by exactly 100 in the one thing the ledger exists to be honest about.
+        const inserted = await db
+          .insert(usersTable)
+          .values({
+            id,
             email,
-            updatedAt: new Date(),
-          },
-        });
+            name,
+            credits: 0,
+          })
+          .onConflictDoNothing({ target: usersTable.id })
+          .returning({ id: usersTable.id });
+
+        if (inserted.length > 0) {
+          // Double-crediting is not a failure mode here. If this grant succeeded
+          // then the row exists, so any retry hits the conflict above and
+          // grants nothing. The one-sided risk is a throw between the two
+          // statements: the retry then conflicts too, and the user is stranded
+          // at 0 rather than wrongly given 100 twice.
+          await grantCredits(id, SIGNUP_CREDIT_GRANT, "signup_grant");
+        }
+      } else {
+        // credits is deliberately absent from the update set: a profile change
+        // is not a payment event, so this path can never move a balance in
+        // either direction. A user we have never seen (a `user.updated` whose
+        // `user.created` we missed) is inserted at the standard grant, which is
+        // the pre-existing behaviour of this handler.
+        await db
+          .insert(usersTable)
+          .values({
+            id,
+            email,
+            name,
+            credits: SIGNUP_CREDIT_GRANT,
+          })
+          .onConflictDoUpdate({
+            target: usersTable.id,
+            set: {
+              name,
+              email,
+              updatedAt: new Date(),
+            },
+          });
+      }
     } else if (eventType === "user.deleted") {
-      // Cascade removes the user's projects, files, chats, and embeddings.
+      // Cascade removes the user's projects, files, chats, embeddings, and the
+      // `credit_transactions` ledger.
       const deletedId = (evt.data as { id?: string }).id;
       if (deletedId) {
         await db.delete(usersTable).where(eq(usersTable.id, deletedId));
