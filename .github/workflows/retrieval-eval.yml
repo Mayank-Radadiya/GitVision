@@ -1,0 +1,153 @@
+name: Retrieval Eval
+
+# Manual-only: the eval embeds 30 questions through OpenRouter and, when
+# bootstrapping, downloads and embeds three whole repositories. That is far too
+# expensive and slow for pull-request CI, so this never runs automatically.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: retrieval-eval
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    # Two repos embed a few hundred files each. The default 6h is plenty, but
+    # the poll step needs to be able to give up rather than burn the whole budget.
+    timeout-minutes: 90
+
+    env:
+      # The eval reads the *production* database, because that is where the
+      # indexed benchmark projects live. There is deliberately no local
+      # pgvector service here: seeding a throwaway database would give the eval
+      # nothing to retrieve.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # Optional. Unset means the citation row prints "n/a" and the run still
+      # passes, which is why this is an empty-string fallback rather than a hard
+      # reference to a secret that forks cannot read.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Required only for the bootstrap step below.
+      INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Where the already-deployed Inngest instance lives. Its own environment
+      # must already be configured with the same DATABASE_URL,
+      # OPENROUTER_API_KEY and GITHUB_TOKEN, otherwise the jobs it runs will
+      # fail and the poll below will time out.
+      INNGEST_DEV: ${{ vars.INNGEST_DEV }}
+      INNGEST_EVENT_URL: ${{ vars.INNGEST_EVENT_URL }}
+      # Set to "false" when the three benchmark repos are already indexed, to
+      # skip the download-and-embed bootstrap entirely.
+      BOOTSTRAP_REPOS: ${{ vars.BOOTSTRAP_REPOS || 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        # No bun-version on purpose: setup-bun reads the packageManager field
+        # from package.json, so the workflow can never drift from the version
+        # the repo actually pins.
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Seed benchmark project rows
+        # The project row cannot be created through the app headlessly:
+        # `createProject` (src/features/dashboard/server/router/services/
+        # projectService.ts) requires a Clerk session and charges 10 credits.
+        # So the harness seeds the two rows that are pure database facts, and
+        # the actual clone + embed is done by the existing `project/created`
+        # Inngest function in the next step. `users` is inserted first purely to
+        # satisfy the projects.owner_id foreign key; no Clerk user exists.
+        if: env.BOOTSTRAP_REPOS == 'true'
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is unset; cannot seed. Set BOOTSTRAP_REPOS=false to run against already-indexed projects."
+            exit 1
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO users (id, name)
+          VALUES ('retrieval-eval', 'Retrieval Eval Bot')
+          ON CONFLICT (id) DO NOTHING;
+
+          INSERT INTO projects (name, github_url, owner_id)
+          VALUES
+            ('express',  'https://github.com/expressjs/express',   'retrieval-eval'),
+            ('ky',       'https://github.com/sindresorhus/ky',     'retrieval-eval'),
+            ('got',      'https://github.com/sindresorhus/got',    'retrieval-eval')
+          ON CONFLICT (owner_id, github_url) DO UPDATE SET updated_at = now();
+          SQL
+
+      - name: Trigger ingest and wait for embeddings
+        if: env.BOOTSTRAP_REPOS == 'true'
+        run: |
+          if [ -z "$INNGEST_EVENT_KEY" ] || [ -z "$INNGEST_EVENT_URL" ]; then
+            echo "::notice::INNGEST_EVENT_KEY or INNGEST_EVENT_URL is unset; skipping ingest. The eval will report any repo that was never indexed as SKIPPED."
+            exit 0
+          fi
+
+          for repo in expressjs/express sindresorhus/ky sindresorhus/got; do
+            owner="${repo%%/*}"
+            name="${repo##*/}"
+            project_id="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -t -A -c \
+              "SELECT id FROM projects WHERE owner_id = 'retrieval-eval' AND github_url = 'https://github.com/$repo'")"
+
+            if [ -z "$project_id" ]; then
+              echo "::error::no project row for $repo; run the seed step first"
+              exit 1
+            fi
+
+            echo "Dispatching project/created for $repo ($project_id)"
+            curl -sS -X POST "$INNGEST_EVENT_URL" \
+              -H "Authorization: Bearer $INNGEST_EVENT_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"name\":\"project/created\",\"data\":{\"projectId\":\"$project_id\",\"repoUrl\":\"https://github.com/$repo\",\"projectName\":\"$name\",\"owner\":\"$owner\",\"repo\":\"$name\"}}"
+            echo
+          done
+
+      - name: Poll until embeddings finish
+        if: env.BOOTSTRAP_REPOS == 'true'
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is not set; nothing to poll."
+            exit 0
+          fi
+
+          for attempt in $(seq 1 80); do
+            # 'pending'/'processing' are the only non-terminal states, so a repo
+            # that failed stops being pending and this loop exits instead of
+            # burning all 80 polls. The eval below then reports that repo as
+            # whatever it actually indexed, which is more useful than aborting.
+            pending="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -t -A -c \
+              "SELECT count(*) FROM projects WHERE owner_id = 'retrieval-eval' AND github_url IN ('https://github.com/expressjs/express','https://github.com/sindresorhus/ky','https://github.com/sindresorhus/got') AND embedding_status IN ('pending','processing')")"
+
+            if [ "$pending" = "0" ]; then
+              echo "All benchmark projects finished indexing."
+              exit 0
+            fi
+
+            if [ "$((attempt % 10))" = "0" ]; then
+              echo "Still indexing ($pending pending) after $((attempt * 30))s"
+            fi
+            sleep 30
+          done
+
+          echo "::warning::Timed out waiting for embeddings. The eval below will report whatever indexed in time."
+
+      - name: Run retrieval eval
+        # Always runs, with or without a successful bootstrap: the runner skips a
+        # repo it cannot find rather than crashing, so a partial index still
+        # produces a table with real numbers for whatever did land.
+        run: bun run eval:retrieval | tee eval-report.md
+
+      - name: Publish report
+        if: always()
+        run: |
+          if [ -f eval-report.md ]; then
+            cat eval-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "eval produced no report" >> "$GITHUB_STEP_SUMMARY"
+          fi
