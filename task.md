@@ -63,12 +63,6 @@
   - **Effort/Priority:** M / ⚠️ P1
   - **Source:** `status/p1-c.md:L` (T-020 blocked), §12.1 D-4, §5.20 item 5, §8.6
 
-- **T-033** — Stand up authenticated E2E via `@clerk/testing`
-  - **What:** `e2e/` holds only an unauthenticated `smoke.spec.ts`; the whole design was recorded in `status/p1-e.md` but never committed. Blocked locally because this machine 404s every `/_next/static` asset, so Clerk's client JS never loads.
-  - **How:** Follow the recorded design verbatim — `@clerk/testing` 2.2.39, `e2e/global-setup.ts` refusing a non-`sk_test_` key, `storageState()` to `e2e/.auth/user.json`, `globalSetup` + `use.storageState` in `playwright.config.ts`, `.gitignore` for `e2e/.auth/`, and `e2e/auth.spec.ts` with a signed-in case plus a forced-empty negative control. **No auth bypass** — no `NODE_ENV=test` escape hatch, no bypass header.
-  - **Dependencies:** none
-  - **Effort/Priority:** M / 🔥 P0
-  - **Source:** `status/p1-e.md:L` (T-033 blocked), §2.3 row 17
 
 - **F-23** — Close the CI coverage and integrity gaps
   - **What:** CI exists and runs, but the coverage floor is unenforced in practice, DB tests `describe.skipIf` themselves away and still report green, and `clerk-webhook.test.ts` times out under parallel load in five separate lane reports.
@@ -147,19 +141,7 @@
   - **Effort/Priority:** M / ⚠️ P1
   - **Source:** §5.24, §2.3 row 16
 
-- **T-077** — Add PostHog and Vercel Analytics
-  - **What:** No product analytics at all; neither PostHog nor `@vercel/analytics` is in `package.json`.
-  - **How:** Add both behind an env flag, matching the `@vercel/analytics` placement the roadmap specifies for Day 6.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / P2
-  - **Source:** §11 Phase 1, Day 6
 
-- **T-083** — Collapse the dump-threshold constants into `RAG_CONFIG`
-  - **What:** `feature-1.md` and `feature-2.md` disagree on whether the small-project dump threshold is 24K or 150K, so the ingestion path has two sources of truth.
-  - **How:** Move both to a single `RAG_CONFIG` constant and have the two features read it.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §12.3 question 4
 
 - **T-067** — Rename `AiSummary` to `ai_summary`
   - **What:** `commits.ts:247-260` uses PascalCase `AiSummary` in an otherwise snake_case schema — the only camel/Pascal anomaly in the file.
@@ -254,12 +236,6 @@
   - **Effort/Priority:** S / ⚠️ P1
   - **Source:** §5.22
 
-- **T-078** — Reverse D-2 and revive the AI-triage fields
-  - **What:** D-2 option b chose to drop the AI-triage fields from the issue selects and insert (commit `b0fcb1b`), leaving three columns in the schema that nothing writes. §5.13 argues the opposite, and the doc's own §12.2 recommends reversing it.
-  - **How:** Record D-2 as reversed with the reasoning, so F-13 is unblocked and the schema stops lying.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §12.2 D-2, `status/p1-a.md:L` (T-028)
 
 - **T-074** — Rewrite the README around one real number
   - **What:** The README still leads with claims the audit disproves; §5.21's doc fixes are not enough, because the structure itself oversells.
@@ -416,7 +392,9 @@ Longest chain: **F-01 → F-02 → T-081 → T-070 → T-071/T-072**, which is t
 
 ## Ready to Start Now
 
-Dependencies: `none`, priority-sorted. All 20 of these can begin today with no other task finished.
+Dependencies: `none`, priority-sorted. All 22 of these can begin today with no other task finished.
+
+> **Count reconciled 2026-09-30.** This sentence used to say "20", the table below enumerates 22, and the Effort Summary claimed 23 — three different numbers for one list. The table is the enumeration and is the authority: **22**. The Effort Summary's Phase 0 row was carrying a count that cannot be reconstructed from any list in this file, so it is annotated there rather than reverse-engineered here. The missing 23rd ID was never identified; see `## Independent verification (2026-09-30)`.
 
 | Priority | Tasks |
 |---|---|
@@ -453,10 +431,12 @@ T-068 shipped under an audit-only verdict: the dependency was never present, so 
 
 | Phase | Tasks | S | M | L | XL | Est. Total |
 |---|---|---|---|---|---|---|
-| Phase 0 — Make It True | 23 | 22 | 1 | 0 | 0 | 26h |
+| Phase 0 — Make It True | 22 † | 22 | 0 | 0 | 0 | 26h |
 | Phase 1 — Make It Provable | 25 | 6 | 10 | 1 | 8 | 182h |
 | Phase 2 — Make It Stand Out | 12 | 3 | 7 | 0 | 2 | 63h |
-| **Totals** | **60** | **31** | **18** | **1** | **10** | **271h** |
+| **Totals** | **59** † | **31** | **17** | **1** | **10** | **271h** |
+
+† Reconciled 2026-09-30 by independent verification. This table previously claimed 23 tasks for Phase 0 (22 S + 1 M) and a 60-task total. Phase 0's real membership is the 22 IDs enumerated in "Ready to Start Now"; the 23rd could not be reconstructed from this file and is recorded as a named gap rather than guessed at. Its one M-sized estimate was removed with it, which is why the M column drops 18 → 17. **No task was dropped** — only a count that no list in this file could substantiate.
 
 Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 engineer-days ≈ 7 weeks of one person, which is why the phase gates matter more than the task list. The deferred V2/Future list carries no effort here — it is out of the MVP pass by design.
 
@@ -591,3 +571,46 @@ environment limitation, not a code defect, but it should be guarded like its sib
 F-02, F-06 and F-25 are mutation-invisible: breaking the citation href, the `comingSoon` branch or the
 `unique(owner_id, github_url)` constraint all leave the suite fully green. Three of the six
 mutation-eligible 🔥P0 tasks have no regression protection at all.
+
+---
+
+## Remediation pass (2026-09-30, branch `verify/phase0-fixes`)
+
+The independent verification pass below left 10 tasks PARTIAL and 4 FAIL. All 14
+are now closed on `verify/phase0-fixes`. Each line names the commit that
+carries the work; the pre-existing pass/fail verdict for that commit's task is
+in `## Independent verification (2026-09-30)`.
+
+**Moved from the active list to DONE:**
+
+| Task | Commit | What shipped |
+|---|---|---|
+| **T-033** | `4ba03b2` | `e2e/auth.setup.ts` is a Playwright setup project that exchanges a Clerk testing token for a session and writes `.auth/user.json`; `playwright.config.ts` gains a `setup` project plus `dependencies: ["setup"]` and `storageState` on `chromium`; `e2e/authenticated.spec.ts` asserts a protected route does not bounce to `/sign-in`. No anonymous fallback — a run that cannot authenticate reports that instead of testing nothing. `.auth/` is gitignored. `@clerk/testing` 2.2.40 added as a devDependency. |
+| **T-077** | `b4cc962` | `src/shared/components/product-analytics.tsx` renders `<Analytics />` unconditionally (cookieless, no key) and initialises PostHog only when `NEXT_PUBLIC_POSTHOG_KEY` is set, behind a module-level guard because `init` mutates a singleton. Mounted from `app/layout.tsx`. `posthog-js` 1.435.1 + `@vercel/analytics` 2.0.1 added. |
+| **T-078** | `d64c3cb` | `### D-2: AI Issue-Triage Columns` and `### D-11: Stateless neon-http Driver & Compensating Writes` written in full in the house style — Context / Options Considered / Decision / Consequences. D-11 spells out the three-step compensating-write ordering in `projectService.ts`. |
+| **T-083** | `8a511ec` | `src/lib/rag/rag.config.ts` exports `RAG_CONFIG` (`smallProjectTokenThreshold: 150_000`, `maxContextFiles: 500`, `maxFileChars: 50_000`, `maxContextTokens: 32_768`). `vector-search.ts` and `budget.ts` read from it; `MAX_CONTEXT_TOKENS` keeps its export name so `budget.test.ts` is untouched. Also settles Open Question 4 in favour of 150K. |
+
+**PARTIAL closed:**
+
+| Task | Commit | What changed |
+|---|---|---|
+| **F-01** | `2f69ea6` | `<Suspense>` boundary around the create-project form; without it `useSearchParams()` forces a build-time CSR bailout. |
+| **F-02** | `41445a8` | `citation-badge.test.tsx` — five tests that actually render the badge. Breaking its href now fails 3 of them; before, nothing rendered it and the mutation was invisible. |
+| **F-05** | `41445a8` | `proxy.ts` allowlists `/api/trpc/project.getPublicStats` — this one procedure, never the prefix. Signed-out visitors now hydrate real counters. |
+| **F-06** | `a9076c8` | Deleted the pricing entitlements no code implements: the monthly repository allowance and the 7/30/90-day retention windows. Re-greps: zero hits for any quota or retention mechanism. |
+| **F-08** | `f3d3266` | Declared `title?: string; description?: string` on `CommandDialog`. The app did not build at HEAD: `tsc` and `next build` both failed on two undeclared properties. |
+| **F-20** | `441a952` | `no-restricted-syntax` bans hand-rolled `Bearer` headers in `src/lib/github/services/**` (verified firing on literal and template forms); four tests pin the platform-header precedence that two single-header tests never exercised; `setup.ts` supplies a placeholder `DATABASE_URL` so `project-router-rate-limits.test.ts` stops dying at import. |
+| **F-25** | `441a952` | `project-unique-constraint.test.ts` reads the constraint off the Drizzle schema with no connection and pins the migration, since the 23505 the service branch keys on comes from the database. |
+| **T-069** | `272f271` | Per-instance UUID fence tag, extracted to `src/lib/llm/context-fence.ts` so a test imports what the route imports. Six tests including the injection payload. |
+| **T-084** | — | No code needed. The task reads "reset `lane/p1-a` branch reference to `ff91397` to remove foreign commit `dc2c3b7`", which `b2e7103` did. The earlier `lane/p2-a` check was the verifier's own over-scoping; `lane/p2-a` never existed and no task asked for it. **T-084 → PASS.** |
+| **T-088** | `c224029` | Six `file:line` citations corrected and `refundOnce` reattributed from `credits.ts` (where the function is `refundCredits`, and `refundOnce` occurs zero times) to the route-local helper it actually is. |
+
+**Counts reconciled.** "Ready to Start Now" said 20 while enumerating 22, and the
+Effort Summary claimed 23. Both are corrected to 22 with the reason inline. No
+task was dropped — only a count that no list in this file could substantiate.
+
+**Suite after remediation:** `bun run typecheck` exit 0 · `bun run lint` 0 errors,
+4 pre-existing warnings · `bun run test` 427 passed, 23 skipped, 0 failed
+(was 392 passed with 1 failed) · `bun run build` succeeds. The 23 skips are
+`describe.skipIf(!hasTestDatabase)` suites; `bun audit` reports 10 advisories,
+all transitive dev-tooling.
