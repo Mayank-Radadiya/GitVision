@@ -79,19 +79,33 @@ export function PricingCard({ plan }: PricingCardProps) {
         </CardContent>
 
         <CardFooter className="pt-6 pb-8">
-          <Button
-            variant={plan.popular ? "default" : "outline"}
-            className={cn(
-              "group h-11 w-full cursor-pointer rounded-lg transition-all",
-              plan.popular && "shadow-primary/20 shadow-md",
-            )}
-            asChild
-          >
-            <Link href="/sign-up">
-              <span>{plan.cta}</span>
-              <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </Button>
+          {plan.comingSoon ? (
+            <Button
+              variant={plan.popular ? "default" : "outline"}
+              disabled
+              aria-disabled="true"
+              className={cn(
+                "h-11 w-full cursor-not-allowed rounded-lg",
+                plan.popular && "shadow-primary/20 shadow-md",
+              )}
+            >
+              {plan.cta}
+            </Button>
+          ) : (
+            <Button
+              variant={plan.popular ? "default" : "outline"}
+              className={cn(
+                "group h-11 w-full cursor-pointer rounded-lg transition-all",
+                plan.popular && "shadow-primary/20 shadow-md",
+              )}
+              asChild
+            >
+              <Link href="/sign-up">
+                <span>{plan.cta}</span>
+                <ArrowRightIcon className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </Button>
+          )}
         </CardFooter>
       </SpotlightCard>
     </motion.div>

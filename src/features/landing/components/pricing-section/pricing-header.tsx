@@ -20,8 +20,8 @@ export function PricingHeader({ isInView }: PricingHeaderProps) {
         pricing
       </h2>
       <p className="text-muted-foreground mx-auto max-w-2xl text-lg">
-        Start free and scale as your team grows. All plans include core analysis
-        features.
+        Start free with 100 credits. Pro and Team are on the roadmap — no
+        payment is required to use GitVision today.
       </p>
     </motion.div>
   );

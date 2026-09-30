@@ -4,7 +4,6 @@ import {
   GitBranchIcon,
   MessageSquareIcon,
   BarChart3Icon,
-  UsersIcon,
   SearchIcon,
 } from "lucide-react";
 import { CommitVisual } from "./commit-visual";
@@ -50,16 +49,6 @@ export const FEATURES: Feature[] = [
     accent: "text-amber-500",
     accentBg: "bg-amber-500/10",
     borderHover: "group-hover:border-amber-500/30",
-    size: "standard",
-  },
-  {
-    name: "Team Insights",
-    description:
-      "Understand who's contributing what, identify key developers, and track team productivity.",
-    icon: UsersIcon,
-    accent: "text-green-500",
-    accentBg: "bg-green-500/10",
-    borderHover: "group-hover:border-green-500/30",
     size: "standard",
   },
   {

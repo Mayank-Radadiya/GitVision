@@ -30,8 +30,9 @@ export function CtaContent({ isInView }: CtaContentProps) {
         transition={{ duration: 0.5, delay: 0.1 }}
         className="text-muted-foreground mx-auto mb-10 max-w-2xl text-lg"
       >
-        Join thousands of developers who use GitVision to make sense of code
-        changes, understand project history, and collaborate more effectively.
+        Use GitVision to make sense of code changes, understand project
+        history, and collaborate more effectively. Start with 100 free credits:
+        10 per project, 1 per chat turn, 1 per commit summary.
       </motion.p>
 
       <motion.div

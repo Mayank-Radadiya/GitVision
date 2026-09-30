@@ -18,6 +18,13 @@ export interface Plan {
   features: string[];
   cta: string;
   popular: boolean;
+  /**
+   * There is no payment path in this codebase — no Stripe, no checkout route,
+   * no webhook — so a plan with a real price cannot honestly offer a buy
+   * button. `comingSoon` renders a disabled button instead of a link to
+   * `/sign-up`, which would be a signup page wearing a purchase's label.
+   */
+  comingSoon?: boolean;
   accent: PlanAccent;
 }
 
@@ -77,8 +84,9 @@ export const PLANS: Plan[] = [
       "AI chat assistant",
       "Priority email support",
     ],
-    cta: "Buy Now",
+    cta: "Coming Soon",
     popular: true,
+    comingSoon: true,
     accent: PRIMARY,
   },
   {
@@ -95,8 +103,9 @@ export const PLANS: Plan[] = [
       "Team performance metrics",
       "Dedicated support",
     ],
-    cta: "Contact Us",
+    cta: "Coming Soon",
     popular: false,
+    comingSoon: true,
     accent: AMBER,
   },
 ];
