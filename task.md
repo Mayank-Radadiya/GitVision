@@ -26,27 +26,6 @@
 
 ### Phase 0 — Make It True (Week 1) — est. 23h (19 S, 1 M)
 
-- **F-02** — Make citations clickable into the viewer
-  - **What:** Citation badges are inert text and the code viewer has no `?file=` deep link, so the core pitch cannot be verified. `useSearchParams` has zero occurrences repo-wide.
-  - **How:** Wrap badges in `next/link` to `/code-viewer/[projectId]?file=<path>&line=<n>` and read the params in the viewer; front-end only, no backend or schema change.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / 🔥 P0
-  - **Source:** §5.2, §2.3 row 14
-
-- **F-06** — Delete the fabricated landing-page claims
-  - **What:** `hero-section/constants.ts:4-6` still claims "50K+ Repos Analyzed", "1M+ Commits Processed", "10K+ Developers"; `features-section/constants.tsx:56` still advertises "Team Insights"; `cta-section/constants.ts:3` repeats the 50K figure.
-  - **How:** Delete the constants and the card, and give the Team plan a real destination — `pricing-card.tsx:82-94` already has `asChild`, it just points nowhere.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / 🔥 P0
-  - **Source:** §5.6
-
-- **F-19** — Land the accessibility batch as one PR
-  - **What:** `aria-pressed` and `aria-current` have zero occurrences repo-wide. The three search inputs at `pr-tab.tsx:106`, `issues-tab.tsx:321`, and `code-viewer-project-grid.tsx:132` are unlabeled. The disclosure rows at `commits-tab.tsx:174-177` and `issues-tab.tsx:158-159` are bare `onClick` with no keyboard path. `project-header.tsx:66` uses native `confirm()`; zero `AlertDialog` exists in the repo.
-  - **How:** Add the ARIA attributes, label the three inputs, give the rows `role="button"` + `tabIndex` + `onKeyDown` (copy the pattern already at `code-viewer/file-tree.tsx:330`), add `aria-describedby` to `Field.tsx`, and replace `confirm()` with a Radix `AlertDialog`.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.19, §2.3 rows 9 and 19
-
 - **F-10** — Prune the dead dashboard payload
   - **What:** `buildPickUpCards` (`projectService.ts:63`), `getRecentActivity` (`:853`), and `getPickUpWhereYouLeftOff` (`:996`, called at `:1033`) all survive; commit `a1794f5` did not remove them.
   - **How:** Delete the three functions, the unused `ActivityEvent`/`PickUpCard`/`PickUpData` types, the dead `budget.ts:24-26` model, and `app/api/project/`; update `src/__tests__/unit/dashboard-pickup-links.test.ts:111` **in the same PR** — the test pins the payload.
@@ -436,17 +415,17 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 6 | Orphaned AI-triage columns, never populated | open | F-13 |
 | 7 | Stale CSP allowlist entry `via.placeholder.com` | fixed | F-20 |
 | 8 | `isProUser` defined and written, never read | open | T-085 |
-| 9 | Native `confirm()` for project deletion | open | F-19 |
+| 9 | Native `confirm()` for project deletion | fixed | F-19 |
 | 10 | Issues N+1 — comments prefetched per row | open | T-066 |
 | 11 | Two live syntax highlighters (Shiki + rehype-highlight) | open | F-22 |
 | 12 | 5 docs say Gemini does embeddings; it is OpenRouter/qwen | fixed | F-21 |
 | 13 | No re-sync — `delete` is the only project mutation | open | F-14 |
-| 14 | Citations not clickable; no `?file=` deep link | open | F-02 |
+| 14 | Citations not clickable; no `?file=` deep link | fixed | F-02 |
 | 15 | No settings/account page, no project settings, no chat UI | open | F-17, F-07 |
 | 16 | Console-only logger; no error tracking | open | F-24 |
 | 17 | 53 unit test files, 1 unauthenticated E2E spec | open | T-086 |
 | 18 | `clerk-webhook.test.ts` flaky under parallel load | open | F-23 |
-| 19 | PascalCase `AiSummary` in snake_case schema | open | T-067 |
+| 19 | PascalCase `AiSummary` in snake_case schema | fixed | T-067 |
 | 20 | Shared single `GITHUB_TOKEN` = one 5,000/hr pool | open | F-14 |
 
 Rows 5 and 17 map to two tasks each; the rest map to one.
@@ -576,7 +555,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-49 tasks shipped across 10 lanes. Original IDs preserved.
+52 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -586,7 +565,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-D:** T-004 (`a9eed54`, gunzip stream had no error handler) · T-009 (`7464b8c`, two routes with zero production callers and no rate limiting) · **T-002 — skipped, already resolved at HEAD**
 
-**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client) · **F-25** (`ee86613`, `unique("projects_owner_id_github_url_unique")` on `projects(owner_id, github_url)` via migration `0005`, so a double-submit can no longer bill 10 credits twice; the 23505 is re-thrown at `createNewProject` as `PROJECT_ALREADY_EXISTS` instead of being buried in `details.originalError`, and `project.create` maps it to a `CONFLICT` "already added" — safe because the insert precedes `spendCredits`, so the duplicate never reaches the charge) · **F-21** (`7fdf90e`, every doc and comment that credited Gemini with embeddings now names `@openrouter/sdk` `qwen/qwen3-embedding-8b` (768-dim), and the chat model is named as `gemini-2.0-flash-001`; the two `.env.example` provider comments were wrong *and* swapped, and the README prerequisite list offered no OpenRouter key at all, so a reader following it could not have configured embedding generation; documentation and comments only, no logic or schema touched) · **F-05** (`e3dd860`, the hero's "50K+ Repos Analyzed" / "1M+ Commits Processed" / "10K+ Developers" literals are now `COUNT(*)` on `projects`, `commits` and `chat_messages` via a new `publicProcedure` — which did not exist, every procedure in the app was `protectedProcedure` — and the client hook reads it with `staleTime: 300_000`; the data is fetched by `prefetch()` in `app/page.tsx` rather than from the browser, because `proxy.ts` protects the whole `/api/trpc` prefix and a signed-out visitor cannot reach even a public procedure over HTTP, so `getPublicStats` is server-reachable only until that allowlist is revisited)
+**Lane p0-E:** **F-01** (`c9d09b6`, `?url=` now read via `useSearchParams` and prefilled into `repoUrl` with a functional `reset`; prefills only, no auto-submit, so no credits are spent until the user submits; five tests in `src/__tests__/unit/add-repo-url-param.test.tsx` pin the contract) · **T-089** (`d3f0064`, exported shared `getGitHubAuthHeader()` helper from GitHub client module and repointed `files.ts:64` through it) · **F-20** (`59b7a5a`, `GET`/`DELETE` on `/api/embeddings` now metered by `enforceLimits` and return 429 on exhaustion, dead `via.placeholder.com` dropped from the CSP allowlist and its assertion inverted, and a `no-restricted-imports` rule bars `axios` under `src/lib/github/services/**` so the tarball fetch routes through the shared client) · **F-25** (`ee86613`, `unique("projects_owner_id_github_url_unique")` on `projects(owner_id, github_url)` via migration `0005`, so a double-submit can no longer bill 10 credits twice; the 23505 is re-thrown at `createNewProject` as `PROJECT_ALREADY_EXISTS` instead of being buried in `details.originalError`, and `project.create` maps it to a `CONFLICT` "already added" — safe because the insert precedes `spendCredits`, so the duplicate never reaches the charge) · **F-21** (`7fdf90e`, every doc and comment that credited Gemini with embeddings now names `@openrouter/sdk` `qwen/qwen3-embedding-8b` (768-dim), and the chat model is named as `gemini-2.0-flash-001`; the two `.env.example` provider comments were wrong *and* swapped, and the README prerequisite list offered no OpenRouter key at all, so a reader following it could not have configured embedding generation; documentation and comments only, no logic or schema touched) · **F-05** (`e3dd860`, the hero's "50K+ Repos Analyzed" / "1M+ Commits Processed" / "10K+ Developers" literals are now `COUNT(*)` on `projects`, `commits` and `chat_messages` via a new `publicProcedure` — which did not exist, every procedure in the app was `protectedProcedure` — and the client hook reads it with `staleTime: 300_000`; the data is fetched by `prefetch()` in `app/page.tsx` rather than from the browser, because `proxy.ts` protects the whole `/api/trpc` prefix and a signed-out visitor cannot reach even a public procedure over HTTP, so `getPublicStats` is server-reachable only until that allowlist is revisited) · **F-02** (`bef84e3`, chat citation badges are now `next/link`s to `/code-viewer/[projectId]?file=<path>` with `projectId` threaded through `ChatRoom`; the viewer derives the selected file from `?file=` (unknown paths fall back to README-first) and scrolls/tints `?line=` via Shiki `.line` spans, with ancestors auto-expanded and the tab stop following the selection; `<Suspense>` wraps the search-param consumer; no `&line=` is emitted yet because `relatedFiles` carries paths only — T-070 is the line producer) · **F-19** (`5b36263`, consolidated accessibility pass: added aria-label to PR/issues/code-viewer search inputs, aria-pressed to filter pills, aria-current="page" to active navigation links, role="button" + tabIndex + Enter/Space onKeyDown on commits and issues disclosure rows, aria-describedby on Field.tsx errors, and replaced native confirm() with Radix AlertDialog in project-header.tsx) · **F-06** (`d7e44a9`, F-05 had already made the hero's three counters real `COUNT(*)`s, so those stayed; what was still fabricated was the cta-section's repeat of "50K+ Repos Analyzed", the "Join thousands of developers" line, and the "Team Insights" card, all of which are gone with the orphaned `UsersIcon` import. The pricing CTAs already pointed at `/sign-up` but were labelled "Buy Now" and "Contact Us", advertising two purchases the product cannot take — there is no Stripe, checkout route or payment webhook anywhere in the codebase — so Pro and Team now carry `comingSoon` and render a disabled button, leaving the Basic card's real link as the only live CTA; the enterprise block's "Contact our sales team" button, which had no `href` and no `onClick`, is deleted)
 
 **Lane p0-t001 (batch):** T-040 · T-041 · T-042 (`bun audit` added to CI) · T-043 (raw `console` routed through `logger`) · T-046 (404/400 not 500 from chat router) · T-047 (400 for malformed body; `await` was inside `safeParse`) · T-048 (user-chosen chat title no longer overwritten) · T-049 (`chat.delete` distinguishes deleted from never-existed) · T-050 (honest issue/comment pagination) · T-051 (`getFileContent` validated with `z.string().uuid()`) · T-053 (Zod 4 migration finished, 12 call sites) · T-054 (font/asset fix, 12 preloads → 1) · T-055 (composite + language indexes) · T-056 (compound commit cursor) · T-057 (IP-based rate-limit dimension) · T-059 (coverage thresholds — no provider was installed) · T-062 (LICENSE decision + architecture doc)
 
