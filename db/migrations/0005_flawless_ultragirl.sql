@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD CONSTRAINT "projects_owner_id_github_url_unique" UNIQUE("owner_id","github_url");

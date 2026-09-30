@@ -194,6 +194,20 @@ export async function createNewProject(
       throw error;
     }
 
+    // Postgres raises 23505 when the unique (owner_id, github_url) constraint
+    // is violated. Drizzle wraps driver errors, so check the cause too. This
+    // has to be re-thrown as its own code: the generic wrap below would bury
+    // 23505 in details.originalError and the caller could not tell "you
+    // already added this repo" apart from a real failure.
+    const driverError = error as { code?: string; cause?: { code?: string } };
+    if (driverError?.code === "23505" || driverError?.cause?.code === "23505") {
+      throw new GitHubError(
+        "Repository already added",
+        "PROJECT_ALREADY_EXISTS",
+        409,
+      );
+    }
+
     logger.error( "Error creating project", {
       url,
       projectName,

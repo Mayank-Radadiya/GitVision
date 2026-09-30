@@ -36,6 +36,13 @@
       "when": 1790689037761,
       "tag": "0004_chats_and_project_files_composite_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790742906628,
+      "tag": "0005_flawless_ultragirl",
+      "breakpoints": true
     }
   ]
 }

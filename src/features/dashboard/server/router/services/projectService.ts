@@ -332,6 +332,12 @@ export function createProjectService() {
               code: "TOO_MANY_REQUESTS",
               message: "GitHub API rate limit exceeded.",
             });
+          if (githubError.code === "PROJECT_ALREADY_EXISTS")
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "This repository has already been added to your account.",
+            });
         }
 
         throw new TRPCError({

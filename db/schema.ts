@@ -89,6 +89,14 @@ export const projectTables = pgTable(
   (table) => {
     return {
       ownerIdIdx: index("owner_id_idx").on(table.ownerId),
+      // A user may only track a given repository once. Without this, a
+      // double-submit (or two concurrent requests) inserts two project rows
+      // and bills 10 credits twice. Credits are a real balance, so the
+      // database — not the client — is the thing that has to say no.
+      projectsOwnerIdGithubUrlUnique: unique("projects_owner_id_github_url_unique").on(
+        table.ownerId,
+        table.githubUrl,
+      ),
     };
   },
 );
