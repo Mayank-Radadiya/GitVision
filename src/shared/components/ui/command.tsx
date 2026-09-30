@@ -43,6 +43,10 @@ function CommandDialog({
   className?: string;
   /** Wrap around the ends of the list. */
   loop?: boolean;
+  /** Names the dialog for assistive tech. Radix's `Root` carries no title of its own. */
+  title?: string;
+  /** Describes the dialog for assistive tech. */
+  description?: string;
 }) {
   return (
     <DialogPrimitive.Root {...props}>
