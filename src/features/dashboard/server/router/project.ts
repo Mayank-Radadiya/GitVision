@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import {
   createTRPCRouter,
   protectedProcedure,
+  publicProcedure,
 } from "../../../../lib/trpc/init";
 import {
   projectCreateSchema,
@@ -12,6 +13,9 @@ import {
 } from "@/src/lib/validation/schemas";
 import { enforceLimits } from "@/src/lib/rate-limit";
 import { createProjectService } from "./services/projectService";
+import { db } from "@/db";
+import { count } from "drizzle-orm";
+import { projectTables, commitsTable, chatMessages } from "@/db/schema";
 
 // Instantiate the service once, saving memory and CPU cycles
 const projectService = createProjectService();
@@ -208,4 +212,41 @@ export const projectRouter = createTRPCRouter({
       }
       return projectService.syncIssues(input.projectId, ctx.userId);
     }),
+
+  /**
+   * Platform-wide row counts for the landing page.
+   *
+   * The hero used to claim "50K+ Repos Analyzed" from a constant. The only
+   * honest replacement is the real number, which is why this is a `COUNT(*)`
+   * over three tables rather than a cached aggregate somewhere.
+   *
+   * Unauthenticated on purpose, so the guard is the shape of the result, not
+   * the procedure: three integers with no `ownerId` filter, no row contents and
+   * no ids. It reveals how much the platform holds and nothing about who owns
+   * it. Anything added to the return value has to keep that true.
+   *
+   * `.mapWith(Number)` is belt-and-braces. Over the `neon-http` driver drizzle
+   * already hands back a number for `count`, but `count` is a bigint in Postgres
+   * and the same codebase guards it on `sum` at
+   * `services/projectService.ts:611` — if the driver ever switches, the
+   * landing page should show `1,204` and not `[object Object]`.
+   *
+   * Reachable server-side only, via `caller`/`prefetch` in
+   * `lib/trpc/server.tsx`. `proxy.ts` protects the whole `/api/trpc` prefix, so
+   * a signed-out browser cannot call it over HTTP. See `publicProcedure` in
+   * `lib/trpc/init.ts` for why per-procedure allowlisting is not available.
+   */
+  getPublicStats: publicProcedure.query(async () => {
+    const [projects, commits, messages] = await Promise.all([
+      db.select({ count: count().mapWith(Number) }).from(projectTables),
+      db.select({ count: count().mapWith(Number) }).from(commitsTable),
+      db.select({ count: count().mapWith(Number) }).from(chatMessages),
+    ]);
+
+    return {
+      projectsCount: projects[0]?.count ?? 0,
+      commitsCount: commits[0]?.count ?? 0,
+      messagesCount: messages[0]?.count ?? 0,
+    };
+  }),
 });

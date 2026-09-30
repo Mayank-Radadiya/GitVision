@@ -82,3 +82,21 @@ const isAuthed = middleware(async ({ ctx, next }) => {
 });
 
 export const protectedProcedure = t.procedure.use(isAuthed);
+
+/**
+ * Public procedure - no session required
+ *
+ * Every procedure in this app was `protectedProcedure` until the landing page
+ * needed real numbers to show a signed-out visitor. There is no mechanism in
+ * the router to make one of those reachable without a session: `proxy.ts`
+ * runs `auth.protect()` on the whole `/api/trpc` prefix, and `httpBatchLink`
+ * POSTs to `/api/trpc?batch=1&input=...`, so a single procedure cannot be
+ * allowlisted by pathname. A public procedure is therefore reachable only
+ * server-side, through the `caller` or `prefetch()` in `server.tsx` — which is
+ * what `app/page.tsx` does for `getPublicStats`.
+ *
+ * Anything added here returns the same rows to a signed-out stranger that it
+ * would return to a signed-in user. Keep it to aggregate counts and never to
+ * anything keyed on `ownerId`.
+ */
+export const publicProcedure = t.procedure;
