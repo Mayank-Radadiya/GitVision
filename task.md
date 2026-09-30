@@ -42,14 +42,6 @@
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
-- **T-020** — Ship error tracking on the recorded transport
-  - **What:** The logger redacts and truncates but nothing ships errors anywhere; there is no production observability. Its walker also handles only plain objects and arrays, so a `Map`, a `Date`, or a custom class instance reaching `extra` is serialized unredacted — a hole in the exact path that would ship errors off-box.
-  - **How:** Depends on D-4 being recorded by F-11. Add `@sentry/nextjs` plus `instrumentation.ts` and structured JSON to stdout; the transport **must** call `serialize`/`redact` from `src/lib/logger.ts` or T-019's redaction is bypassed. Extend the redaction walker to recurse into `Map`, serialize `Date` as ISO, and expand class instances to their enumerable own properties rather than dropping them. Env-flag off in local and CI.
-  - **Dependencies:** F-11
-  - **Effort/Priority:** M / ⚠️ P1
-  - **Source:** `status/p1-c.md:L` (T-020 blocked), §12.1 D-4, §5.20 item 5, §8.6
-
-
 - **T-086** — Add the three authenticated E2E specs
   - **What:** Nothing covers ingest → RAG → chat. The gap is that a user can break the entire thesis and CI stays green.
   - **How:** With storage state from T-033, add three specs — ingest a tiny public repo and assert file count > 0; ask a question and assert a citation appears and its click-through resolves; spend credits to zero and assert the block.
@@ -314,7 +306,7 @@ All 20 rows of §2.3, each re-verified against the live tree.
 | 13 | No re-sync — `delete` is the only project mutation | open | F-14 |
 | 14 | Citations not clickable; no `?file=` deep link | fixed | F-02 |
 | 15 | No settings/account page, no project settings, no chat UI | open | F-17, F-07 |
-| 16 | Console-only logger; no error tracking | open | F-24 |
+| 16 | Console-only logger; no error tracking | fixed | F-24, T-020 |
 | 17 | 53 unit test files, 1 unauthenticated E2E spec | open | T-086 |
 | 18 | `clerk-webhook.test.ts` flaky under parallel load | fixed | F-23 |
 | 19 | PascalCase `AiSummary` in snake_case schema | open | T-067 |
@@ -453,7 +445,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-55 tasks shipped across 10 lanes. Original IDs preserved.
+56 tasks shipped across 10 lanes. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -472,7 +464,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p1-b:** T-016 (`c222a3a`, secret-file patterns) · T-015 (`1d27991`, entry names resolved with `posix.normalize`) · T-021 (`bff7167`, report-only CSP + `app/api/csp-report/route.ts` collector + `proxy.ts` PUBLIC entry)
 
-**Lane p1-c:** T-019 (`f6e00ab`, redaction at all four levels, deep through context and errors)
+**Lane p1-c:** T-019 (`f6e00ab`, redaction at all four levels, deep through context and errors) · **T-020** (`45fa5da`, redaction walker extended to Map, Set, Date, Error, and class instances with a depth and cycle ceiling; error transport registered from `sentry.server.config.ts` so the already-redacted record is the only thing that ever leaves the process, and the SDK stays out of the client bundle entirely; gated to production with a DSN present)
 
 **Lane p1-d:** T-018 (`0f0415b`, charge before enqueue with explicit compensation) · T-029 (`3be9f2b`, 10 round-trips measured) · T-030 (`5a96c81`, 10 → 3 round-trips) · **T-031 — skipped with evidence** (production Neon: 7-day window uses `Index Scan` at 0.085 ms, 2000-day worst case is a 402-row `Seq Scan` at 0.588 ms total, against a 394 ms dashboard load; the planner declined both candidate indexes on a 4,000-commit PG18)
 
