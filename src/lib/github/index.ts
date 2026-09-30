@@ -19,3 +19,7 @@ export {
   GitHubNotFoundError,
   GitHubValidationError,
 } from "./errors";
+
+// ── HTTP / Auth Utilities ──
+export { getGitHubAuthHeader } from "./client";
+

@@ -15,6 +15,7 @@ import { createGunzip } from "zlib";
 import { computeHash } from "@/src/features/rag/services/code-chunker";
 import { GITHUB_CONFIG } from "../constants";
 import { GitHubError, GitHubValidationError, GitHubAPIError } from "../errors";
+import { getGitHubAuthHeader } from "../client";
 import { isIgnoredPath } from "../utils";
 import { logger } from "@/src/lib/logger";
 
@@ -61,7 +62,7 @@ export async function getRepositoryFiles(
       url: `https://api.github.com/repos/${owner}/${repo}/tarball`,
       responseType: "stream",
       headers: {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        ...getGitHubAuthHeader(),
         Accept: "application/vnd.github.v3+json",
       },
       timeout: 120000, // 2-minute timeout for large repos

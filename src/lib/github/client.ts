@@ -34,6 +34,16 @@ export function getOctokit(): Octokit {
   return octokit;
 }
 
+export function getGitHubAuthHeader(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    return {};
+  }
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 /**
  * HTTP GET with automatic retries and exponential backoff.
  * Retries on 404 (GitHub CDN propagation lag), 429, and 5xx.
