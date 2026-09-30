@@ -27,6 +27,9 @@ export default async function ChatDetailPage({ params }: ChatPageProps) {
         projectId={chatData.projectId}
         // Joined in by chat.getById — no second query needed for the name.
         projectName={chatData.projectName ?? undefined}
+        // Also joined in / parsed by chat.getById, for the F-03 starter chips.
+        projectLanguages={chatData.languages}
+        projectDependencies={chatData.dependencies}
         type={chatData.type as "project" | "general"}
         title={chatData.title}
         // ponytail: only the newest 300 messages load. Longer chats start

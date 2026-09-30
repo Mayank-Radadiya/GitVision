@@ -13,12 +13,17 @@ import {
   parseChatError,
   type ChatErrorInfo,
 } from "@/src/shared/lib/chat-errors";
+import { getStarterChips } from "@/src/features/chat/lib/starter-chips";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatRoomProps {
   chatId: string;
   projectId?: string | null;
   projectName?: string;
+  /** Language names, most-shared first — drives the starter chips (F-03). */
+  projectLanguages?: string[];
+  /** `package.json` dependency names — gates the auth starter chip. */
+  projectDependencies?: string[];
   type: "project" | "general";
   title: string;
   initialMessages?: Array<{
@@ -76,6 +81,14 @@ const RETRIEVAL_PHASE_LABELS: Record<
   ranking: "Ranking results...",
 };
 
+// A general chat has no project record to read, so F-03 leaves its suggestions
+// as the hand-written general-purpose ones.
+const GENERAL_CHIPS = [
+  "Explain React Server Components",
+  "Best practices for API design",
+  "Explain TCP vs UDP",
+];
+
 function RetrievalSkeleton({
   phase = "searching",
 }: {
@@ -129,6 +142,8 @@ export function ChatRoom({
   chatId,
   projectId,
   projectName,
+  projectLanguages = [],
+  projectDependencies = [],
   type,
   title,
   initialMessages = [],
@@ -218,12 +233,22 @@ export function ChatRoom({
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  const handleSubmit = () => {
-    if (!input.trim()) return;
+  // One send path for both the input and a starter chip. A chip has to submit,
+  // not just fill the box, so it cannot go through `setInput` and let the user
+  // press enter — that is the whole difference between F-03 and the three
+  // placeholder buttons it replaced. Keeping one function means a chip gets
+  // the same mid-stream `stop()` and the same error reset as typed text.
+  const sendPrompt = (text: string) => {
+    const prompt = text.trim();
+    if (!prompt) return;
     if (isLoading && stop) {
       stop();
     }
-    sendMessage({ text: input });
+    setLiveSources([]);
+    setHasFirstToken(false);
+    setRetrievalPhase("searching");
+    setChatError(null);
+    sendMessage({ text: prompt });
     setInput("");
   };
 
@@ -251,15 +276,6 @@ export function ChatRoom({
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const onSubmit = () => {
-    if (!input.trim()) return;
-    setLiveSources([]);
-    setHasFirstToken(false);
-    setRetrievalPhase("searching");
-    setChatError(null);
-    handleSubmit();
-  };
-
   // For persisted messages (loaded from DB), read relatedFiles from
   // initialMessages. For the live streaming message, use liveSources.
   const getRelatedFiles = (
@@ -284,6 +300,14 @@ export function ChatRoom({
     isLoading &&
     messages[messages.length - 1]?.role === "assistant" &&
     hasFirstToken;
+
+  // F-03: four project-specific chips, computed from the project record on
+  // every render. `getStarterChips` is a pure fold over two small arrays and the
+  // props are plain data, so there is nothing here worth memoising.
+  const starterChips =
+    type === "project"
+      ? getStarterChips(projectLanguages, projectDependencies)
+      : GENERAL_CHIPS;
 
   return (
     <div className="flex h-[calc(100vh-2rem)] flex-col">
@@ -329,24 +353,14 @@ export function ChatRoom({
                   : "Ask any programming question — algorithms, system design, or debugging help."}
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
-                {(type === "project"
-                  ? [
-                      "Where is authentication handled?",
-                      "Explain the project structure",
-                      "How does the API layer work?",
-                    ]
-                  : [
-                      "Explain React Server Components",
-                      "Best practices for API design",
-                      "Explain TCP vs UDP",
-                    ]
-                ).map((suggestion) => (
+                {starterChips.map((prompt) => (
                   <button
-                    key={suggestion}
-                    onClick={() => setInput(suggestion)}
+                    key={prompt}
+                    type="button"
+                    onClick={() => sendPrompt(prompt)}
                     className="border-border/40 text-muted-foreground hover:bg-muted/50 hover:text-foreground cursor-pointer rounded-lg border px-3 py-1.5 text-xs transition-colors"
                   >
-                    {suggestion}
+                    {prompt}
                   </button>
                 ))}
               </div>
@@ -424,7 +438,7 @@ export function ChatRoom({
           <ChatInput
             value={input}
             onChange={setInput}
-            onSubmit={onSubmit}
+            onSubmit={() => sendPrompt(input)}
             onStop={stop}
             isLoading={isLoading}
             placeholder={

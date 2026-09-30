@@ -5,14 +5,51 @@ import {
   protectedProcedure,
 } from "../../../../lib/trpc/init";
 import { db } from "@/db";
-import { projectChats, chatMessages, projectTables } from "@/db/schema";
-import { eq, and, desc, lt } from "drizzle-orm";
+import {
+  projectChats,
+  chatMessages,
+  projectTables,
+  projectFiles,
+} from "@/db/schema";
+import { eq, and, desc, lt, like, or, sql } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
+import { parsePackageJsonDeps } from "@/src/features/chat/lib/starter-chips";
 
 const DEFAULT_CHAT_LIMIT = 30;
 const MAX_CHAT_LIMIT = 100;
 const DEFAULT_MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LIMIT = 300;
+
+/**
+ * Dependency names for the starter chips (F-03), read from the `package.json`
+ * the tarball extractor already stored.
+ *
+ * `orderBy(length(fileName))` is the monorepo tie-break: a workspace has
+ * `apps/web/package.json` alongside a root one, and the root is the one that
+ * describes the repository. `package-lock.json` cannot match — the pattern
+ * requires a path separator immediately before `package.json`.
+ *
+ * No ownership check: the caller reached this with a chat row already filtered
+ * on `project_chats.user_id`, and that row carries the project id.
+ */
+async function getProjectDependencies(projectId: string): Promise<string[]> {
+  const [manifest] = await db
+    .select({ code: projectFiles.code })
+    .from(projectFiles)
+    .where(
+      and(
+        eq(projectFiles.projectId, projectId),
+        or(
+          eq(projectFiles.fileName, "package.json"),
+          like(projectFiles.fileName, "%/package.json"),
+        ),
+      ),
+    )
+    .orderBy(sql`length(${projectFiles.fileName})`)
+    .limit(1);
+
+  return parsePackageJsonDeps(manifest?.code);
+}
 
 export const chatRouter = createTRPCRouter({
   create: protectedProcedure
@@ -125,6 +162,9 @@ export const chatRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       // The page needs the project name too, so join it in rather than making
       // the caller run a second query for a key the chat row already carries.
+      // `languages` rides the same join: the empty chat state renders
+      // project-specific starter chips (F-03) and would otherwise open a second
+      // round trip for a column the joined row already has.
       const [chat] = await db
         .select({
           id: projectChats.id,
@@ -135,6 +175,7 @@ export const chatRouter = createTRPCRouter({
           createdAt: projectChats.createdAt,
           updatedAt: projectChats.updatedAt,
           projectName: projectTables.projectName,
+          languages: projectTables.languages,
         })
         .from(projectChats)
         .leftJoin(projectTables, eq(projectChats.projectId, projectTables.id))
@@ -168,7 +209,29 @@ export const chatRouter = createTRPCRouter({
         ? newest.slice(0, input.messageLimit)
         : newest;
 
-      return { ...chat, messages: messages.reverse(), hasMoreMessages };
+      // Dependency names for the starter chips. There is no `dependencies`
+      // column — ingestion never parsed one — so the source of truth is the
+      // `package.json` the tarball extractor already stored in `project_files`.
+      // A repo with no `package.json` (Go, Rust) simply has no chips gated on
+      // dependencies, so the miss is the normal path, not an error.
+      const dependencies = chat.projectId
+        ? await getProjectDependencies(chat.projectId)
+        : [];
+
+      // The UI wants language *names*; `color`/`size`/`percentage` are a
+      // rendering detail of the overview widget. Ordered by share so the
+      // architecture chip names the dominant stack deterministically.
+      const languageNames = [...(chat.languages ?? [])]
+        .sort((a, b) => b.percentage - a.percentage)
+        .map((l) => l.name);
+
+      return {
+        ...chat,
+        languages: languageNames,
+        dependencies,
+        messages: messages.reverse(),
+        hasMoreMessages,
+      };
     }),
 
   delete: protectedProcedure
