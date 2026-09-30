@@ -54,12 +54,6 @@
   - **Effort/Priority:** S / P2
   - **Source:** §5.8
 
-- **T-084** — Reset `lane/p1-a` to `ff91397`
-  - **What:** A parallel agent in a shared worktree pushed `dc2c3b7 [T-037]` onto `lane/p1-a`. The real T-037 is `9907918` on `lane/p2-a` (also tagged `p2-a-t037`). `lane/p1-a` currently carries a foreign commit.
-  - **How:** From another worktree, `git branch -f lane/p1-a ff91397`; no code change.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** `status/p1-a.md:L` (isolation note)
 
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
@@ -530,7 +524,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane p0-t001 (batch):** T-040 · T-041 · T-042 (`bun audit` added to CI) · T-043 (raw `console` routed through `logger`) · T-046 (404/400 not 500 from chat router) · T-047 (400 for malformed body; `await` was inside `safeParse`) · T-048 (user-chosen chat title no longer overwritten) · T-049 (`chat.delete` distinguishes deleted from never-existed) · T-050 (honest issue/comment pagination) · T-051 (`getFileContent` validated with `z.string().uuid()`) · T-053 (Zod 4 migration finished, 12 call sites) · T-054 (font/asset fix, 12 preloads → 1) · T-055 (composite + language indexes) · T-056 (compound commit cursor) · T-057 (IP-based rate-limit dimension) · T-059 (coverage thresholds — no provider was installed) · T-062 (LICENSE decision + architecture doc)
 
-**Lane p1-a:** T-014 (`57de263`, `onFailure` handlers) · T-017 (`e3ff9be`, chat model pinned to `gemini-2.0-flash-001` in `src/lib/llm/config.ts`) · T-012 (`ff91397`, Prepare counts every file; Finalize stores `partial`) · T-013 (`dda38cf`, partial-index badge) · T-024 (`d42c004`, retention doc no longer advertises a sweep that does not exist) · T-028 (`b0fcb1b`, AI-triage fields dropped from selects and insert)
+**Lane p1-a:** T-014 (`57de263`, `onFailure` handlers) · T-017 (`e3ff9be`, chat model pinned to `gemini-2.0-flash-001` in `src/lib/llm/config.ts`) · T-012 (`ff91397`, Prepare counts every file; Finalize stores `partial`) · T-013 (`dda38cf`, partial-index badge) · T-024 (`d42c004`, retention doc no longer advertises a sweep that does not exist) · T-028 (`b0fcb1b`, AI-triage fields dropped from selects and insert) · **T-084** (`ff91397`, reset `lane/p1-a` branch reference to `ff91397` to remove foreign commit `dc2c3b7` and restore lane isolation)
 
 **Lane p1-b:** T-016 (`c222a3a`, secret-file patterns) · T-015 (`1d27991`, entry names resolved with `posix.normalize`) · T-021 (`bff7167`, report-only CSP + `app/api/csp-report/route.ts` collector + `proxy.ts` PUBLIC entry)
 
