@@ -50,7 +50,8 @@ const MIGRATIONS_DIR = path.resolve(process.cwd(), "db/migrations");
  * of the schema.
  *
  * Idempotent within a process: the second describe block in a file must not
- * re-run `CREATE TABLE` over tables the first one already made. Against a
+ * re-run `CREATE TABLE` over tables the first one already made, and a DROP
+ * whose target is already gone is a no-op rather than an error. Against a
  * database that was already migrated, DDL is still re-run, so callers that
  * want a pristine database should recreate it (see the workflow).
  */
@@ -70,10 +71,21 @@ export function applyMigrations(): void {
         try {
           psql(statement);
         } catch (error) {
-          // "already exists" means a previous suite in this process already
-          // applied it. Anything else is a real failure and must surface.
+          // Both messages mean the same thing here: a previous suite already
+          // applied this statement, so re-running it has nothing left to do.
+          //
+          // "already exists" covers CREATE TABLE / ADD CONSTRAINT. "does not
+          // exist" covers the reverse — 0007 drops `users.is_pro_user`, which
+          // 0000 created, so on a second pass over an already-migrated
+          // database the DROP has nothing to drop and errors. That is what
+          // broke CI: these integration files each call applyMigrations() in
+          // several describe blocks, and the suites share one database, so the
+          // second file to run replayed 0007 against a column the first had
+          // already removed.
+          //
+          // Anything else is a real failure and must surface.
           const message = String((error as { stderr?: string }).stderr ?? error);
-          if (!/already exists/i.test(message)) {
+          if (!/already exists|does not exist/i.test(message)) {
             throw error;
           }
         }

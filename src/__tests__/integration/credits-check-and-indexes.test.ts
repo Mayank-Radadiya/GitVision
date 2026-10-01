@@ -148,8 +148,12 @@ describe.skipIf(!hasTestDatabase)("chat and file-tree indexes exist", () => {
     expect(def).toContain("updated_at");
   });
 
-  it("project_files_language_idx backs the selectDistinct in getLanguageBreakdown", () => {
-    const def = indexDef("project_files_language_idx");
+  it("project_files_project_id_language_idx backs the selectDistinct in getLanguageBreakdown", () => {
+    // Named for its leading column, like every other index in the tree. This
+    // asserted `project_files_language_idx`, which 0004 never created — the
+    // test passed only because `hasTestDatabase` is unset locally and the
+    // whole describe skips, so nothing caught the wrong name until CI.
+    const def = indexDef("project_files_project_id_language_idx");
 
     expect(def).not.toBe("");
     expect(def).toContain("language");

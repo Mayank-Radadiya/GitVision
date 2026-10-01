@@ -8,7 +8,7 @@ GitVision — Next.js 15 App Router app that indexes GitHub repositories and ans
 
 ## Commands
 
-`bun` is the package manager (`packageManager: "bun@1.2.2"`). Do not use npm/pnpm/yarn.
+`bun` is the package manager (`packageManager: "bun@1.4.0"`). Do not use npm/pnpm/yarn.
 
 ```bash
 bun run typecheck   # tsc --noEmit
@@ -56,7 +56,7 @@ Layering is `app → features → lib → db`, with exactly three documented exc
 - `next.config.ts` keeps `log` alongside `error`/`warn` in production (`removeConsole`) because INFO lines carry Inngest pipeline progress. Removing them breaks stuck-job diagnosis.
 - Logging must go through `src/lib/logger.ts` (nine keys redacted). Sentry auto-capture bypasses redaction unless handled explicitly.
 - `src/lib/rag/rag.config.ts` (`RAG_CONFIG`) is the single source for retrieval thresholds — don't reintroduce module-local constants.
-- Credit spend is atomic via single data-modifying CTEs with a DB-level `CHECK`. `refundCredits` takes three arguments.
+- Credit spend is atomic via single data-modifying CTEs with a DB-level `CHECK`. `refundCredits(userId, cost, reason, refId?)` takes four parameters — three required, plus an optional `refId` that is the idempotency key. Most call sites pass three and let it default; the claim's absence would silently drop the key where a claim-flow refund needs it.
 - Migrations in `db/migrations/` are paired `.sql` + `.notes.md` files.
 - `@tanstack/react-query` and `@trpc/tanstack-react-query` are both installed. Check which one a file uses before copying a pattern.
 
