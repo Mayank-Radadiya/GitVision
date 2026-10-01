@@ -21,7 +21,7 @@ const { calls, dbState, spend } = vi.hoisted(() => ({
     spendThrows: false,
   },
   spend: {
-    refund: vi.fn(async () => 90),
+    refund: vi.fn(async (_userId: string, _cost: number, _reason: string) => 90),
   },
 }));
 
@@ -69,12 +69,18 @@ vi.mock("@/src/lib/inngest/client", () => ({
 vi.mock("@/src/lib/credits", () => ({
   PROJECT_CREATION_COST: 10,
   COMMIT_SUMMARY_COST: 1,
-  spendCredits: vi.fn(async () => {
+  openCharge: vi.fn(async (userId: string, cost: number, reason: string) => {
     calls.push("spendCredits");
     if (dbState.spendThrows) throw new Error("charge failed");
-    return dbState.spendResult;
+    if (dbState.spendResult === null) return null;
+    return {
+      settle: () => {},
+      refund: async () => {
+        calls.push("refundCredits");
+        spend.refund(userId, cost, reason);
+      },
+    };
   }),
-  refundCredits: spend.refund,
 }));
 
 vi.mock("@/src/lib/github", () => ({
@@ -139,7 +145,9 @@ describe("createProject ordering", () => {
 
     await expect(createProject()).rejects.toThrow();
 
-    expect(calls).toEqual(["spendCredits", "db.delete(project)"]);
+    // The refund comes after the row is gone, not before: the charge is only
+    // compensated once the compensating write it compensates for has landed.
+    expect(calls).toEqual(["spendCredits", "db.delete(project)", "refundCredits"]);
     expect(inngest.send).toHaveBeenCalledTimes(1);
     expect(spend.refund).toHaveBeenCalledWith("user-1", 10, "project_creation");
   });

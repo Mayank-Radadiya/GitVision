@@ -14,7 +14,7 @@ import { enforceLimits } from "@/src/lib/rate-limit";
 import { logger } from "@/src/lib/logger";
 import { isSearchableIndexingStatus } from "@/src/lib/indexing-status";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
-import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
+import { openCharge, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
 import { LLM_SETTINGS } from "@/src/lib/llm/config";
 import { rewriteQueryForRetrieval } from "@/src/lib/llm/query-rewrite";
@@ -367,8 +367,8 @@ export async function POST(req: Request) {
 
     // Enforce the credit budget — atomic spend, 402 when exhausted.
     // Spent after validation so invalid requests don't burn credits.
-    const remaining = await spendCredits(userId, CHAT_TURN_COST, "chat_turn");
-    if (remaining === null) {
+    const charge = await openCharge(userId, CHAT_TURN_COST, "chat_turn");
+    if (charge === null) {
       return new Response(
         JSON.stringify({
           error: "You're out of credits. Please top up to continue chatting.",
@@ -412,26 +412,17 @@ export async function POST(req: Request) {
     // The credit is charged before the model runs, so a turn that never
     // produces an answer — provider error, timeout, user navigating away —
     // would otherwise cost the user money for nothing. An abort is reported by
-    // the AI SDK through more than one channel, so the refund is latched: it
-    // runs at most once per request no matter how many times it is signalled.
-    let refunded = false;
-    const refundOnce = async () => {
-      if (refunded) return;
-      refunded = true;
-      try {
-        await refundCredits(userId, CHAT_TURN_COST, "chat_turn");
-      } catch (error) {
-        logger.error("[Chat] Credit refund failed", error);
-      }
-    };
+    // the AI SDK through more than one channel, so `charge.refund()` is called
+    // from several places; the handle makes the refund happen at most once, and
+    // keys it so the guarantee outlives this process.
 
     const stream = createUIMessageStream({
       onError: (error) => {
         if (req.signal.aborted) {
-          void refundOnce();
+          void charge.refund();
           return JSON.stringify({ code: "aborted", message: "" });
         }
-        void refundOnce();
+        void charge.refund();
         const { code, message } = categorizeModelError(error);
         logger.error("[Chat] Stream error", error);
         return JSON.stringify({ code, message });
@@ -573,7 +564,7 @@ export async function POST(req: Request) {
             // genuinely-completed generations are stored — and only a completed
             // generation keeps the credit it was charged.
             if (finishReason !== "stop" && finishReason !== "length") {
-              await refundOnce();
+              await charge.refund();
               return;
             }
             if (chatId) {
@@ -623,6 +614,12 @@ export async function POST(req: Request) {
               retrievalPath: activeRetrievalPath,
               hitCount: relatedFiles.length,
             });
+
+            // Last, and only on the fully-successful path. The answer is already
+            // delivered and the history is already written, so from here on this
+            // charge is earned — including against an abort the SDK reports
+            // after the stream completed.
+            charge.settle();
           },
         });
 

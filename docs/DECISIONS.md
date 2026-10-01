@@ -245,8 +245,8 @@ Set `Cross-Origin-Opener-Policy: same-origin` on `/:path*` in `next.config.ts` (
 
 - **Status:** Accepted
 - **Date:** 2026-09-30
-- **Relates To:** **T-018** (credit charge order), **T-045** (compensation latches)
-- **Impacted Files:** `src/lib/db` driver construction, `src/features/dashboard/server/router/services/projectService.ts`, `src/lib/credits.ts`
+- **Relates To:** **T-018** (credit charge order), **T-045** (compensation latches), **T-096** (`openCharge` handle; amends Consequences)
+- **Impacted Files:** `src/lib/db` driver construction, `src/features/dashboard/server/router/services/projectService.ts`, `src/lib/credits.ts`, `app/api/chat/route.ts`
 
 #### Context
 Creating a project is a multi-step operation: validate the repo URL, `INSERT` the
@@ -320,9 +320,24 @@ introduce one under the assumption that it will work. If a transaction ever
 becomes genuinely necessary, that decision is a driver decision, not a local
 refactor — and it supersedes this record.
 
-The same reasoning applies elsewhere: `app/api/chat/route.ts` latches its
-credit refund with a per-request `refunded` flag rather than relying on a
-transaction to guarantee single-refund semantics.
+The same reasoning applies elsewhere: a chat turn spends its credit before the
+model is called, so every failure after that point needs a compensating refund,
+and the refund has to happen at most once. The AI SDK reports a single aborted
+stream through both `onError` and `onFinish`, so "once" is not implied by the
+signal arriving — it has to be owned.
+
+**Amended by T-096.** The chat route previously enforced that with a per-request
+`let refunded` flag inside the handler, and `projectService.createProject` left
+its refund uncaught. A flag is a memory of the current process, and a serverless
+instance can be reclaimed between the charge and the refund; a refund the flag
+guarded could therefore be lost entirely. `src/lib/credits.ts` now exposes
+`openCharge(userId, cost, reason)`, which spends, mints one idempotency key for
+the refund leg, and returns a handle whose `refund()` is once-only both in
+process and across processes. This is a *stronger* guarantee than the flag on the
+same Option C footing — still a compensating write, still no transaction — so it
+amends this record rather than superseding it. The handle also gained a
+`settle()`, because a turn that completed must not be refundable by an abort
+reported afterwards; the flag could not express that distinction.
 
 ---
 

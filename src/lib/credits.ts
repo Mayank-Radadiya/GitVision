@@ -35,11 +35,27 @@
  *    direction, but it does mean `0009` has to be applied before this code is
  *    live. Passing `null` for `refId` can never conflict — Postgres treats
  *    NULLs as distinct — so an unkeyed movement is unaffected either way.
+ *
+ *    That clause alone does **not** make a keyed movement idempotent, and this
+ *    is the part that is easy to get wrong. `ON CONFLICT` suppresses the
+ *    conflicting *row*; it does not undo a sibling data-modifying CTE that has
+ *    already run. In the shape below the `UPDATE` is one such CTE, so a replayed
+ *    keyed movement would move the balance a second time, write only one ledger
+ *    row, and report `null`. `replayGuard` is what makes the key real — see its
+ *    own comment for the shape of the guarantee and its one remaining hole.
+ *
+ * 4. **A refund is issued at most once per charge, and that survives the
+ *    process dying.** `openCharge` returns a handle that owns the once-only
+ *    state and the refund's idempotency key together, because keeping those two
+ *    facts apart from each other is what let three call sites grow three
+ *    different compensation shapes — one of which latched in a request-scoped
+ *    variable that a serverless eviction erases along with the request.
  */
 
 import { db } from "@/db";
 import { creditTransactions, type CreditReason } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import { logger } from "@/src/lib/logger";
+import { sql, type SQL } from "drizzle-orm";
 
 /** Credits charged to create a project. */
 export const PROJECT_CREATION_COST = 10;
@@ -79,14 +95,49 @@ export const DAILY_CREDIT_GRANT = 5;
 type BalanceRow = { balance_after: number };
 
 /**
+ * The clause that makes a keyed movement safe to replay, or nothing when the
+ * movement carries no key.
+ *
+ * Needed because of how Postgres runs a statement with several data-modifying
+ * CTEs: they all execute, and `ON CONFLICT DO NOTHING` on one of them skips only
+ * the row that conflicted. With the `UPDATE` in a sibling CTE of the `INSERT`,
+ * a replay would therefore move the balance again while writing no second ledger
+ * row. Requiring that no row with this key exists yet makes the `UPDATE` match
+ * zero rows on the replay, which empties the CTE and takes the `INSERT` with it
+ * — so the replay costs nothing at all and reports `null`, which is what both
+ * callers above document as "already applied".
+ *
+ * Why the `UPDATE` stays first rather than adopting `claimCredits`' insert-first
+ * shape: the `UPDATE` is what takes the row lock, and it needs to take it before
+ * the ledger insert decides anything. An insert-first shape computes
+ * `balance_after` from the pre-lock snapshot, so two concurrent movements can
+ * both read the same balance and the later `UPDATE` overwrites the earlier one's
+ * increment — a lost update. Here the row is locked first and re-read, which is
+ * the same reason the affordability guard below is in the `WHERE` clause.
+ *
+ * Remaining hole: two *simultaneous* first runs of one key share a snapshot, so
+ * both can evaluate `NOT EXISTS` as true and both move the balance, with one
+ * ledger row. That needs concurrent replays of a single charge — which happens
+ * when a serverless instance is evicted mid-refund and a client retries against
+ * a second instance inside the same few milliseconds. The sequential retry, which
+ * is the ordinary case, is covered.
+ */
+function replayGuard(refId: string | null | undefined): SQL {
+  if (refId == null) return sql.empty();
+  return sql`AND NOT EXISTS (SELECT 1 FROM credit_transactions WHERE ref_id = ${refId})`;
+}
+
+/**
  * Atomically spend `cost` credits, recording the movement in the ledger.
  *
  * @param reason what the charge was for; becomes the row's `reason`.
- * @param refId optional idempotency key. A replayed insert carrying a key
- *   already in the ledger writes no second row; omitting it leaves the movement
- *   unkeyed, which is correct for a charge that is issued once per call.
+ * @param refId optional idempotency key. A replayed movement carrying a key
+ *   already in the ledger moves the balance not at all and returns null; omitting
+ *   it leaves the movement unkeyed, which is correct for a charge that is issued
+ *   once per call. See `replayGuard`.
  * @returns the remaining balance, or null when the user could not afford it (in
- *   which case nothing was charged and nothing was recorded).
+ *   which case nothing was charged and nothing was recorded) or when the key was
+ *   already spent.
  */
 export async function spendCredits(
   userId: string,
@@ -99,6 +150,7 @@ export async function spendCredits(
       UPDATE users
          SET credits = users.credits - ${cost}, updated_at = now()
        WHERE users.id = ${userId} AND users.credits >= ${cost}
+         ${replayGuard(refId)}
       RETURNING credits
     )
     INSERT INTO credit_transactions (user_id, delta, reason, balance_after, ref_id)
@@ -132,6 +184,7 @@ export async function grantCredits(
       UPDATE users
          SET credits = users.credits + ${amount}, updated_at = now()
        WHERE users.id = ${userId}
+         ${replayGuard(refId)}
       RETURNING credits
     )
     INSERT INTO credit_transactions (user_id, delta, reason, balance_after, ref_id)
@@ -150,9 +203,9 @@ export async function grantCredits(
  * the thing being paid for did not happen — a model error, a timeout, the user
  * navigating away mid-stream.
  *
- * @param refId optional idempotency key; see `spendCredits`. The chat route
- *   does not pass one, because it guards its refund with a module-local latch
- *   instead — see FINDINGS in the F-04 report for what that leaves open.
+ * @param refId optional idempotency key; see `spendCredits`. `openCharge` derives
+ *   one per charge and is what metered paths should call — a bare `refundCredits`
+ *   can be issued twice for one charge unless the caller is trusted to remember.
  */
 export async function refundCredits(
   userId: string,
@@ -161,6 +214,99 @@ export async function refundCredits(
   refId?: string | null,
 ): Promise<number | null> {
   return grantCredits(userId, cost, reason, refId);
+}
+
+/**
+ * An open charge: `cost` credits have been deducted, and the work they paid for
+ * has not reported success yet.
+ *
+ * Deliberately an object rather than a pair of bare calls. The two operations a
+ * caller needs — "the work finished" and "the work failed" — must not both be
+ * callable on the same charge, and the refund must not be able to throw. None of
+ * that is expressible as two functions over `(userId, cost, reason)`; all of it is
+ * one object with two methods, which is why this is the interface every metered
+ * path uses instead of arranging the calls itself.
+ */
+export type Charge = {
+  /**
+   * Record that the work completed, so no refund can be issued for this charge
+   * afterwards. Safe to call more than once.
+   *
+   * Settling is not optional bookkeeping: the chat stream can report completion
+   * and *then* still report an abort, and a credit that is refunded after the
+   * answer was delivered is free usage. Without this, a refund is the default and
+   * the last signal to arrive wins.
+   */
+  settle(): void;
+
+  /**
+   * Return the charge because the work did not happen.
+   *
+   * Idempotent: the first call issues the refund and every later call returns
+   * without a round-trip. Two independent guards, neither sufficient alone —
+   *
+   * 1. The handle's own state, which stops the common case (an abort reported
+   *    through more than one channel) without re-querying the ledger.
+   * 2. The refund's `ref_id`, fixed when the charge was opened. If the process
+   *    dies between the charge and the refund, the in-process guard dies with it
+   *    and a retry would credit the user twice; `ON CONFLICT (ref_id) DO NOTHING`
+   *    in `grantCredits` collapses those retries onto one credit instead. Only
+   *    the refund leg is keyed — keying the charge on the same id would make the
+   *    refund collide with its own charge and never be issued at all.
+   *
+   * Never throws. A refund that fails has already lost the race it was
+   * compensating for, and letting it reject would replace the real failure — a
+   * provider outage, a dead worker — with a database error that says nothing
+   * about what went wrong. The failure is logged instead.
+   */
+  refund(): Promise<void>;
+};
+
+/**
+ * Charge `cost` credits for work that is about to happen, returning a handle for
+ * settling or refunding it.
+ *
+ * This is the entry point for every metered path. Charging and compensating are
+ * one interface rather than two because D-11 settled on the non-transactional
+ * `neon-http` driver: every step after a charge needs a compensating branch, and
+ * three call sites each writing their own shape is how they drifted into
+ * disagreeing about whether a refund may throw.
+ *
+ * @returns the handle, or null when the user could not afford the charge — in
+ *   which case nothing was deducted and there is nothing to refund. The caller
+ *   decides what "cannot afford" means to its own protocol (a 402 from a route, a
+ *   `FORBIDDEN` from a procedure); this module returns no HTTP and no tRPC.
+ */
+export async function openCharge(
+  userId: string,
+  cost: number,
+  reason: CreditReason,
+): Promise<Charge | null> {
+  const balance = await spendCredits(userId, cost, reason);
+  if (balance === null) return null;
+
+  // Minted once per charge, not once per refund attempt, which is the whole
+  // point: every attempt to refund this charge must carry the same key.
+  const refundRefId = `${reason}:${crypto.randomUUID()}:refund`;
+  let state: "open" | "settled" | "refunded" = "open";
+
+  return {
+    settle() {
+      if (state === "open") state = "settled";
+    },
+    async refund() {
+      if (state !== "open") return;
+      state = "refunded";
+      try {
+        await refundCredits(userId, cost, reason, refundRefId);
+      } catch (error) {
+        logger.error(
+          `[Credits] Refund of ${cost} (${reason}) failed; the charge stands`,
+          error,
+        );
+      }
+    },
+  };
 }
 
 /**

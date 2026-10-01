@@ -18,6 +18,7 @@ const { state } = vi.hoisted(() => ({
     commitsTable: undefined as unknown,
     summaryImpl: async (_url: string, _hash: string) => "a real summary",
     refunds: [] as number[],
+    charges: [] as { cost: number; reason: string }[],
   },
 }));
 
@@ -42,10 +43,14 @@ vi.mock("@/db", () => {
 });
 
 vi.mock("@/src/lib/credits", () => ({
-  spendCredits: async () => 42,
-  refundCredits: async (_userId: string, cost: number) => {
-    state.refunds.push(cost);
-    return 42 + cost;
+  openCharge: async (_userId: string, cost: number, reason: string) => {
+    state.charges.push({ cost, reason });
+    return {
+      settle: () => {},
+      refund: async () => {
+        state.refunds.push(cost);
+      },
+    };
   },
   PROJECT_CREATION_COST: 10,
   COMMIT_SUMMARY_COST: 3,
@@ -76,6 +81,7 @@ beforeEach(() => {
   state.commitRows = [{ id: COMMIT_ID, commitHash: "abc123" }];
   state.summaryImpl = async () => "a real summary";
   state.refunds = [];
+  state.charges = [];
 });
 
 describe("generateAiSummary billing", () => {
@@ -87,6 +93,7 @@ describe("generateAiSummary billing", () => {
     );
 
     expect(summary).toBe("a real summary");
+    expect(state.charges).toEqual([{ cost: 3, reason: "commit_summary" }]);
     expect(state.refunds).toEqual([]);
   });
 

@@ -13,11 +13,10 @@ import {
 import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
-import { logger } from "@/src/lib/logger";
 import { isIndexingInFlight } from "@/src/lib/indexing-status";
 import {
-  spendCredits,
-  refundCredits,
+  openCharge,
+  type Charge,
   PROJECT_CREATION_COST,
   COMMIT_SUMMARY_COST,
 } from "@/src/lib/credits";
@@ -190,9 +189,12 @@ export function createProjectService() {
         // Atomic, concurrency-safe deduction. The read above is only a fast-fail
         // for the common case; this guarded UPDATE is the real authority, so two
         // concurrent requests can never drive the balance negative.
-        let chargedBalance: number | null = null;
+        // `openCharge` owns the refund-once guarantee and the refund's
+        // idempotency key, so the compensation below cannot double-credit and
+        // cannot throw over the error it is compensating for.
+        let charge: Charge | null = null;
         try {
-          chargedBalance = await spendCredits(
+          charge = await openCharge(
             userId,
             PROJECT_CREATION_COST,
             "project_creation",
@@ -210,7 +212,7 @@ export function createProjectService() {
           });
         }
 
-        if (chargedBalance === null) {
+        if (charge === null) {
           // Lost the race against a concurrent request that drained the balance.
           await db
             .delete(projectTables)
@@ -235,15 +237,15 @@ export function createProjectService() {
           });
         } catch (inngestError) {
           // Compensate in both directions: the charge landed but the user gets
-          // no project, so the row goes and the credits come back.
+          // no project, so the row goes and the credits come back. The row
+          // delete stays here rather than moving into the charge handle because
+          // deleting a project is not this module's business — but the credit
+          // half does belong to it, and `refund()` cannot reject, so a failed
+          // refund can no longer replace this error with an unrelated one.
           await db
             .delete(projectTables)
             .where(eq(projectTables.id, projectId));
-          await refundCredits(
-            userId,
-            PROJECT_CREATION_COST,
-            "project_creation",
-          );
+          await charge.refund();
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message:
@@ -933,12 +935,12 @@ export function createProjectService() {
       // Each call is a real Gemini request. Ownership alone does not bound it —
       // a user could walk every commit in their project for free — so charge
       // before doing the work, using the same atomic primitive as chat.
-      const remaining = await spendCredits(
+      const charge = await openCharge(
         userId,
         COMMIT_SUMMARY_COST,
         "commit_summary",
       );
-      if (remaining === null) {
+      if (charge === null) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You're out of credits. Please top up to generate summaries.",
@@ -946,6 +948,9 @@ export function createProjectService() {
       }
 
       try {
+        // No `settle()` here, unlike the chat route: nothing signals failure
+        // after this returns, so there is no later `refund()` for a settle to
+        // suppress. The `catch` is the whole story on this path.
         return await getAiSummaryOfCommit(
           project.githubUrl,
           commitRecord[0].commitHash,
@@ -956,11 +961,7 @@ export function createProjectService() {
         // The credit is spent above, before the work. A summary that was never
         // produced has to be paid back, or a provider outage silently charges
         // every user for a failure.
-        try {
-          await refundCredits(userId, COMMIT_SUMMARY_COST, "commit_summary");
-        } catch (refundError) {
-          logger.error("Commit summary credit refund failed", refundError);
-        }
+        await charge.refund();
         throw error;
       }
     },

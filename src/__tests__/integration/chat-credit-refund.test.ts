@@ -16,6 +16,9 @@ const refunds: number[] = [];
 /** Captured `streamText` options, so a test can invoke the onFinish hook. */
 let streamTextOptions: { onFinish?: (e: unknown) => Promise<void> } = {};
 
+/** Captured `onError` from `createUIMessageStream`, so a test can report a failure. */
+let streamOnError: ((e: unknown) => unknown) | undefined;
+
 /** How many times the route reached the model — i.e. built an answer stream. */
 let streamTextRuns = 0;
 
@@ -94,16 +97,28 @@ vi.mock("@/src/lib/rate-limit", () => ({
   enforceLimits: async () => ({ allowed: true, limit: 20, remaining: 19, scope: "user" }),
 }));
 
+// The real `openCharge` is stubbed here, not the primitives under it, because
+// the once-only guarantee this suite pins is the handle's: it has to hold
+// across the abort/error signals the route reports, which arrive separately
+// and out of order. `credit-charge.test.ts` pins the handle against the
+// database; this suite pins the route against the handle.
 vi.mock("@/src/lib/credits", () => ({
   CHAT_TURN_COST: 1,
-  spendCredits: async () => {
+  openCharge: async (_userId: string, cost: number, _reason: string) => {
     calls.push("spendCredits");
-    return 42;
-  },
-  refundCredits: async (_userId: string, cost: number) => {
-    calls.push("refundCredits");
-    refunds.push(cost);
-    return 43;
+    let open = true;
+    return {
+      settle: () => {
+        calls.push("settle");
+        open = false;
+      },
+      refund: async () => {
+        if (!open) return;
+        open = false;
+        calls.push("refundCredits");
+        refunds.push(cost);
+      },
+    };
   },
 }));
 
@@ -132,6 +147,7 @@ vi.mock("ai", () => ({
     // handler so a test can report a provider failure. Like the real SDK, a
     // rejection from `execute` is surfaced through `onError`.
     const handler = opts.onError;
+    streamOnError = handler;
     streamSettled = opts
       .execute({
         writer: { merge: () => {}, write: () => {} },
@@ -221,12 +237,21 @@ async function finishStream(finishReason: string, text = "partial") {
   await streamTextOptions.onFinish?.({ text, finishReason });
 }
 
+/**
+ * Reports a failure through the route's `onError`, as the SDK does for a stream
+ * that breaks after the producer already resolved.
+ */
+async function reportStreamError(error: unknown) {
+  await streamOnError?.(error);
+}
+
 beforeEach(() => {
   calls.length = 0;
   refunds.length = 0;
   streamTextOptions = {};
   streamTextRuns = 0;
   streamSettled = Promise.resolve();
+  streamOnError = undefined;
   searchSimilarCodeImpl = async () => [];
 });
 
@@ -259,6 +284,23 @@ describe("chat credit accounting", () => {
     await finishStream("error");
 
     expect(refunds).toEqual([1]);
+  });
+
+  it("keeps the credit when an abort is reported after the answer was persisted", async () => {
+    // The defect T-096 closed. A turn that finished normally had persisted its
+    // assistant row, yet a late abort still reached `onError` with the
+    // `refunded` flag still false — the user kept the answer and lost the
+    // credit. The charge settles at the end of the successful path, so the
+    // later abort finds nothing left to refund.
+    await post();
+    await finishStream("stop");
+    const afterCompletion = calls.filter((c) => c === "insert").length;
+
+    await reportStreamError(new Error("aborted after the answer landed"));
+    await finishStream("aborted");
+
+    expect(calls.filter((c) => c === "insert").length).toBe(afterCompletion);
+    expect(refunds).toEqual([]);
   });
 
   it("does not persist a truncated answer", async () => {
