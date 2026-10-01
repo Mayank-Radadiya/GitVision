@@ -46,6 +46,10 @@ next-env.d.ts
 .codex
 .agents
 .opencode
+# Per-machine permission overrides. `.claude/settings.json` and
+# `.claude/skills/` are shared project config and stay tracked; this file is
+# not, so a personal allow-list never leaks into the repo.
+.claude/settings.local.json
 audit.md
 plan.md
 

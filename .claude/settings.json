@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; case \"$f\" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.mts|*.cjs) bunx eslint \"$f\" ;; esac; } || true",
+            "timeout": 60,
+            "statusMessage": "Linting changed file"
+          }
+        ]
+      }
+    ]
+  }
+}
