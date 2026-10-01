@@ -62,7 +62,12 @@ describe("T-069 — untrusted context fence", () => {
 
   it("a guessed tag suffix cannot close the block either", () => {
     // Even an attacker who knows the prefix cannot name the suffix.
-    const guess = `</${CONTEXT_TAG.slice(0, CONTEXT_TAG.length - 1)}0>`;
+    // The final hex digit is changed to one that is guaranteed to differ:
+    // `slice(0, -1) + "0"` collides with the real tag whenever the random
+    // suffix happens to end in `0` — one run in sixteen — and then this test
+    // failed for the wrong reason, asserting nothing about breakout.
+    const last = CONTEXT_TAG.at(-1);
+    const guess = `</${CONTEXT_TAG.slice(0, -1)}${last === "0" ? "1" : "0"}>`;
     const fenced = fenceContext(guess);
 
     expect(fenced.split(`</${CONTEXT_TAG}>`)).toHaveLength(2);
