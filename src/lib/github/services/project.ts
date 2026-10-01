@@ -213,6 +213,10 @@ export async function createNewProject(
       projectName,
       userId,
       error: error instanceof Error ? error.message : "Unknown error",
+      // Drizzle's message is only "Failed query: <sql> params: <...>". The
+      // Postgres code lives here, and without it a 42703 (missing column) is
+      // indistinguishable from a 23514 or a connection reset.
+      code: driverError?.code,
     });
 
     throw new GitHubError(
