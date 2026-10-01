@@ -124,7 +124,14 @@ export async function searchSimilarCode(
           sql`${codeEmbeddings.chunkContentTsv} @@ ${tsQuery}`,
         ),
       )
-      .orderBy(sql`desc(ts_rank(${codeEmbeddings.chunkContentTsv}, ${tsQuery}))`)
+      // `DESC` is written as bare SQL, not Drizzle's `desc()`. Inside a raw
+      // `sql` template only the interpolated values are escaped — the literal
+      // text is emitted verbatim, so `desc(ts_rank(...))` reached Postgres as a
+      // call to a function that does not exist and every query passing a
+      // `query` string failed with `syntax error at or near "desc"`. That
+      // killed the whole function, not just this leg: the throw happened after
+      // the dense query had already run. T-092.
+      .orderBy(sql`ts_rank(${codeEmbeddings.chunkContentTsv}, ${tsQuery}) DESC`)
       .limit(candidatePool);
 
     // `minSimilarity` gates the dense list only. A sparse-only hit is by

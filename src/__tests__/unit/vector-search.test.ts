@@ -83,6 +83,22 @@ describe("searchSimilarCode", () => {
     // of the sparse half: exact identifiers are lexically close, not semantically.
     expect(results.map((r) => r.filePath)).toEqual(["b.ts", "a.ts", "e.ts"]);
   });
+
+  it("orders the sparse half with SQL DESC, not a call to a nonexistent desc() function", async () => {
+    // T-092. A raw `sql` template escapes its interpolated values but emits the
+    // literal text around them, so `desc(ts_rank(...))` reached Postgres as a
+    // function call and failed with `syntax error at or near "desc"` — taking
+    // down the whole function, dense half included, for every query that passed
+    // a `query` string. Asserting `ts_rank` is present is not enough: it is
+    // present in the broken form too, which is why the bug survived the test
+    // above it. This pins the ordering keyword itself.
+    await searchSimilarCode("project-1", embedding, "auth", 8, 0.7);
+
+    const sparseQuery = captured.at(-1)!.query;
+    const orderBy = sparseQuery.slice(sparseQuery.indexOf("order by"));
+    expect(orderBy).toMatch(/ts_rank\(.*\)\s+desc/i);
+    expect(orderBy).not.toMatch(/\bdesc\s*\(/i);
+  });
 });
 
 describe("reRankResults", () => {
