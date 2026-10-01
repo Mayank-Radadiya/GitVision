@@ -53,6 +53,18 @@ jobs:
       # without a GitHub token at all.
       DATABASE_URL: postgres://user:pass@localhost:5432/placeholder
 
+      # Placeholder for the same reason. `src/lib/gemini.ts` throws
+      # "GEMINI_API_KEY is Missing" at module scope, and it is reachable from
+      # the build: `app/api/inngest/route.ts` imports the Inngest functions,
+      # which import the GitHub layer, which re-exports `services/commits`,
+      # which imports that module. Next.js collects page data for every route
+      # during `next build`, so the throw fired while building /api/inngest and
+      # failed the step. Nothing calls the model during a build, so a
+      # syntactically present dummy is enough — same contract as
+      # DATABASE_URL above.
+      GEMINI_API_KEY: ci-build-placeholder
+      OPENROUTER_API_KEY: ci-build-placeholder
+
     steps:
       - uses: actions/checkout@v4
 
