@@ -328,7 +328,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 ## DONE (excluded from active list)
 
-63 tasks shipped across 10 lanes. Original IDs preserved.
+64 tasks shipped: 63 across 10 lanes, plus T-091 outside the lane structure. Original IDs preserved.
 
 **Lane p0-A:** T-006 (`d38344f`, RAG failure now fails the turn; `onError` latches exactly one refund) · T-011 (`e6000d7`, dead imports removed, `baseProcedure` unexported)
 
@@ -364,6 +364,8 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 
 **Lane docs:** T-088 (`c1c8071`, wrote `docs/SECURITY.md` covering the tarball path-traversal and symlink defence, 404-not-403 ownership, atomic credit spending with the DB-level `CHECK` and the latched refund, three-dimensional rate limiting, and nine-key log redaction — each linked to the suite that pins it; linked from the README) · **F-11** (`74da0d6`, recorded blocking decisions D-1, D-3, D-4, and D-8 with full context, trade-offs, and invariants in `docs/DECISIONS.md`, unblocking T-005, T-020, and T-038)
 
+**Outside the lane structure:** T-091 (`e5aaced`, `createNewProject`'s catch block now logs `error.code` alongside the message. Drizzle wraps driver errors, so `error.message` is only `"Failed query: <sql> params: <...>"` and the SQLSTATE lives on `code`/`cause.code` — never in the text. Every failure that was not one of the three re-thrown `GitHubError` types therefore produced an identical, unactionable log line: a `42703` (the schema having drifted from the Drizzle model) was indistinguishable from a `23514` check violation or a connection reset. `driverError` was already in scope from the `23505` unique-violation branch F-25 added directly above, so this reads the same field rather than re-deriving it; the thrown `PROJECT_CREATE_ERROR` is unchanged, so no caller contract moved. No test: the branch is a logging-only read of a property the 23505 path already exercises, and asserting on `logger.error` arguments would pin the log shape rather than the behaviour. Found and committed while clearing an uncommitted working-tree change during the `verify/phase0-fixes` → `v2.1.0` fast-forward, so it belongs to no lane and has no `status/*.md` file. **No Defect Coverage row exists for it and none was invented** — the table tracks §2.3, and no §2.3 row describes this; row 16 is console-only logging with no error *tracking*, which F-24 and T-020 already closed)
+
 ---
 
 ## Self-Check
@@ -376,7 +378,7 @@ Estimates use S = 1h, M = 4h, L = 8h, XL = 16h. Nothing exceeds XL. 271h ≈ 34 
 - All 20 §2.3 rows appear in Defect Coverage with a task ID.
 - All 25 §5 features F-01…F-25 are accounted for; F-12, F-14 and F-16 have moved to DONE. F-20 and F-24 are carried in full, including §8.1's shared auth header and §8.6's redaction walker.
 - All 10 §14 Must-Haves are covered, including #9 Security Made Visible (T-088).
-- Every new task (T-063…T-089) carries a §-citation or a `status/*.md` citation.
+- Every new task (T-063…T-089) carries a §-citation or a `status/*.md` citation. T-091 is the one exception and is recorded as such: it was found in an uncommitted working-tree change during branch consolidation, not derived from a source document, so it has neither citation and no lane.
 - All 10 required sections present, plus a deferred V2/Future section so §6.1 and §6.2 are on the record rather than silently dropped.
 - Every claim is either quoted from the source documents or verified by grep against the live tree. No "I believe", no "should be".
 
