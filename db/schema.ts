@@ -108,10 +108,15 @@ export const projectTables = pgTable(
      * `embeddingStatus` alongside this column to pick the right message.
      */
     briefing: jsonb("briefing").$type<RepoBriefing>(),
-    // Embedding status tracking for deferred RAG processing
+    // Embedding status tracking for deferred RAG processing.
+    // The legal values are declared once, in src/lib/indexing-status.ts, and
+    // constrained in the database by migration 0015. This column stays an
+    // untyped varchar deliberately: db/ is the bottom of the layering and cannot
+    // import lib/, so binding the type here would either duplicate the list or
+    // add a fourth documented layering exception.
     embeddingStatus: varchar("embedding_status", { length: 20 })
       .notNull()
-      .default("pending"), // Values: 'pending' | 'processing' | 'completed' | 'partial' | 'failed'
+      .default("pending"),
     embeddingError: text("embedding_error"), // Store error message if failed
     embeddingProgress: integer("embedding_progress").notNull().default(0), // Track progress (0-100)
     /**

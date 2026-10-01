@@ -7,20 +7,32 @@
  * reading, this decides what a row means.
  */
 
-export const TERMINAL_EMBEDDING_STATUSES = ["completed", "partial", "failed"] as const;
+// Sourced from the vocabulary module rather than declared here. This file
+// decides what a row means for the SSE stream; it does not decide which values
+// are legal. `indexing-status.ts` is the single declaration, and the database
+// constrains the same list (migration 0015).
+//
+// Re-exported under the old names so the three call sites that predate
+// `indexing-status.ts` do not each have to know which of the two modules owns
+// the vocabulary.
+import {
+  TERMINAL_INDEXING_STATUSES,
+  isTerminalIndexingStatus,
+  type TerminalIndexingStatus,
+} from "@/src/lib/indexing-status";
 
-export type TerminalEmbeddingStatus = (typeof TERMINAL_EMBEDDING_STATUSES)[number];
-
-export function isTerminalStatus(status: string): status is TerminalEmbeddingStatus {
-  return (TERMINAL_EMBEDDING_STATUSES as readonly string[]).includes(status);
-}
+export {
+  TERMINAL_INDEXING_STATUSES as TERMINAL_EMBEDDING_STATUSES,
+  isTerminalIndexingStatus as isTerminalStatus,
+};
+export type { TerminalIndexingStatus };
 
 export type IndexingPhase =
   | "queued"
   | "preparing"
   | "embedding"
   | "finalizing"
-  | TerminalEmbeddingStatus;
+  | TerminalIndexingStatus;
 
 export interface IndexingCounts {
   status: string;
@@ -35,7 +47,7 @@ export interface IndexingCounts {
  * only way to tell "still working out the scope" from "working through it".
  */
 export function derivePhase({ status, indexedFileCount, totalFileCount, percentage }: IndexingCounts): IndexingPhase {
-  if (isTerminalStatus(status)) return status;
+  if (isTerminalIndexingStatus(status)) return status;
   if (status !== "processing") return "queued";
   if (totalFileCount <= 0) return "preparing";
   if (indexedFileCount < totalFileCount) return "embedding";

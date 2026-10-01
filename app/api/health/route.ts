@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { projectTables } from "@/db/schema";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { logger } from "@/src/lib/logger";
+import { findAbandonedClaims } from "@/src/lib/indexing-state";
 import { STUCK_AFTER_MS } from "@/src/lib/health";
 
 // A health check that gets cached is worse than no health check: it will
@@ -37,25 +37,9 @@ export async function GET() {
   const staleBefore = new Date(Date.now() - STUCK_AFTER_MS);
 
   try {
-    const stuck = await db
-      .select({
-        // `id` is what an operator needs to act on. `projectName` is the
-        // customer's data and this response is public, so it stays out.
-        id: projectTables.id,
-        embeddingStatus: projectTables.embeddingStatus,
-        updatedAt: projectTables.updatedAt,
-      })
-      .from(projectTables)
-      .where(
-        and(
-          eq(projectTables.embeddingStatus, "processing"),
-          or(
-            lt(projectTables.updatedAt, staleBefore),
-            isNull(projectTables.updatedAt),
-          ),
-        ),
-      )
-      .limit(STUCK_QUERY_LIMIT);
+    // `projectName` is the customer's data and this response is public, so the
+    // query behind this interface selects only the fields an operator needs.
+    const stuck = await findAbandonedClaims(staleBefore, STUCK_QUERY_LIMIT);
 
     if (stuck.length > 0) {
       logger.error(

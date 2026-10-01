@@ -20,6 +20,7 @@ import {
 import { getOctokit } from "../client";
 import { parseGitHubUrl } from "../utils";
 import { logger } from "@/src/lib/logger";
+import { INITIAL_INDEXING_STATUS } from "@/src/lib/indexing-status";
 
 /**
  * Creates a new project in the database with GitHub repository information.
@@ -127,7 +128,11 @@ export async function createNewProject(
         totalCommits: history?.totalCount || 0,
         languages, // ← tech stack breakdown
         // totalFiles: 0 is the column default; updated by getRepositoryFiles()
-        embeddingStatus: "pending",
+        //
+        // A new row starts un-claimed. `projectCreated` does not write this
+        // column — it fires `embeddings/generate`, and the pipeline's claim step
+        // is what moves it to `processing`.
+        embeddingStatus: INITIAL_INDEXING_STATUS,
         embeddingProgress: 0,
         createdAt: new Date(),
         updatedAt: new Date(),

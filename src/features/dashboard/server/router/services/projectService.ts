@@ -14,6 +14,7 @@ import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
 import { inngest } from "@/src/lib/inngest/client";
 import { logger } from "@/src/lib/logger";
+import { isIndexingInFlight } from "@/src/lib/indexing-status";
 import {
   spendCredits,
   refundCredits,
@@ -382,7 +383,7 @@ export function createProjectService() {
       // would burn a tarball download and then have the Inngest function drop
       // the result on the floor when it found the project busy, so say so
       // here instead of letting the user wait for a no-op.
-      if (project[0].embeddingStatus === "processing") {
+      if (isIndexingInFlight(project[0].embeddingStatus)) {
         throw new TRPCError({
           code: "CONFLICT",
           message:

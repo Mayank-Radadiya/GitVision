@@ -12,6 +12,7 @@ import { eq, and } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { enforceLimits } from "@/src/lib/rate-limit";
 import { logger } from "@/src/lib/logger";
+import { isSearchableIndexingStatus } from "@/src/lib/indexing-status";
 import { chatRequestSchema } from "@/src/lib/validation/schemas";
 import { spendCredits, refundCredits, CHAT_TURN_COST } from "@/src/lib/credits";
 import { generateQueryEmbedding } from "@/src/features/rag/services/embeddings";
@@ -383,9 +384,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // `embeddingStatus` is NOT NULL in the schema; the earlier `string | null`
+    // annotation here was stale and only survived because the readiness check
+    // was an inline `!==` comparison, which tolerates null without noticing.
     let projectInfo: {
       projectName: string;
-      embeddingStatus: string | null;
+      embeddingStatus: string;
       estimatedTokens: number | null;
     } | null = null;
 
@@ -440,10 +444,7 @@ export async function POST(req: Request) {
           try {
             // "partial" means the cap cut the file set short, not that the index
             // is missing — retrieval over the indexed files still works.
-            if (
-              projectInfo.embeddingStatus !== "completed" &&
-              projectInfo.embeddingStatus !== "partial"
-            ) {
+            if (!isSearchableIndexingStatus(projectInfo.embeddingStatus)) {
               activeRetrievalPath = "not-indexed";
               systemPrompt = `You are GitVision AI. The project "${
                 projectInfo.projectName

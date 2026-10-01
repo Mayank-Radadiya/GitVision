@@ -1,25 +1,36 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projectTables, codeEmbeddings } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { projectTables } from "@/db/schema";
+import { logger } from "@/src/lib/logger";
+import { repairEmptyIndex, resetAbandonedClaims } from "@/src/lib/indexing-state";
 
+/**
+ * Operator repair for projects whose indexing state contradicts reality:
+ *
+ *   1. rows holding a claim no live run is advancing, and
+ *   2. rows claiming `completed` with no embeddings behind them.
+ *
+ * Both transitions live in `indexing-state.ts` now, so this script is the same
+ * shape a future admin endpoint would be — it selects candidates and delegates.
+ */
 async function resetStuckProjects() {
-  // 1. Reset projects stuck in "processing"
-  const processingResult = await db
-    .update(projectTables)
-    .set({
-      embeddingStatus: "pending",
-      embeddingProgress: 0,
-      embeddingError: null,
-    })
-    .where(eq(projectTables.embeddingStatus, "processing"))
-    .returning({ id: projectTables.id, name: projectTables.projectName });
+  // Anything wedged in "processing" past the health check's staleness window is
+  // reset in one statement. There is no "recent" filter here: an operator running
+  // this has decided every stuck claim is stuck, so the window would only hide
+  // rows the operator wants back.
+  const STUCK_AFTER_MS = Number(process.env.STUCK_AFTER_MS ?? 15 * 60 * 1000);
+  const staleBefore = new Date(Date.now() - STUCK_AFTER_MS);
+
+  const processingResult = await resetAbandonedClaims(staleBefore);
 
   console.log(
     "Reset 'processing' projects:",
     JSON.stringify(processingResult, null, 2),
   );
 
-  // 2. Reset projects marked "completed" but with 0 actual embeddings
+  // Rows that claim `completed` but have no embeddings are repaired one project
+  // at a time: the count query is per-project, so there is no single statement
+  // that expresses "completed and empty".
   const completedProjects = await db
     .select({
       id: projectTables.id,
@@ -30,21 +41,9 @@ async function resetStuckProjects() {
 
   let staleCount = 0;
   for (const project of completedProjects) {
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(codeEmbeddings)
-      .where(eq(codeEmbeddings.projectId, project.id));
+    const repaired = await repairEmptyIndex(project.id);
 
-    if ((countResult?.count ?? 0) === 0) {
-      await db
-        .update(projectTables)
-        .set({
-          embeddingStatus: "pending",
-          embeddingProgress: 0,
-          embeddingError: null,
-        })
-        .where(eq(projectTables.id, project.id));
-
+    if (repaired) {
       console.log(
         `Reset stale 'completed' project: ${project.name} (${project.id})`,
       );
@@ -59,6 +58,7 @@ async function resetStuckProjects() {
 }
 
 resetStuckProjects().catch((e) => {
+  logger.error("reset-stuck-embeddings failed:", e);
   console.error("Error:", e);
   process.exit(1);
 });

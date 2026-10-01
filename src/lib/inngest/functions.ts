@@ -18,6 +18,16 @@ import { processFileForRag } from "@/src/features/rag/services/rag-ingestion";
 import { generateRepoBriefing } from "@/src/features/rag/services/rag/briefing-generator";
 import { logger } from "@/src/lib/logger";
 import { grantDailyCredits, DAILY_CREDIT_GRANT } from "../credits";
+import {
+  claimIndexing,
+  completeIndexing,
+  failAbandonedIndexing,
+  failIndexing,
+  partiallyCompleteIndexing,
+  publishIndexingProgress,
+  publishIndexingScope,
+} from "@/src/lib/indexing-state";
+import { isIndexingInFlight } from "@/src/lib/indexing-status";
 
 // Ceilings for the embedding pipeline's file load. The SQL LIMIT bounds how much
 // of the repo enters memory (and the Inngest step payload); the per-file cap
@@ -61,15 +71,10 @@ export const projectCreated = inngest.createFunction(
       logger.error(
         `[Inngest] projectCreated exhausted retries for ${failedProjectId}: ${error.message}`,
       );
-      await db
-        .update(projectTables)
-        .set({
-          embeddingStatus: "failed",
-          embeddingError: `Project setup failed after all retries: ${error.message}`,
-          lastEmbeddingAttempt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(projectTables.id, failedProjectId));
+      await failAbandonedIndexing(
+        failedProjectId,
+        `Project setup failed after all retries: ${error.message}`,
+      );
     },
   },
   async ({ event, step }) => {
@@ -145,45 +150,22 @@ export const generateEmbeddings = inngest.createFunction(
         `[Inngest] generateEmbeddings exhausted retries for ${failedProjectId}: ${error.message}`,
       );
 
-      await db
-        .update(projectTables)
-        .set({
-          embeddingStatus: "failed",
-          embeddingError: `Embedding job failed after all retries: ${error.message}`,
-          lastEmbeddingAttempt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(projectTables.id, failedProjectId));
+      await failAbandonedIndexing(
+        failedProjectId,
+        `Embedding job failed after all retries: ${error.message}`,
+      );
     },
   },
   async ({ event, step }) => {
     const { projectId } = event.data;
 
-    // Step 1: Atomically claim the "processing" state and load files.
-    // UPDATE ... WHERE status != 'processing' RETURNING is atomic, so two
-    // concurrent embeddings/generate events can't both pass the old
-    // check-then-set race (TOCTOU) — the loser gets `claimed: false`.
+    // Step 1: Claim the pipeline and load files.
+    //
+    // `claimIndexing` is a single conditional UPDATE, so two concurrent
+    // embeddings/generate events can't both pass an old check-then-set race
+    // (TOCTOU) — the loser gets `false` and returns without touching anything.
     const prepared = await step.run("Prepare", async () => {
-      const [claimed] = await db
-        .update(projectTables)
-        .set({
-          embeddingStatus: "processing",
-          embeddingProgress: 0,
-          embeddingError: null,
-          // Zero the counters up front: a re-run must never show the previous
-          // run's counts while the new run is still discovering its files.
-          indexedFileCount: 0,
-          totalFileCount: 0,
-          lastEmbeddingAttempt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(projectTables.id, projectId),
-            ne(projectTables.embeddingStatus, "processing"),
-          ),
-        )
-        .returning({ id: projectTables.id });
+      const claimed = await claimIndexing(projectId);
 
       if (!claimed) {
         logger.info(
@@ -231,10 +213,7 @@ export const generateEmbeddings = inngest.createFunction(
       // the batches are still running. `totalFileCount` is the uncapped
       // project file count — the same number Finalize uses to decide whether
       // the run was capped.
-      await db
-        .update(projectTables)
-        .set({ totalFileCount: total, updatedAt: new Date() })
-        .where(eq(projectTables.id, projectId));
+      await publishIndexingScope(projectId, total);
 
       return { claimed: true, files: allFiles, total };
     });
@@ -247,15 +226,10 @@ export const generateEmbeddings = inngest.createFunction(
       // We claimed the pipeline but found no files — mark failed so the
       // project isn't left stuck in "processing" forever.
       await step.run("Handle Empty", async () => {
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "failed",
-            embeddingError:
-              "No source files found. Ensure the project has been synced from GitHub.",
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
+        await failIndexing(
+          projectId,
+          "No source files found. Ensure the project has been synced from GitHub.",
+        );
       });
 
       return { success: false, projectId, reason: "no-files" };
@@ -322,14 +296,7 @@ export const generateEmbeddings = inngest.createFunction(
           );
           const indexed = Math.max(0, attempted - errors.length);
 
-          await db
-            .update(projectTables)
-            .set({
-              embeddingProgress: progress,
-              indexedFileCount: indexed,
-              updatedAt: new Date(),
-            })
-            .where(eq(projectTables.id, projectId));
+          await publishIndexingProgress(projectId, { percent: progress, indexedFileCount: indexed });
 
           logger.info(
             `[Inngest] Batch ${batchIndex + 1}: ${attempted}/${files.length} files (${progress}%)`,
@@ -359,16 +326,11 @@ export const generateEmbeddings = inngest.createFunction(
             : "Files may be empty or unsupported."
         }`;
 
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "failed",
-            embeddingError: errorMsg,
-            embeddingProgress: 0,
-            indexedFileCount: 0,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
+        await failIndexing(projectId, errorMsg, {
+          progress: 0,
+          indexedFileCount: 0,
+          estimatedTokens: 0,
+        });
 
         return { success: false, error: errorMsg, truncated: false };
       }
@@ -390,17 +352,11 @@ export const generateEmbeddings = inngest.createFunction(
           .slice(0, 3)
           .join("; ")}`;
 
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "failed",
-            embeddingError: errorMsg,
-            embeddingProgress: 100,
-            indexedFileCount: indexedFiles,
-            estimatedTokens,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
+        await failIndexing(projectId, errorMsg, {
+          progress: 100,
+          indexedFileCount: indexedFiles,
+          estimatedTokens,
+        });
 
         logger.error(`[Inngest] ⚠️ Embeddings incomplete for ${projectId}: ${errors.length} file error(s)`);
 
@@ -418,17 +374,11 @@ export const generateEmbeddings = inngest.createFunction(
           prepared.total - selectedFiles
         } files are not searchable.`;
 
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "partial",
-            embeddingProgress: 100,
-            embeddingError: truncatedMsg,
-            indexedFileCount: indexedFiles,
-            estimatedTokens,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
+        await partiallyCompleteIndexing(
+          projectId,
+          { indexedFileCount: indexedFiles, estimatedTokens },
+          truncatedMsg,
+        );
 
         logger.warn(
           `[Inngest] ⚠️ Partial index for ${projectId}: ${selectedFiles}/${prepared.total} files embedded`,
@@ -438,17 +388,10 @@ export const generateEmbeddings = inngest.createFunction(
       }
 
       // Mark as completed
-      await db
-        .update(projectTables)
-        .set({
-          embeddingStatus: "completed",
-          embeddingProgress: 100,
-          embeddingError: null,
-          indexedFileCount: indexedFiles,
-          estimatedTokens,
-          updatedAt: new Date(),
-        })
-        .where(eq(projectTables.id, projectId));
+      await completeIndexing(projectId, {
+        indexedFileCount: indexedFiles,
+        estimatedTokens,
+      });
 
       logger.info(
         `[Inngest] ✅ Embeddings complete for ${projectId}: ${actualCount} embeddings, ${totalChunks} chunks`,
@@ -699,7 +642,7 @@ export const resyncProject = inngest.createFunction(
         .where(eq(projectTables.id, projectId))
         .limit(1);
 
-      if (state?.embeddingStatus === "processing") {
+      if (state && isIndexingInFlight(state.embeddingStatus)) {
         logger.warn(
           `[Inngest] resyncProject deferred for ${projectId}: embeddings already processing`,
         );

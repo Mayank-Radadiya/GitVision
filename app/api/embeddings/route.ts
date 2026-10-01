@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/db";
-import { projectTables, codeEmbeddings } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
 import { assertProjectOwnership, ProjectAccessError } from "@/src/lib/guards";
 import { enforceLimits } from "@/src/lib/rate-limit";
 import { inngest } from "@/src/lib/inngest/client";
 import { projectIdSchema } from "@/src/lib/validation/schemas";
+import { isIndexingInFlight } from "@/src/lib/indexing-status";
+import { repairEmptyIndex, resetIndexing } from "@/src/lib/indexing-state";
 import { logger } from "@/src/lib/logger";
 
 export async function POST(req: Request) {
@@ -41,35 +40,23 @@ export async function POST(req: Request) {
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
 
-    if (project.embeddingStatus === "processing") {
+    if (isIndexingInFlight(project.embeddingStatus)) {
       return NextResponse.json(
         { error: "Embeddings are already being generated" },
         { status: 409 },
       );
     }
 
-    // Safety check: if status is "completed" but no embeddings actually exist,
-    // reset status to allow re-generation
+    // Safety check: a row can say "completed" with no embeddings behind it (a
+    // wiped table, an evicted row). Reset so the retry below has something to
+    // claim.
     if (project.embeddingStatus === "completed") {
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(codeEmbeddings)
-        .where(eq(codeEmbeddings.projectId, projectId));
-
-      if ((countResult?.count ?? 0) === 0) {
+      const repaired = await repairEmptyIndex(projectId);
+      if (repaired) {
         logger.warn(
           `[Embeddings] Project ${projectId} marked as completed but has 0 embeddings — resetting to pending`,
           { requestId, projectId },
         );
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "pending",
-            embeddingProgress: 0,
-            embeddingError: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
       }
     }
 
@@ -134,42 +121,20 @@ export async function GET(req: Request) {
     // Tenant isolation: 404 if the project isn't owned by this user
     const project = await assertProjectOwnership(projectId, userId);
 
-    // Auto-correct: if marked as "completed" but no embeddings exist, reset to "pending"
-    if (project.embeddingStatus === "completed") {
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(codeEmbeddings)
-        .where(eq(codeEmbeddings.projectId, projectId));
-
-      if ((countResult?.count ?? 0) === 0) {
-        await db
-          .update(projectTables)
-          .set({
-            embeddingStatus: "pending",
-            embeddingProgress: 0,
-            embeddingError: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectTables.id, projectId));
-
-        return NextResponse.json({
-          status: "pending",
-          progress: 0,
-          error: null,
-          indexedFileCount: 0,
-          totalFileCount: 0,
-        });
-      }
-    }
+    // A row that claims "completed" with no embeddings behind it is lying, and
+    // this poll is the last thing standing between the UI and that lie. Repair
+    // it and report the repaired state, not the stale row we just read.
+    const repaired =
+      project.embeddingStatus === "completed" ? await repairEmptyIndex(projectId) : false;
 
     return NextResponse.json({
-      status: project.embeddingStatus,
-      progress: project.embeddingProgress,
-      error: project.embeddingError,
+      status: repaired ? "pending" : project.embeddingStatus,
+      progress: repaired ? 0 : project.embeddingProgress,
+      error: repaired ? null : project.embeddingError,
       // Live counters, so a client that missed the SSE stream (or never opened
       // one) still renders "N of M" instead of parsing the error prose.
-      indexedFileCount: project.indexedFileCount,
-      totalFileCount: project.totalFileCount,
+      indexedFileCount: repaired ? 0 : project.indexedFileCount,
+      totalFileCount: repaired ? 0 : project.totalFileCount,
     });
   } catch (error) {
     if (error instanceof ProjectAccessError) {
@@ -227,15 +192,10 @@ export async function DELETE(req: Request) {
       logger.error("Failed to send embeddings/cancel event:", error, { requestId, projectId });
     }
 
-    await db
-      .update(projectTables)
-      .set({
-        embeddingStatus: "pending",
-        embeddingProgress: 0,
-        embeddingError: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(projectTables.id, projectId));
+    // Unconditional by design: the row is reset whether or not the cancel event
+    // reached the run. Any run still holding the claim has had it taken away, and
+    // the guards in indexing-state stop it from writing over this.
+    await resetIndexing(projectId);
 
     logger.info(`Embedding generation cancelled for ${projectId}`, { requestId, projectId });
 
