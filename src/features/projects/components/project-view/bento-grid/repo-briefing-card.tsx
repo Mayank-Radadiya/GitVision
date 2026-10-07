@@ -75,7 +75,7 @@ function Section({
     <div>
       <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5">
         {icon}
-        <h4 className="text-[11px] font-medium tracking-wide uppercase">
+        <h4 className="text-xs font-medium tracking-wide uppercase">
           {heading}
         </h4>
       </div>
@@ -105,19 +105,22 @@ function MissingState({ status }: { status: string | null | undefined }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) {
+function RepoBriefingCard({
+  briefing,
+  embeddingStatus,
+}: RepoBriefingCardProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+        <div className="bg-primary/10 text-primary flex h-7 w-7 items-center justify-center rounded-lg">
           <BookOpen className="h-3.5 w-3.5" />
         </div>
         <div>
           <h3 className="text-foreground text-sm leading-none font-semibold">
             Repository Briefing
           </h3>
-          <p className="text-muted-foreground mt-0.5 text-[11px]">
+          <p className="text-muted-foreground mt-0.5 text-xs">
             What this project is and how it works
           </p>
         </div>
@@ -127,7 +130,7 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
         <MissingState status={embeddingStatus} />
       ) : (
         <div className="space-y-4">
-          <p className="text-foreground/90 text-sm leading-relaxed">
+          <p className="text-foreground text-base leading-relaxed">
             {briefing.summary}
           </p>
 
@@ -135,7 +138,7 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
             <div>
               <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
                 <Boxes className="h-3 w-3" />
-                <h4 className="text-[11px] font-medium tracking-wide uppercase">
+                <h4 className="text-xs font-medium tracking-wide uppercase">
                   Tech Stack
                 </h4>
               </div>
@@ -146,7 +149,7 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
                 {briefing.techStack.map((tech) => (
                   <li
                     key={tech}
-                    className="border-border/60 bg-muted/40 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+                    className="border-border/60 bg-muted/40 rounded-md border px-2 py-0.5 text-xs font-medium"
                   >
                     {tech}
                   </li>
@@ -156,14 +159,17 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
           )}
 
           {briefing.keyComponents.length > 0 && (
-            <Section icon={<LayoutGrid className="h-3 w-3" />} heading="Key Components">
+            <Section
+              icon={<LayoutGrid className="h-3 w-3" />}
+              heading="Key Components"
+            >
               <ul className="space-y-2.5">
                 {briefing.keyComponents.map((component) => (
                   <li key={component.name}>
                     <p className="text-foreground text-xs font-medium">
                       {component.name}
                     </p>
-                    <p className="text-muted-foreground mt-0.5 text-[11px] leading-relaxed">
+                    <p className="text-muted-foreground mt-0.5 text-sm leading-relaxed">
                       {component.role}
                     </p>
                     {component.paths.length > 0 && (
@@ -171,7 +177,7 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
                         {component.paths.map((path) => (
                           <li
                             key={path}
-                            className="text-muted-foreground bg-muted/40 rounded px-1.5 py-0.5 font-mono text-[10px]"
+                            className="text-muted-foreground bg-muted/40 rounded px-1.5 py-0.5 font-mono text-xs"
                           >
                             {path}
                           </li>
@@ -189,7 +195,7 @@ function RepoBriefingCard({ briefing, embeddingStatus }: RepoBriefingCardProps) 
               icon={<Network className="h-3 w-3" />}
               heading="Architecture"
             >
-              <p className="text-muted-foreground text-[11px] leading-relaxed">
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 {briefing.architecture}
               </p>
             </Section>

@@ -23,7 +23,7 @@ export default async function UserProjectPage({ params }: PageProps) {
 
   return (
     <HydrateClient>
-      <ProjectPage />
+      <ProjectPage key={projectId} />
     </HydrateClient>
   );
 }

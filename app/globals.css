@@ -48,6 +48,8 @@ body {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   /* GitVision add-repo identity — see brief. These used to load IBM Plex Sans
@@ -506,4 +508,41 @@ body {
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* Repository workspace: one accent and AA text pairs in both themes. Scoped
+   tokens keep the rest of the application's existing palette unchanged. */
+.project-workspace {
+  --primary: oklch(0.48 0.2 260);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: var(--primary);
+  --muted-foreground: oklch(0.46 0.015 286);
+}
+.dark .project-workspace {
+  --primary: oklch(0.72 0.14 260);
+  --primary-foreground: oklch(0.15 0.01 260);
+  --muted-foreground: oklch(0.74 0.015 286);
+}
+.project-workspace :where(button, a, input, select, [role="button"]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.project-section:not([hidden]) {
+  animation: project-section-enter 180ms ease-out;
+}
+@keyframes project-section-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-workspace *, .project-workspace *::before, .project-workspace *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.project-workspace [data-slot="button"].bg-primary,
+.project-workspace [data-slot="button"].from-primary {
+  color: var(--primary-foreground);
 }

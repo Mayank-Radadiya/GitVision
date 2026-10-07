@@ -8,6 +8,7 @@ import {
 import {
   projectCreateSchema,
   projectIdSchema,
+  projectRenameSchema,
   projectCommitsSchema,
   generateAiSummarySchema,
 } from "@/src/lib/validation/schemas";
@@ -28,10 +29,7 @@ const projectService = createProjectService();
  */
 const cursorSchema = z
   .string()
-  .regex(
-    /^\d{4}-\d{2}-\d{2}T[\d:.]+Z\|[0-9a-fA-F-]{36}$/,
-    "Invalid cursor",
-  );
+  .regex(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\|[0-9a-fA-F-]{36}$/, "Invalid cursor");
 
 export const projectRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -77,6 +75,16 @@ export const projectRouter = createTRPCRouter({
     .input(projectIdSchema)
     .mutation(async ({ input, ctx }) => {
       return projectService.deleteProject(input.projectId, ctx.userId);
+    }),
+
+  rename: protectedProcedure
+    .input(projectRenameSchema)
+    .mutation(async ({ input, ctx }) => {
+      return projectService.renameProject(
+        input.projectId,
+        ctx.userId,
+        input.projectName,
+      );
     }),
 
   getFiles: protectedProcedure

@@ -36,7 +36,6 @@ interface Contributor {
 // ─── Bot detection ────────────────────────────────────────────────────────────
 
 const BOT_PATTERNS = [
-  /noreply/i,
   /bot@/i,
   /github-actions/i,
   /vercel\b/i,
@@ -156,21 +155,20 @@ function AvatarFacepile({
     <div className="mb-4 flex items-center">
       <div className="flex -space-x-2.5">
         {contributors.map((c) => {
-          const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=random&size=32`;
           return (
             <Avatar
               key={c.email}
               className="ring-background h-8 w-8 ring-2 transition-transform hover:z-10 hover:-translate-y-0.5 hover:scale-110"
             >
-              <AvatarImage src={c.avatar || placeholder} alt={c.name} />
-              <AvatarFallback className="bg-muted text-[11px]">
+              <AvatarImage src={c.avatar || undefined} alt={c.name} />
+              <AvatarFallback className="bg-muted text-xs">
                 {c.name[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
           );
         })}
         {extra > 0 && (
-          <div className="ring-background bg-muted text-muted-foreground z-10 flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold ring-2">
+          <div className="ring-background bg-muted text-muted-foreground z-10 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ring-2">
             +{extra}
           </div>
         )}
@@ -192,19 +190,18 @@ function ContributorRow({
 }) {
   const percentage =
     maxCount > 0 ? (contributor.commitCount / maxCount) * 100 : 0;
-  const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(contributor.name)}&background=random&size=32`;
 
   return (
     <div className="group flex items-center gap-2.5">
-      <span className="text-muted-foreground/40 w-3.5 shrink-0 text-right text-[10px] font-bold">
+      <span className="text-muted-foreground w-3.5 shrink-0 text-right text-xs font-semibold">
         {rank}
       </span>
       <Avatar className="ring-border/40 group-hover:ring-primary/40 h-6 w-6 shrink-0 ring-1 transition-all">
         <AvatarImage
-          src={contributor.avatar || placeholder}
+          src={contributor.avatar || undefined}
           alt={contributor.name}
         />
-        <AvatarFallback className="text-[10px]">
+        <AvatarFallback className="text-xs">
           {contributor.name[0]?.toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -215,7 +212,7 @@ function ContributorRow({
           </p>
           <div className="ml-1 flex shrink-0 items-center gap-2">
             <Sparkline data={contributor.velocity} />
-            <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+            <span className="text-muted-foreground font-mono text-xs tabular-nums">
               {contributor.commitCount}
             </span>
           </div>
@@ -236,13 +233,13 @@ function ContributorRow({
 function EmptyContributors() {
   return (
     <div className="flex flex-col items-center justify-center py-6 text-center">
-      <div className="bg-muted/40 border-border/30 mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border">
-        <Users className="text-muted-foreground/40 h-4 w-4" />
+      <div className="bg-muted/40 border-border/30 mb-3 flex h-10 w-10 items-center justify-center rounded-xl border">
+        <Users className="text-muted-foreground h-4 w-4" />
       </div>
       <p className="text-muted-foreground text-xs font-medium">
         No commits yet
       </p>
-      <p className="text-muted-foreground/60 mt-0.5 text-[11px]">
+      <p className="text-muted-foreground mt-0.5 text-xs">
         Contributors appear as commits are loaded.
       </p>
     </div>
@@ -263,20 +260,20 @@ function ContributorWidget({
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+          <div className="bg-primary/10 text-primary flex h-7 w-7 items-center justify-center rounded-lg">
             <Users className="h-3.5 w-3.5" />
           </div>
           <div>
             <h3 className="text-foreground text-sm leading-none font-semibold">
               Contributors
             </h3>
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               7-day velocity
             </p>
           </div>
         </div>
         {contributors.length > 0 && (
-          <span className="text-muted-foreground bg-muted/40 border-border/40 rounded-full border px-2 py-0.5 text-[11px]">
+          <span className="text-muted-foreground bg-muted/40 border-border/40 rounded-full border px-2 py-0.5 text-xs">
             {totalContributors} total
           </span>
         )}

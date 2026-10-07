@@ -1,75 +1,69 @@
 "use client";
 
-/**
- * Project Tabs — 4-tab underline navigation.
- * Overview / Commits / Pull Requests / Issues
- * Uses Framer Motion layoutId for smooth underline indicator sliding.
- */
-
-import { memo } from "react";
-import { motion } from "framer-motion";
-import { LayoutGrid, GitCommit, GitPullRequest, CircleDot } from "lucide-react";
+import { memo, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 import type { ProjectTab } from "@/features/projects/types/project.types";
+import { PROJECT_SECTIONS } from "./workspace-navigation";
 
-interface ProjectTabsProps {
-  activeTab: ProjectTab;
-  onTabChange: (tab: ProjectTab) => void;
-}
-
-const TABS: { id: ProjectTab; label: string; icon: React.ElementType }[] = [
-  { id: "overview", label: "Overview", icon: LayoutGrid },
-  { id: "commits", label: "Commits", icon: GitCommit },
-  { id: "pull-requests", label: "Pull Requests", icon: GitPullRequest },
-  { id: "issues", label: "Issues", icon: CircleDot },
-];
-
-/** One source of truth so a tab and the panel it controls cannot drift apart. */
 export const tabId = (tab: ProjectTab) => `project-tab-${tab}`;
 export const tabPanelId = (tab: ProjectTab) => `project-tab-panel-${tab}`;
 
-function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
+function ProjectTabs({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: ProjectTab;
+  onTabChange: (tab: ProjectTab) => void;
+}) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
   return (
     <div
       role="tablist"
       aria-label="Project sections"
-      className="border-border/40 relative flex scrollbar-none items-center gap-0 overflow-x-auto border-b"
+      className="border-border flex scrollbar-none overflow-x-auto border-b"
     >
-      {TABS.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = activeTab === tab.id;
-
-        return (
-          <button
-            key={tab.id}
-            id={tabId(tab.id)}
-            aria-controls={tabPanelId(tab.id)}
-            onClick={() => onTabChange(tab.id)}
-            className={cn(
-              "relative flex shrink-0 cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200",
-              isActive
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground/80",
-            )}
-            aria-selected={isActive}
-            role="tab"
-          >
-            <Icon className="h-4 w-4" />
-            <span>{tab.label}</span>
-
-            {/* Underline indicator */}
-            {isActive && (
-              <motion.div
-                layoutId="project-tab-underline"
-                className="bg-primary absolute right-0 bottom-0 left-0 h-0.5 rounded-t-full"
-                transition={{ type: "spring", bounce: 0.15, duration: 0.35 }}
-              />
-            )}
-          </button>
-        );
-      })}
+      {PROJECT_SECTIONS.map(({ id, label, icon: Icon }, index) => (
+        <button
+          key={id}
+          ref={(element) => {
+            refs.current[index] = element;
+          }}
+          id={tabId(id)}
+          aria-controls={tabPanelId(id)}
+          aria-selected={activeTab === id}
+          tabIndex={activeTab === id ? 0 : -1}
+          role="tab"
+          onClick={() => onTabChange(id)}
+          onKeyDown={(event) => {
+            let next: number;
+            if (event.key === "ArrowRight")
+              next = (index + 1) % PROJECT_SECTIONS.length;
+            else if (event.key === "ArrowLeft")
+              next =
+                (index - 1 + PROJECT_SECTIONS.length) % PROJECT_SECTIONS.length;
+            else if (event.key === "Home") next = 0;
+            else if (event.key === "End") next = PROJECT_SECTIONS.length - 1;
+            else return;
+            event.preventDefault();
+            onTabChange(PROJECT_SECTIONS[next].id);
+            refs.current[next]?.focus();
+            refs.current[next]?.scrollIntoView?.({
+              block: "nearest",
+              inline: "nearest",
+            });
+          }}
+          className={cn(
+            "focus-visible:ring-ring relative flex shrink-0 items-center gap-2 border-b-2 px-4 py-4 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset",
+            activeTab === id
+              ? "border-primary text-foreground"
+              : "text-muted-foreground hover:border-border hover:text-foreground border-transparent",
+          )}
+        >
+          <Icon className="size-4" aria-hidden="true" />
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
-
 export default memo(ProjectTabs);

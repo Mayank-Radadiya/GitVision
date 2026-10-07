@@ -31,9 +31,12 @@ vi.mock("react-hot-toast", () => ({
   default: { loading: vi.fn(), dismiss: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@/src/features/projects/components/project-view/project-header", () => ({
-  default: () => <div>header</div>,
-}));
+vi.mock(
+  "@/src/features/projects/components/project-view/project-header",
+  () => ({
+    default: () => <div>header</div>,
+  }),
+);
 vi.mock("@/src/features/projects/components/project-view/bento-grid", () => ({
   default: () => <div>overview grid</div>,
   BentoCard: () => <div />,
@@ -54,7 +57,15 @@ vi.mock(
   () => ({ default: () => <div>issues</div> }),
 );
 
-const TAB_NAMES = ["Overview", "Commits", "Pull Requests", "Issues"];
+const TAB_NAMES = [
+  "Overview",
+  "Issues",
+  "Pull Requests",
+  "Files",
+  "Contributors",
+  "Commits",
+  "Settings",
+];
 
 describe("project tabs", () => {
   it("is a tablist whose tabs each point at a panel", () => {
@@ -77,6 +88,26 @@ describe("project tabs", () => {
       "aria-selected",
       "false",
     );
+  });
+
+  it("uses one tab stop and supports arrow, Home, and End navigation", () => {
+    const change = vi.fn();
+    render(<ProjectTabs activeTab="overview" onTabChange={change} />);
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    expect(overview).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: "Issues" })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+    fireEvent.keyDown(overview, { key: "ArrowRight" });
+    expect(change).toHaveBeenLastCalledWith("issues");
+    expect(screen.getByRole("tab", { name: "Issues" })).toHaveFocus();
+    fireEvent.keyDown(overview, { key: "End" });
+    expect(change).toHaveBeenLastCalledWith("settings");
+    fireEvent.keyDown(overview, { key: "Home" });
+    expect(change).toHaveBeenLastCalledWith("overview");
+    fireEvent.keyDown(overview, { key: "ArrowLeft" });
+    expect(change).toHaveBeenLastCalledWith("settings");
   });
 
   it.each(TAB_NAMES)("renders the %s panel labelled by its tab", (name) => {

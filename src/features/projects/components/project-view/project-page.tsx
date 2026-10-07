@@ -1,70 +1,57 @@
 "use client";
 
-/**
- * Project Page v3 — Tab-driven workspace orchestrator.
- *
- * Layout:
- *   [Header]      — name, health ring, stars/forks, Ask AI + Code Viewer
- *   [Sub-nav]     — Overview / Commits / Pull Requests / Issues (underline tabs)
- *   [Tab Content] — AnimatePresence cross-fade between tab panels
- */
-
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
-import { AnimatePresence, motion } from "framer-motion";
+import { MotionConfig } from "framer-motion";
 import {
   useProjectDetails,
   useProjectCommits,
 } from "@/features/projects/hooks/use-project";
 import ProjectHeader from "./project-header";
 import ProjectTabs, { tabId, tabPanelId } from "./project-tabs";
-import CodeViewer from "./code-viewer";
 import ProjectError from "./project-error";
-import BentoGrid, { BentoCard } from "./bento-grid";
-import CommitsTab from "./tab-content/commits-tab";
-import PullRequestsTab from "./tab-content/pr-tab";
-import IssuesTab from "./tab-content/issues-tab";
+import BentoGrid from "./bento-grid";
+import WorkspaceSummary from "./workspace-summary";
+import { SectionSkeleton } from "./workspace-skeleton";
+import {
+  PROJECT_COMMAND_EVENT,
+  PROJECT_SECTIONS,
+  type ProjectCommand,
+} from "./workspace-navigation";
 import type { ProjectTab } from "@/features/projects/types/project.types";
 
-// ─── Tab Transition Variants ─────────────────────────────────────────────────
-
-const TAB_VARIANTS = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -4 },
-};
-
-/** The panel a tab controls. `tabIndex` keeps it reachable by keyboard when a
- *  panel holds nothing focusable, e.g. the overview grid. */
-function TabPanel({ tab, children }: { tab: ProjectTab; children: React.ReactNode }) {
-  return (
-    <motion.div
-      id={tabPanelId(tab)}
-      role="tabpanel"
-      aria-labelledby={tabId(tab)}
-      tabIndex={0}
-      variants={TAB_VARIANTS}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      transition={{ duration: 0.22, ease: "easeOut" }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
+const CodeViewer = dynamic(() => import("./code-viewer"), {
+  loading: SectionSkeleton,
+});
+const CommitsTab = dynamic(() => import("./tab-content/commits-tab"), {
+  loading: SectionSkeleton,
+});
+const PullRequestsTab = dynamic(() => import("./tab-content/pr-tab"), {
+  loading: SectionSkeleton,
+});
+const IssuesTab = dynamic(() => import("./tab-content/issues-tab"), {
+  loading: SectionSkeleton,
+});
+const TeamTab = dynamic(() => import("./tab-content/team-tab"), {
+  loading: SectionSkeleton,
+});
+const SettingsTab = dynamic(() => import("./tab-content/settings-tab"), {
+  loading: SectionSkeleton,
+});
+const ProjectDetailsDrawer = dynamic(() => import("./project-details-drawer"), {
+  ssr: false,
+});
 
 export default function ProjectPage() {
-  const params = useParams();
-  const projectId = params.projectId as string;
-
+  const params = useParams<{ projectId: string }>();
+  const projectId = params.projectId;
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
-  const [showCodeViewer, setShowCodeViewer] = useState(false);
-
-  // ─── Data ─────────────────────────────────────────────────────────────────
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [visited, setVisited] = useState<Set<ProjectTab>>(
+    () => new Set(["overview"]),
+  );
   const {
     data: project,
     isLoading,
@@ -72,134 +59,181 @@ export default function ProjectPage() {
     error,
     refetch,
   } = useProjectDetails(projectId);
-
   const { data: commitsData } = useProjectCommits(projectId);
   const commits = useMemo(
-    () => commitsData?.pages.flatMap((p) => p.commits) ?? [],
+    () => commitsData?.pages.flatMap((page) => page.commits) ?? [],
     [commitsData],
   );
+  const navigate = useCallback((tab: ProjectTab) => {
+    setActiveTab(tab);
+    setVisited((previous) =>
+      previous.has(tab) ? previous : new Set([...previous, tab]),
+    );
+  }, []);
+  const openDetails = useCallback(() => setDetailsOpen(true), []);
+  const openFiles = useCallback(() => navigate("files"), [navigate]);
 
-  const handleOpenCodeViewer = useCallback(() => setShowCodeViewer(true), []);
+  useEffect(() => {
+    const command = (event: Event) => {
+      const detail = (event as CustomEvent<ProjectCommand>).detail;
+      if (detail === "details") setDetailsOpen(true);
+      else if (PROJECT_SECTIONS.some((section) => section.id === detail))
+        navigate(detail);
+    };
+    const shortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable=true], [role=dialog], [role=menu]",
+        ) ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      )
+        return;
+      // Single-key shortcuts only run from the workspace background, so they
+      // never override typing or shortcuts inside interactive sections.
+      if (!target?.closest("[data-project-shortcuts]")) return;
+      if (event.shiftKey && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        setDetailsOpen(true);
+      }
+      if (event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        navigate("files");
+      }
+    };
+    window.addEventListener(PROJECT_COMMAND_EVENT, command);
+    window.addEventListener("keydown", shortcut);
+    return () => {
+      window.removeEventListener(PROJECT_COMMAND_EVENT, command);
+      window.removeEventListener("keydown", shortcut);
+    };
+  }, [navigate]);
 
-  // ─── Error ────────────────────────────────────────────────────────────────
-  if (isError && !isLoading) {
+  if (isError && !isLoading)
     return (
       <ProjectError
         message={error?.message || null}
         onRetry={() => {
-          toast.loading("Retrying...", { id: "retry" });
-          refetch().finally(() => toast.dismiss("retry"));
+          toast.loading("Retrying…", { id: "retry" });
+          void refetch().finally(() => toast.dismiss("retry"));
         }}
       />
     );
-  }
 
-  // ─── Code Viewer overlay ─────────────────────────────────────────────────
-  if (showCodeViewer) {
-    return (
-      <div className="min-h-screen p-6 lg:p-8">
-        <div className="mx-auto max-w-7xl space-y-5">
-          <button
-            onClick={() => setShowCodeViewer(false)}
-            className="text-muted-foreground hover:text-foreground group flex cursor-pointer items-center gap-1.5 text-xs transition-colors"
-          >
-            <span className="inline-block transition-transform group-hover:-translate-x-0.5">
-              ←
-            </span>
-            Back to {project?.projectName || "Dashboard"}
-          </button>
-          <CodeViewer projectId={projectId} />
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Main layout ──────────────────────────────────────────────────────────
+  const current = PROJECT_SECTIONS.find((section) => section.id === activeTab)!;
   return (
-    <div className="min-h-screen p-5 lg:p-8">
-      <div className="mx-auto max-w-7xl">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-          className="space-y-5"
-        >
-          {/* Header */}
-          <ProjectHeader
-            projectName={project?.projectName}
-            githubUrl={project?.githubUrl}
-            stars={project?.star}
-            forks={project?.forks}
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.2 }}>
+      <div
+        className="project-workspace bg-background text-foreground min-h-screen"
+        data-project-shortcuts
+      >
+        <ProjectHeader
+          projectName={project?.projectName}
+          githubUrl={project?.githubUrl}
+          isLoading={isLoading}
+          projectId={projectId}
+          onOpenCodeViewer={openFiles}
+          onOpenDetails={openDetails}
+          embeddingStatus={project?.embeddingStatus}
+          totalFiles={project?.totalFiles}
+          indexedFileCount={project?.indexedFileCount}
+          totalFileCount={project?.totalFileCount}
+        />
+        <div className="mx-auto max-w-7xl space-y-7 px-5 pt-7 pb-12 sm:px-8 lg:px-10">
+          <WorkspaceSummary
+            isLoading={isLoading}
             totalCommits={project?.totalCommits}
             totalContributors={project?.totalContributors}
             totalBranches={project?.totalBranches}
-            isLoading={isLoading}
-            projectId={projectId}
-            onOpenCodeViewer={handleOpenCodeViewer}
-            embeddingStatus={project?.embeddingStatus}
-            totalFiles={project?.totalFiles}
             indexedFileCount={project?.indexedFileCount}
             totalFileCount={project?.totalFileCount}
+            embeddingStatus={project?.embeddingStatus}
             lastSyncedAt={project?.lastSyncedAt}
+            onNavigate={navigate}
+            onOpenDetails={openDetails}
           />
-
-          {/* Sub-navigation tabs */}
-          {!isLoading && (
-            <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
-          )}
-
-          {/* Tab Content with AnimatePresence */}
-          <AnimatePresence mode="wait">
-            {/* ── Overview ── */}
-            {activeTab === "overview" && (
-              <TabPanel tab="overview">
-                {isLoading ? (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <BentoCard className="h-72 animate-pulse sm:col-span-2" />
-                    <BentoCard className="h-64 animate-pulse" />
-                    <BentoCard className="h-64 animate-pulse" />
-                    <BentoCard className="h-96 animate-pulse sm:col-span-2" />
-                  </div>
+          <ProjectTabs activeTab={activeTab} onTabChange={navigate} />
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">
+                {current.label}
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {current.description}
+              </p>
+            </div>
+            <p className="text-muted-foreground hidden pt-1 text-xs lg:block">
+              Shift D · Details<span className="mx-2">/</span>Shift F · Files
+            </p>
+          </div>
+          {/* Visited panels remain mounted to preserve search, expansion and
+              file selection. Heavy sections load only on their first visit. */}
+          {PROJECT_SECTIONS.map(({ id }) => (
+            <div
+              key={id}
+              id={tabPanelId(id)}
+              role="tabpanel"
+              aria-labelledby={tabId(id)}
+              tabIndex={0}
+              hidden={activeTab !== id}
+              className="project-section focus-visible:ring-ring min-h-80 min-w-0 rounded-md focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {visited.has(id) &&
+                (isLoading ? (
+                  <SectionSkeleton />
                 ) : (
-                  <BentoGrid
-                    projectId={projectId}
-                    repoUrl={project?.githubUrl || ""}
-                    commits={commits}
-                    totalContributors={project?.totalContributors ?? 0}
-                    languages={project?.languages ?? []}
-                    briefing={project?.briefing ?? null}
-                    embeddingStatus={project?.embeddingStatus ?? null}
-                  />
-                )}
-              </TabPanel>
-            )}
-
-            {/* ── Commits ── */}
-            {activeTab === "commits" && (
-              <TabPanel tab="commits">
-                <CommitsTab />
-              </TabPanel>
-            )}
-
-            {/* ── Pull Requests ── */}
-            {activeTab === "pull-requests" && (
-              <TabPanel tab="pull-requests">
-                <PullRequestsTab
-                  projectId={projectId}
-                  repoUrl={project?.githubUrl}
-                />
-              </TabPanel>
-            )}
-
-            {/* ── Issues ── */}
-            {activeTab === "issues" && (
-              <TabPanel tab="issues">
-                <IssuesTab projectId={projectId} repoUrl={project?.githubUrl} />
-              </TabPanel>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  <>
+                    {id === "overview" && (
+                      <BentoGrid
+                        projectId={projectId}
+                        repoUrl={project?.githubUrl || ""}
+                        commits={commits}
+                        totalContributors={project?.totalContributors ?? 0}
+                        languages={project?.languages ?? []}
+                        briefing={project?.briefing ?? null}
+                        embeddingStatus={project?.embeddingStatus ?? null}
+                      />
+                    )}
+                    {id === "commits" && (
+                      <CommitsTab repoUrl={project?.githubUrl} />
+                    )}
+                    {id === "pull-requests" && (
+                      <PullRequestsTab
+                        projectId={projectId}
+                        repoUrl={project?.githubUrl}
+                      />
+                    )}
+                    {id === "issues" && (
+                      <IssuesTab
+                        projectId={projectId}
+                        repoUrl={project?.githubUrl}
+                      />
+                    )}
+                    {id === "files" && <CodeViewer projectId={projectId} />}
+                    {id === "team" && (
+                      <TeamTab
+                        projectId={projectId}
+                        totalContributors={project?.totalContributors ?? 0}
+                      />
+                    )}
+                    {id === "settings" && project && (
+                      <SettingsTab project={project} />
+                    )}
+                  </>
+                ))}
+            </div>
+          ))}
+        </div>
+        {project && detailsOpen && (
+          <ProjectDetailsDrawer
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            project={project}
+          />
+        )}
       </div>
-    </div>
+    </MotionConfig>
   );
 }

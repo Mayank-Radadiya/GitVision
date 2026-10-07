@@ -21,7 +21,16 @@ import { useQueryClient } from "@tanstack/react-query";
 export function useProjectDetails(projectId: string) {
   return trpc.project.getDetails.useQuery(
     { projectId },
-    { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
+    {
+      enabled: !!projectId,
+      staleTime: 5 * 60 * 1000,
+      refetchInterval: (query) =>
+        ["pending", "processing"].includes(
+          query.state.data?.embeddingStatus ?? "",
+        )
+          ? 5000
+          : false,
+    },
   );
 }
 
@@ -93,6 +102,22 @@ export function useProjectIssues(projectId: string, isPullRequest: boolean) {
   return trpc.project.getIssues.useQuery(
     { projectId, isPullRequest },
     { enabled: !!projectId, staleTime: 60 * 1000 },
+  );
+}
+
+/** Cursor-paged issues for the workspace. Uses the same endpoint and sync
+ * invalidation as the existing query, while making older results reachable. */
+export function usePaginatedProjectIssues(
+  projectId: string,
+  isPullRequest: boolean,
+) {
+  return trpc.project.getIssues.useInfiniteQuery(
+    { projectId, isPullRequest, limit: 50 },
+    {
+      enabled: !!projectId,
+      getNextPageParam: (page) => page.nextCursor ?? undefined,
+      staleTime: 60 * 1000,
+    },
   );
 }
 

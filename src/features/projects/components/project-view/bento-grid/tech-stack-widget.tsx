@@ -24,7 +24,7 @@ interface Language {
 }
 
 /** Shown when GitHub reported no language data for this repository. */
-const FALLBACK_COLOR = "#6b7280";
+const FALLBACK_COLOR = "var(--primary)";
 
 const MAX_LEGEND_ROWS = 6;
 
@@ -44,7 +44,7 @@ function toLanguages(entries: LanguageEntry[]): Language[] {
     .map((entry) => ({
       name: entry.name,
       percentage: (entry.size / total) * 100,
-      color: entry.color ?? FALLBACK_COLOR,
+      color: FALLBACK_COLOR,
     }))
     .sort((a, b) => b.percentage - a.percentage)
     .slice(0, MAX_LEGEND_ROWS);
@@ -59,14 +59,14 @@ function TechStackWidget({ languages }: { languages: LanguageEntry[] }) {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400">
+        <div className="bg-primary/10 text-primary flex h-7 w-7 items-center justify-center rounded-lg">
           <Code2 className="h-3.5 w-3.5" />
         </div>
         <div>
           <h3 className="text-foreground text-sm leading-none font-semibold">
             Tech Stack
           </h3>
-          <p className="text-muted-foreground mt-0.5 text-[11px]">
+          <p className="text-muted-foreground mt-0.5 text-xs">
             Language distribution
           </p>
         </div>
@@ -85,11 +85,12 @@ function TechStackWidget({ languages }: { languages: LanguageEntry[] }) {
                 key={lang.name}
                 initial={{ scaleX: 0, transformOrigin: "left" }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.6, delay: i * 0.1, ease: "easeOut" }}
+                transition={{ duration: 0.2, delay: i * 0.1, ease: "easeOut" }}
                 className="h-full rounded-full"
                 style={{
                   width: `${lang.percentage}%`,
                   backgroundColor: lang.color,
+                  opacity: 1 - i / (MAX_LEGEND_ROWS + 1),
                 }}
               />
             ))}
@@ -102,13 +103,16 @@ function TechStackWidget({ languages }: { languages: LanguageEntry[] }) {
                 key={lang.name}
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
+                transition={{ duration: 0.2, delay: 0.3 + i * 0.06 }}
                 className="flex items-center justify-between"
               >
                 <div className="flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: lang.color }}
+                    style={{
+                      backgroundColor: lang.color,
+                      opacity: 1 - i / (MAX_LEGEND_ROWS + 1),
+                    }}
                   />
                   <span className="text-foreground/80 text-xs font-medium">
                     {lang.name}

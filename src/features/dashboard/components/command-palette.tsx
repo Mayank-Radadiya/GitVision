@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { FolderGit2 } from "lucide-react";
 
 import { trpc } from "@/src/lib/trpc/client";
@@ -15,6 +15,11 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/shared/components/ui/command";
+import {
+  PROJECT_COMMAND_EVENT,
+  OPEN_COMMAND_EVENT,
+  PROJECT_SECTIONS,
+} from "@/features/projects/components/project-view/workspace-navigation";
 import { PRIMARY_NAVIGATION } from "./sidebar/sidebar.constants";
 
 /**
@@ -61,6 +66,8 @@ interface PaletteProject {
  */
 export function CommandPalette() {
   const router = useRouter();
+  const pathname = usePathname();
+  const inProject = /^\/dashboard\/user-project\/[^/]+/.test(pathname);
   const [open, setOpen] = useState(false);
 
   // Handle keyboard shortcut (Cmd/Ctrl + K)
@@ -71,8 +78,13 @@ export function CommandPalette() {
         setOpen((prev) => !prev);
       }
     };
+    const openPalette = () => setOpen(true);
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener(OPEN_COMMAND_EVENT, openPalette);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener(OPEN_COMMAND_EVENT, openPalette);
+    };
   }, []);
 
   const { data: dashboard } = trpc.project.getDashboardData.useQuery(
@@ -110,6 +122,37 @@ export function CommandPalette() {
       <CommandInput placeholder="Jump to a project or run a command..." />
       <CommandList>
         <CommandEmpty>No results.</CommandEmpty>
+
+        {inProject && (
+          <CommandGroup heading="This project">
+            {PROJECT_SECTIONS.map(({ id, label, icon: Icon }) => (
+              <CommandItem
+                key={id}
+                keywords={["project", "section"]}
+                onSelect={() => {
+                  setOpen(false);
+                  window.dispatchEvent(
+                    new CustomEvent(PROJECT_COMMAND_EVENT, { detail: id }),
+                  );
+                }}
+              >
+                <Icon />
+                Go to {label}
+              </CommandItem>
+            ))}
+            <CommandItem
+              onSelect={() => {
+                setOpen(false);
+                window.dispatchEvent(
+                  new CustomEvent(PROJECT_COMMAND_EVENT, { detail: "details" }),
+                );
+              }}
+            >
+              <FolderGit2 />
+              Open project details<CommandShortcut>Shift D</CommandShortcut>
+            </CommandItem>
+          </CommandGroup>
+        )}
 
         <CommandGroup heading="Navigation">
           {PRIMARY_NAVIGATION.map((item) => {

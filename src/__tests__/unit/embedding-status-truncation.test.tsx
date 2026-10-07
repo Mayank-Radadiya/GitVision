@@ -70,19 +70,22 @@ describe("IndexingStatusBadge", () => {
     ).toBeInTheDocument();
   });
 
-  it.each(["completed", "pending", "processing", "failed", null])(
-    "shows the synced badge for status %s",
-    (status) => {
-      render(
-        <IndexingStatusBadge
-          embeddingStatus={status}
-          totalFiles={1200}
-          indexedFileCount={500}
-          totalFileCount={1200}
-        />,
-      );
+  it.each([
+    ["completed", "AI ready"],
+    ["pending", "Queued for indexing"],
+    ["processing", "Indexing"],
+    ["failed", "Indexing failed"],
+    [null, "Index status unavailable"],
+  ])("accurately describes status %s", (status, label) => {
+    render(
+      <IndexingStatusBadge
+        embeddingStatus={status}
+        totalFiles={1200}
+        indexedFileCount={500}
+        totalFileCount={1200}
+      />,
+    );
 
-      expect(screen.getByText("AI Synced")).toBeInTheDocument();
-    },
-  );
+    expect(screen.getByText(label!)).toBeInTheDocument();
+  });
 });

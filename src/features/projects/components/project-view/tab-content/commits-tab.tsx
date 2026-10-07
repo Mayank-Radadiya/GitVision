@@ -8,7 +8,7 @@
  *   - Bold typography and improved hierarchy.
  */
 
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,8 +19,11 @@ import {
   ExternalLink,
   Calendar,
   Hash,
+  Search,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import toast from "react-hot-toast";
+import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Skeleton } from "@/shared/components/ui/skeleton";
@@ -33,71 +36,28 @@ import { useParams as useNextParams } from "next/navigation";
 
 // ─── High Contrast Prefix Map ────────────────────────────────────────────────
 
-const PREFIX_STYLE: Record<
-  string,
-  { color: string; bg: string; border: string; label: string }
-> = {
-  feat: {
-    color: "text-emerald-700 dark:text-emerald-400",
-    bg: "bg-emerald-500/15",
-    border: "border-emerald-500/30",
-    label: "Feature",
-  },
-  fix: {
-    color: "text-rose-700 dark:text-rose-400",
-    bg: "bg-rose-500/15",
-    border: "border-rose-500/30",
-    label: "Fix",
-  },
-  refactor: {
-    color: "text-violet-700 dark:text-violet-400",
-    bg: "bg-violet-500/15",
-    border: "border-violet-500/30",
-    label: "Refactor",
-  },
-  chore: {
-    color: "text-zinc-700 dark:text-zinc-400",
-    bg: "bg-zinc-500/15",
-    border: "border-zinc-500/30",
-    label: "Chore",
-  },
-  docs: {
-    color: "text-sky-700 dark:text-sky-400",
-    bg: "bg-sky-500/15",
-    border: "border-sky-500/30",
-    label: "Docs",
-  },
-  style: {
-    color: "text-pink-700 dark:text-pink-400",
-    bg: "bg-pink-500/15",
-    border: "border-pink-500/30",
-    label: "Style",
-  },
-  test: {
-    color: "text-amber-700 dark:text-amber-400",
-    bg: "bg-amber-500/15",
-    border: "border-amber-500/30",
-    label: "Test",
-  },
-  perf: {
-    color: "text-orange-700 dark:text-orange-400",
-    bg: "bg-orange-500/15",
-    border: "border-orange-500/30",
-    label: "Perf",
-  },
-  ci: {
-    color: "text-cyan-700 dark:text-cyan-400",
-    bg: "bg-cyan-500/15",
-    border: "border-cyan-500/30",
-    label: "CI",
-  },
-  build: {
-    color: "text-indigo-700 dark:text-indigo-400",
-    bg: "bg-indigo-500/15",
-    border: "border-indigo-500/30",
-    label: "Build",
-  },
-};
+const PREFIX_STYLE = Object.fromEntries(
+  Object.entries({
+    feat: "Feature",
+    fix: "Fix",
+    refactor: "Refactor",
+    chore: "Chore",
+    docs: "Docs",
+    style: "Style",
+    test: "Test",
+    perf: "Perf",
+    ci: "CI",
+    build: "Build",
+  }).map(([prefix, label]) => [
+    prefix,
+    {
+      color: "text-muted-foreground",
+      bg: "bg-muted",
+      border: "border-border",
+      label,
+    },
+  ]),
+);
 
 function parsePrefix(message: string) {
   const match = message.match(/^([a-z]+)(\([^)]*\))?!?:\s*/i);
@@ -111,23 +71,6 @@ function parsePrefix(message: string) {
 }
 
 // ─── Dynamic Hash Colors ──────────────────────────────────────────────────────
-
-const HASH_COLORS = [
-  "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20",
-  "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20",
-  "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20",
-  "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20",
-  "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20",
-  "text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20",
-];
-
-function getHashStyles(hash: string) {
-  let num = 0;
-  for (let i = 0; i < hash.length; i++) {
-    num += hash.charCodeAt(i);
-  }
-  return HASH_COLORS[num % HASH_COLORS.length];
-}
 
 // ─── Single Commit Row ────────────────────────────────────────────────────────
 
@@ -157,7 +100,7 @@ function CommitRow({
   const style = prefix ? PREFIX_STYLE[prefix] : null;
 
   // If no prefix, we generate a stable vibrant color for this commit based on its hash
-  const dynamicStyles = getHashStyles(commit.commitHash);
+  const dynamicStyles = "text-muted-foreground bg-muted/40 border-border";
 
   const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(commit.authorName)}&background=random&size=32`;
   const commitUrl = repoUrl
@@ -189,7 +132,7 @@ function CommitRow({
             setExpanded((v) => !v);
           }
         }}
-        className="flex cursor-pointer items-start gap-4 px-5 py-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        className="focus-visible:ring-primary/40 flex cursor-pointer items-start gap-4 px-5 py-4 focus-visible:ring-1 focus-visible:outline-none"
       >
         {/* Dynamic Icon / Avatar Block */}
         <div className="shrink-0 pt-0.5">
@@ -223,14 +166,14 @@ function CommitRow({
               {style && prefix ? (
                 <Badge
                   variant="outline"
-                  className={`h-5 shrink-0 border px-1.5 text-[10px] font-bold ${style.bg} ${style.border} ${style.color} tracking-wider uppercase`}
+                  className={`h-5 shrink-0 border px-1.5 text-xs font-semibold ${style.bg} ${style.border} ${style.color} tracking-wider uppercase`}
                 >
                   {scope ? `${style.label} (${scope})` : style.label}
                 </Badge>
               ) : (
                 <Badge
                   variant="outline"
-                  className={`h-5 shrink-0 border px-1.5 text-[10px] font-bold tracking-wider uppercase ${dynamicStyles}`}
+                  className={`h-5 shrink-0 border px-1.5 text-xs font-semibold tracking-wider uppercase ${dynamicStyles}`}
                 >
                   Commit
                 </Badge>
@@ -256,7 +199,7 @@ function CommitRow({
               {commit.authorName}
             </span>
             <div className="bg-border/80 h-1 w-1 rounded-full" />
-            <span className="text-muted-foreground/60 flex items-center gap-1.5 text-[11px] font-medium">
+            <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
               <Calendar className="h-3 w-3" />
               {formatDistanceToNow(new Date(commit.authorDate), {
                 addSuffix: true,
@@ -269,15 +212,15 @@ function CommitRow({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className={`hidden cursor-pointer items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors sm:flex ${dynamicStyles} opacity-80 shadow-sm hover:opacity-100`}
+                className={`hidden cursor-pointer items-center gap-1 rounded border px-2 py-0.5 font-mono text-xs font-medium transition-colors sm:flex ${dynamicStyles} opacity-80 shadow-sm hover:opacity-100`}
               >
                 <Hash className="h-3 w-3" />
                 {commit.commitHash.slice(0, 7)}
-                <ExternalLink className="ml-0.5 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                <ExternalLink className="ml-0.5 h-3 w-3 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" />
               </a>
             ) : (
               <span
-                className={`hidden items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium sm:flex ${dynamicStyles} opacity-80 shadow-sm`}
+                className={`hidden items-center gap-1 rounded border px-2 py-0.5 font-mono text-xs font-medium sm:flex ${dynamicStyles} opacity-80 shadow-sm`}
               >
                 <Hash className="h-3 w-3" />
                 {commit.commitHash.slice(0, 7)}
@@ -287,7 +230,7 @@ function CommitRow({
             {commit.aiSummary && (
               <>
                 <div className="bg-border/80 h-1 w-1 rounded-full" />
-                <span className="flex items-center gap-1.5 rounded border border-violet-200 bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-600 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-400">
+                <span className="border-border bg-primary/10 text-primary flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-semibold">
                   <Sparkles className="h-3 w-3" />
                   AI Summary
                 </span>
@@ -299,7 +242,7 @@ function CommitRow({
         {/* Expand chevron */}
         <div className="mt-3 shrink-0 sm:mt-1.5">
           <ChevronDown
-            className={`text-muted-foreground/40 h-5 w-5 transition-transform duration-200 ${
+            className={`text-muted-foreground h-5 w-5 transition-transform duration-200 ${
               expanded ? "rotate-180" : ""
             }`}
           />
@@ -329,17 +272,17 @@ function CommitRow({
 
               {/* AI Summary area */}
               {isGenerating ? (
-                <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400">
+                <div className="border-border bg-primary/10 text-primary flex items-center gap-3 rounded-xl border px-4 py-3 shadow-sm">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                  <span className="text-xs font-bold tracking-wide uppercase">
+                  <span className="text-xs font-semibold tracking-wide uppercase">
                     Analyzing commit payload…
                   </span>
                 </div>
               ) : commit.aiSummary ? (
-                <div className="flex gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm dark:border-violet-500/20 dark:bg-violet-500/10">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                <div className="border-border bg-primary/10 flex gap-3 rounded-xl border px-4 py-3 shadow-sm">
+                  <Sparkles className="text-primary mt-0.5 h-4 w-4 shrink-0" />
                   <div>
-                    <p className="mb-1.5 text-[10px] font-bold tracking-widest text-violet-700 uppercase dark:text-violet-400">
+                    <p className="text-primary mb-1.5 text-xs font-semibold tracking-widest uppercase">
                       GitVision Analysis
                     </p>
                     <p className="text-foreground/90 text-sm leading-relaxed font-medium">
@@ -355,7 +298,7 @@ function CommitRow({
                     e.stopPropagation();
                     onGenerateSummary(commit.id);
                   }}
-                  className="h-8 w-fit cursor-pointer gap-2 bg-violet-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 w-fit cursor-pointer gap-2 px-4 text-xs font-medium shadow-xs"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   Generate AI Analysis
@@ -373,7 +316,7 @@ function CommitRow({
 
 function CommitsSkeleton() {
   return (
-    <div className="border-border/50 divide-border/30 bg-card divide-y overflow-hidden rounded-2xl border">
+    <div className="border-border/50 divide-border/30 bg-card divide-y overflow-hidden rounded-xl border">
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-start gap-4 px-5 py-4">
           <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
@@ -398,11 +341,13 @@ function CommitsSkeleton() {
 
 function EmptyCommits() {
   return (
-    <div className="border-border/50 bg-muted/10 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-20 text-center">
-      <div className="bg-background border-border mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border shadow-sm">
-        <GitCommit className="text-muted-foreground/60 h-6 w-6" />
+    <div className="border-border/50 bg-muted/10 flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-20 text-center">
+      <div className="bg-background border-border mb-4 flex h-14 w-14 items-center justify-center rounded-xl border shadow-sm">
+        <GitCommit className="text-muted-foreground h-6 w-6" />
       </div>
-      <h3 className="text-foreground text-lg font-bold">No commits tracked</h3>
+      <h3 className="text-foreground text-lg font-semibold">
+        No commits tracked
+      </h3>
       <p className="text-muted-foreground mt-1 max-w-sm text-sm font-medium">
         Connect your repository and push code to see a vibrant timeline of your
         project&apos;s history here.
@@ -413,14 +358,23 @@ function EmptyCommits() {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-function CommitsTab() {
+function CommitsTab({ repoUrl }: { repoUrl?: string }) {
   const params = useNextParams();
   const projectId = params.projectId as string;
 
-  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
-    useProjectCommits(projectId);
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useProjectCommits(projectId);
 
   const generateAiSummary = useGenerateAiSummary(projectId);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("newest");
   const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const handleGenerateSummary = useCallback(
@@ -428,13 +382,37 @@ function CommitsTab() {
       setGeneratingId(commitId);
       generateAiSummary.mutate(
         { projectId, commitId },
-        { onSettled: () => setGeneratingId(null) },
+        {
+          onSettled: () => setGeneratingId(null),
+          onSuccess: () => toast.success("Commit analysis ready"),
+          onError: (error) =>
+            toast.error(error.message || "Couldn’t analyze this commit"),
+        },
       );
     },
     [generateAiSummary, projectId],
   );
 
-  const allCommits = data?.pages.flatMap((p) => p.commits) ?? [];
+  const allCommits = useMemo(
+    () => data?.pages.flatMap((p) => p.commits) ?? [],
+    [data],
+  );
+  const filteredCommits = useMemo(
+    () =>
+      allCommits
+        .filter((commit) =>
+          `${commit.commitMessage} ${commit.authorName} ${commit.commitHash}`
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+        )
+        .sort(
+          (a, b) =>
+            (new Date(b.authorDate).getTime() -
+              new Date(a.authorDate).getTime()) *
+            (sort === "newest" ? 1 : -1),
+        ),
+    [allCommits, search, sort],
+  );
   const totalLoaded = allCommits.length;
 
   return (
@@ -442,7 +420,7 @@ function CommitsTab() {
       {/* Header row */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <h2 className="text-foreground text-xl font-bold tracking-tight">
+          <h2 className="text-foreground text-xl font-semibold tracking-tight">
             Commit History
           </h2>
           {!isLoading && totalLoaded > 0 && (
@@ -452,12 +430,51 @@ function CommitsTab() {
           )}
         </div>
         {/* AI indicator */}
-        <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-600 shadow-sm dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-400">
+        <div className="border-border bg-primary/10 text-primary flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
           <span>Click rows for AI Analysis</span>
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2"
+            aria-hidden="true"
+          />
+          <Input
+            aria-label="Search commits"
+            placeholder="Search message, author, or hash…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <select
+          aria-label="Sort commits"
+          value={sort}
+          onChange={(event) => setSort(event.target.value)}
+          className="border-input bg-background rounded-md border px-3 py-2 text-sm"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
+      {isError && (
+        <div
+          role="alert"
+          className="border-destructive/30 flex items-center justify-between rounded-xl border p-4 text-sm"
+        >
+          <p>Couldn’t load commit history.</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
+      <p className="text-muted-foreground text-xs">
+        Search and sorting apply to loaded history. Load older commits to
+        include more results.
+      </p>
       {/* List */}
       {isLoading ? (
         <CommitsSkeleton />
@@ -465,11 +482,17 @@ function CommitsTab() {
         <EmptyCommits />
       ) : (
         <>
-          <div className="border-border/50 bg-card overflow-hidden rounded-2xl border shadow-sm">
-            {allCommits.map((commit, index) => (
+          <div className="border-border/50 bg-card overflow-hidden rounded-xl border shadow-sm">
+            {filteredCommits.length === 0 && (
+              <p className="text-muted-foreground p-8 text-center text-sm">
+                No matching commits. Try a different search.
+              </p>
+            )}
+            {filteredCommits.map((commit, index) => (
               <CommitRow
                 key={`${commit.id}-${index}`}
                 commit={commit}
+                repoUrl={repoUrl}
                 isGenerating={generatingId === commit.id}
                 isAnyGenerating={generatingId !== null}
                 onGenerateSummary={handleGenerateSummary}
@@ -485,7 +508,7 @@ function CommitsTab() {
                 size="lg"
                 onClick={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
-                className="border-border/50 bg-background hover:bg-muted/50 w-full max-w-sm gap-2.5 text-sm font-bold transition-all"
+                className="border-border/50 bg-background hover:bg-muted/50 w-full max-w-sm gap-2.5 text-sm font-semibold transition-all"
               >
                 {isFetchingNextPage ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -499,7 +522,7 @@ function CommitsTab() {
 
           {!hasNextPage && totalLoaded > 0 && (
             <div className="flex justify-center pt-4">
-              <span className="text-muted-foreground/40 text-xs font-bold tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                 End of History
               </span>
             </div>

@@ -41,4 +41,11 @@ export interface Commit {
 
 // ─── Tab Navigation ──────────────────────────────────────────────────────────
 
-export type ProjectTab = "overview" | "commits" | "pull-requests" | "issues";
+export type ProjectTab =
+  | "overview"
+  | "commits"
+  | "pull-requests"
+  | "issues"
+  | "files"
+  | "team"
+  | "settings";

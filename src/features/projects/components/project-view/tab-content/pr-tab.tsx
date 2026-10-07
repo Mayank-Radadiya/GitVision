@@ -14,6 +14,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { Badge } from "@/shared/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -22,7 +23,7 @@ import {
   AvatarFallback,
 } from "@/shared/components/ui/avatar";
 import {
-  useProjectIssues,
+  usePaginatedProjectIssues,
   useSyncIssues,
 } from "@/features/projects/hooks/use-project";
 import { motion } from "framer-motion";
@@ -42,24 +43,24 @@ const STATUS_CONFIG: Record<
 > = {
   open: {
     label: "Open",
-    className: "bg-emerald-500/8 text-emerald-400 border-emerald-500/20",
-    glow: "bg-emerald-400/20",
+    className: "bg-primary/10 text-primary border-border",
+    glow: "bg-primary/10",
     Icon: GitPullRequest,
-    color: "text-emerald-400",
+    color: "text-primary",
   },
   merged: {
     label: "Merged",
-    className: "bg-violet-500/8 text-violet-400 border-violet-500/20",
-    glow: "bg-violet-400/20",
+    className: "bg-primary/10 text-primary border-border",
+    glow: "bg-primary/10",
     Icon: GitPullRequestClosed,
-    color: "text-violet-400",
+    color: "text-primary",
   },
   closed: {
     label: "Closed",
-    className: "bg-rose-500/8 text-rose-400 border-rose-500/20",
-    glow: "bg-rose-400/20",
+    className: "bg-primary/10 text-primary border-border",
+    glow: "bg-primary/10",
     Icon: GitPullRequestClosed,
-    color: "text-rose-400",
+    color: "text-primary",
   },
 };
 
@@ -76,43 +77,85 @@ interface PullRequestsTabProps {
 }
 
 function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
-  const { data, isLoading } = useProjectIssues(projectId, true);
-  const prs = data?.items ?? [];
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = usePaginatedProjectIssues(projectId, true);
+  const prs = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
   const { mutate: syncIssues, isPending: isSyncing } = useSyncIssues(projectId);
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sort, setSort] = useState("updated");
 
   const filteredPRs = useMemo(() => {
-    return prs.filter((pr) => {
-      // 1. Text Search Filter
-      const matchesSearch = pr.title
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+    return prs
+      .filter((pr) => {
+        // 1. Text Search Filter
+        const matchesSearch = pr.title
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
 
-      // 2. Status Filter
-      if (activeFilter === "Open" && pr.state !== "open") return false;
-      if (activeFilter === "Closed" && pr.state !== "closed") return false;
+        // 2. Status Filter
+        if (activeFilter === "Open" && pr.state !== "open") return false;
+        if (activeFilter === "Closed" && pr.state !== "closed") return false;
 
-      return matchesSearch;
-    });
-  }, [prs, activeFilter, searchQuery]);
+        return matchesSearch;
+      })
+      .sort((a, b) =>
+        sort === "number"
+          ? b.issueNumber - a.issueNumber
+          : new Date(b.githubUpdatedAt ?? b.githubCreatedAt ?? 0).getTime() -
+            new Date(a.githubUpdatedAt ?? a.githubCreatedAt ?? 0).getTime(),
+      );
+  }, [prs, activeFilter, searchQuery, sort]);
 
   return (
     <div className="space-y-4">
+      {isError && (
+        <div
+          role="alert"
+          className="border-destructive/30 bg-destructive/5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm"
+        >
+          <p>Couldn’t load repository work. Please try again.</p>
+          <button
+            onClick={() => void refetch()}
+            className="font-medium underline underline-offset-4"
+          >
+            Try again
+          </button>
+        </div>
+      )}
       {/* Search + Filter Row */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="group/search relative flex-1">
-          <Search className="text-muted-foreground/40 group-focus-within/search:text-primary/50 absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 transition-colors" />
+          <Search className="text-muted-foreground group-focus-within/search:text-primary/50 absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 transition-colors" />
           <input
             type="text"
             placeholder="Search pull requests…"
             aria-label="Search pull requests"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground/45 focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
+            className="border-border/40 bg-card/60 text-foreground placeholder:text-muted-foreground focus:ring-primary/25 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm transition-all duration-200 focus:ring-2 focus:outline-none"
           />
         </div>
-        <div className="border-border/40 bg-card/60 flex shrink-0 items-center gap-0.5 rounded-xl border p-1 backdrop-blur-sm">
+        <select
+          aria-label="Sort repository work"
+          value={sort}
+          onChange={(event) => setSort(event.target.value)}
+          className="border-border bg-card rounded-xl border px-3 py-2 text-sm"
+        >
+          <option value="updated">Recently updated</option>
+          <option value="number">Newest number</option>
+        </select>
+        <div className="border-border/40 bg-card/60 flex shrink-0 items-center gap-0.5 rounded-xl border p-1">
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -122,14 +165,14 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                 "relative cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                 activeFilter === f
                   ? "text-primary"
-                  : "text-muted-foreground/60 hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {activeFilter === f && (
                 <motion.div
                   layoutId="pr-filter-pill"
                   className="bg-primary/10 border-primary/15 absolute inset-0 rounded-lg border"
-                  transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+                  transition={{ type: "spring", bounce: 0.15, duration: 0.2 }}
                 />
               )}
               <span className="relative">{f}</span>
@@ -139,28 +182,39 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
       </div>
 
       {/* PR List */}
-      <div className="border-border/40 divide-border/25 bg-card/50 divide-y overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm">
+      <div className="border-border/40 divide-border/25 bg-card/50 divide-y overflow-hidden rounded-xl border shadow-sm">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="relative">
               <div className="border-primary/10 h-8 w-8 rounded-full border-2" />
               <Loader2 className="text-primary/40 absolute inset-0 h-8 w-8 animate-spin" />
             </div>
-            <span className="text-muted-foreground/40 text-xs font-medium">
+            <span className="text-muted-foreground text-xs font-medium">
               Loading pull requests…
             </span>
           </div>
         ) : filteredPRs.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="bg-muted/20 flex h-10 w-10 items-center justify-center rounded-full">
-              <GitPullRequest className="text-muted-foreground/25 h-4 w-4" />
+              <GitPullRequest className="text-muted-foreground h-4 w-4" />
             </div>
-            <p className="text-muted-foreground/40 text-sm font-medium">
+            <p className="text-muted-foreground text-sm font-medium">
               No pull requests found
             </p>
-            {prs.length === 0 && !searchQuery ? (
+            {prs.length === 0 && !searchQuery && !isError ? (
               <button
-                onClick={() => syncIssues({ projectId })}
+                onClick={() =>
+                  syncIssues(
+                    { projectId },
+                    {
+                      onSuccess: () => toast.success("Repository work synced"),
+                      onError: (error) =>
+                        toast.error(
+                          error.message || "Couldn’t sync. Try again.",
+                        ),
+                    },
+                  )
+                }
                 disabled={isSyncing}
                 className="border-border/40 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -170,7 +224,7 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                 {isSyncing ? "Syncing from GitHub…" : "Sync PRs from GitHub"}
               </button>
             ) : (
-              <p className="text-muted-foreground/25 text-xs">
+              <p className="text-muted-foreground text-xs">
                 Try adjusting your search or filters
               </p>
             )}
@@ -218,12 +272,12 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                             className="hover:bg-muted/30 group/link cursor-pointer rounded-lg p-1.5 transition-all"
                             title="View on GitHub"
                           >
-                            <ExternalLink className="text-muted-foreground/50 group-hover/link:text-foreground h-3.5 w-3.5 transition-all group-hover/link:scale-105" />
+                            <ExternalLink className="text-muted-foreground group-hover/link:text-foreground h-3.5 w-3.5 transition-all group-hover/link:scale-105" />
                           </a>
                         )}
                         <Badge
                           variant="outline"
-                          className={`h-5 shrink-0 border px-2 text-[10px] font-medium ${statusConfig.className}`}
+                          className={`h-5 shrink-0 border px-2 text-xs font-medium ${statusConfig.className}`}
                         >
                           {statusConfig.label}
                         </Badge>
@@ -231,11 +285,11 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                     </div>
 
                     {/* Meta row */}
-                    <div className="text-muted-foreground/60 flex flex-wrap items-center gap-2 text-[11px]">
-                      <span className="text-muted-foreground/40 font-mono">
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-muted-foreground font-mono">
                         #{pr.issueNumber}
                       </span>
-                      <span className="text-muted-foreground/35">•</span>
+                      <span className="text-muted-foreground">•</span>
                       <span>
                         {pr.state === "open" ? "opened" : "updated"}{" "}
                         {formatDistanceToNow(
@@ -247,11 +301,11 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
                           { addSuffix: true },
                         )}
                       </span>
-                      <span className="text-muted-foreground/35">•</span>
-                      <div className="text-muted-foreground/70 flex items-center gap-1.5 font-medium">
+                      <span className="text-muted-foreground">•</span>
+                      <div className="text-muted-foreground flex items-center gap-1.5 font-medium">
                         <Avatar className="ring-border/30 h-4 w-4 ring-1">
                           <AvatarImage src={pr.authorAvatar || ""} />
-                          <AvatarFallback className="text-[7px] font-bold">
+                          <AvatarFallback className="text-[7px] font-semibold">
                             {pr.authorLogin.slice(0, 1).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
@@ -266,10 +320,23 @@ function PullRequestsTab({ projectId, repoUrl }: PullRequestsTabProps) {
         )}
       </div>
 
+      {hasNextPage && (
+        <button
+          disabled={isFetchingNextPage}
+          onClick={() => void fetchNextPage()}
+          className="border-border rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {isFetchingNextPage ? "Loading more…" : "Load more"}
+        </button>
+      )}
+      <p className="text-muted-foreground text-xs">
+        Search, filters, and sorting apply to loaded results.{" "}
+        {hasNextPage ? "Load more to include older work." : ""}
+      </p>
       {/* Footer watermark */}
-      <p className="text-muted-foreground/25 mt-4 flex items-center justify-center gap-1.5 pt-2 text-center text-[11px]">
+      <p className="text-muted-foreground mt-4 flex items-center justify-center gap-1.5 pt-2 text-center text-xs">
         <Sparkles className="h-3 w-3" />
-        AI Triage powered by GitVision
+        Synced from GitHub
       </p>
     </div>
   );

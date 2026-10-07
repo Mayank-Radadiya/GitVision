@@ -64,6 +64,10 @@ export const projectIdSchema = z.object({
   projectId: validators.uuid,
 });
 
+export const projectRenameSchema = projectIdSchema.extend({
+  projectName: z.string().trim().pipe(projectCreateSchema.shape.projectName),
+});
+
 /**
  * Project commits query schema (with pagination)
  */

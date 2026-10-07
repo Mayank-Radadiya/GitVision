@@ -315,6 +315,18 @@ export function createProjectService() {
       return project[0];
     },
 
+    async renameProject(projectId: string, userId: string, projectName: string) {
+      const [project] = await db
+        .update(projectTables)
+        .set({ projectName, updatedAt: new Date() })
+        .where(and(eq(projectTables.id, projectId), eq(projectTables.ownerId, userId)))
+        .returning({ id: projectTables.id, projectName: projectTables.projectName });
+      if (!project) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+      return project;
+    },
+
     async deleteProject(projectId: string, userId: string) {
       await assertProjectOwnership(projectId, userId);
       // ON DELETE CASCADE handles commits, files, embeddings, issues, chats

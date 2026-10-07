@@ -1,35 +1,30 @@
 "use client";
 
-/**
- * Project Header v2 — Includes Repository Health circular progress ring,
- * Stars/Forks pills, AI Syncing badge, and primary action buttons.
- */
-
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 import {
-  ArrowLeft,
+  ChevronRight,
   ExternalLink,
-  Star,
-  GitFork,
+  FolderGit2,
   Code,
   MessageSquare,
-  ShieldCheck,
   MoreVertical,
   Trash2,
   RefreshCw,
   Loader2,
+  PanelRight,
+  Search,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { Badge } from "@/shared/components/ui/badge";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/shared/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -42,15 +37,11 @@ import {
   AlertDialogTitle,
 } from "@/shared/components/ui/alert-dialog";
 import { trpc } from "@/src/lib/trpc/client";
-
 import { IndexingStatusBadge } from "./indexing-status-badge";
+import EditableProjectName from "./editable-project-name";
+import { OPEN_COMMAND_EVENT } from "./workspace-navigation";
 
-import { useState } from "react";
-import toast from "react-hot-toast";
-
-// ─── Dropdown Actions ────────────────────────────────────────────────────────
-
-function ProjectOptionsDropdown({
+export function ProjectOptionsDropdown({
   projectId,
   projectName,
 }: {
@@ -58,6 +49,7 @@ function ProjectOptionsDropdown({
   projectName: string;
 }) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const deleteMutation = trpc.project.delete.useMutation({
@@ -74,7 +66,10 @@ function ProjectOptionsDropdown({
     },
   });
   const resyncMutation = trpc.project.resync.useMutation({
-    onSuccess: () => toast.success("Sync started — this runs in the background"),
+    onSuccess: () => {
+      void utils.project.getDetails.invalidate({ projectId });
+      toast.success("Sync started — this runs in the background");
+    },
     onError: (err) => toast.error(err.message || "Failed to start sync"),
   });
 
@@ -100,7 +95,7 @@ function ProjectOptionsDropdown({
             onSelect={(e) => e.preventDefault()}
             onClick={() => resyncMutation.mutate({ projectId })}
             disabled={resyncMutation.isPending || isDeleting}
-            className="cursor-pointer focus:bg-muted/50"
+            className="focus:bg-muted/50 cursor-pointer"
           >
             {resyncMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -109,6 +104,7 @@ function ProjectOptionsDropdown({
             )}
             {resyncMutation.isPending ? "Starting sync..." : "Sync now"}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
@@ -116,7 +112,7 @@ function ProjectOptionsDropdown({
             }}
             onClick={() => setIsAlertOpen(true)}
             disabled={isDeleting}
-            className="cursor-pointer text-red-500 hover:bg-red-500/10 hover:text-red-600 focus:bg-red-500/10 focus:text-red-600"
+            className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
           >
             {isDeleting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -133,16 +129,13 @@ function ProjectOptionsDropdown({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {projectName}? This action cannot be
-              undone.
+              Are you sure you want to delete {projectName}? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
+            <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -159,316 +152,148 @@ function ProjectOptionsDropdown({
   );
 }
 
-// ─── Health Ring ──────────────────────────────────────────────────────────────
-
-interface HealthRingProps {
-  score: number; // 0–100
-  size?: number;
-}
-
-function HealthRing({ score, size = 68 }: HealthRingProps) {
-  const radius = (size - 10) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
-
-  const color =
-    score >= 80
-      ? "#22c55e" // green
-      : score >= 55
-        ? "#f59e0b" // amber
-        : "#ef4444"; // red
-
-  const label = score >= 80 ? "Excellent" : score >= 55 ? "Good" : "Needs Work";
-
-  return (
-    <div className="relative flex shrink-0 items-center justify-center">
-      <svg width={size} height={size} className="-rotate-90">
-        {/* Track */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={5}
-          className="text-muted/30"
-        />
-        {/* Progress */}
-        <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-        />
-      </svg>
-      {/* Center text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-foreground text-base leading-none font-bold tabular-nums">
-          {score}
-        </span>
-        <span className="text-muted-foreground mt-0.5 text-[9px] leading-none font-medium">
-          {label}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Health Score Derivation ─────────────────────────────────────────────────
-
-function deriveHealthScore(
-  stars: number,
-  commits: number,
-  contributors: number,
-  branches: number,
-): number {
-  // Simple heuristic score (0–100)
-  let score = 50;
-  if (commits > 20) score += 15;
-  else if (commits > 5) score += 8;
-  if (contributors > 3) score += 15;
-  else if (contributors > 1) score += 8;
-  if (stars > 10) score += 10;
-  else if (stars > 2) score += 5;
-  if (branches > 2) score += 10;
-  return Math.min(100, score);
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface ProjectHeaderProps {
-  projectName: string | undefined;
-  githubUrl: string | undefined;
-  stars: number | undefined;
-  forks: number | undefined;
-  totalCommits: number | undefined;
-  totalContributors: number | undefined;
-  totalBranches: number | undefined;
+  projectName?: string;
+  githubUrl?: string;
   isLoading: boolean;
   projectId: string;
   onOpenCodeViewer: () => void;
-  embeddingStatus: string | null | undefined;
-  totalFiles: number | null | undefined;
+  onOpenDetails: () => void;
+  embeddingStatus?: string | null;
+  totalFiles?: number | null;
   indexedFileCount?: number | null;
   totalFileCount?: number | null;
-  lastSyncedAt?: Date | string | null;
 }
-
-function extractOwnerRepo(url: string) {
-  const clean = url
-    .replace(/^https?:\/\/(www\.)?github\.com\//, "")
-    .replace(/\.git$/, "");
-  const parts = clean.split("/");
-  if (parts.length >= 2)
-    return { owner: parts[0], repo: parts.slice(1).join("/") };
-  return { owner: "", repo: clean };
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 function ProjectHeader({
   projectName,
   githubUrl,
-  stars,
-  forks,
-  totalCommits,
-  totalContributors,
-  totalBranches,
   isLoading,
   projectId,
   onOpenCodeViewer,
+  onOpenDetails,
   embeddingStatus,
   totalFiles,
   indexedFileCount,
   totalFileCount,
-  lastSyncedAt,
 }: ProjectHeaderProps) {
   const router = useRouter();
-  const cleanUrl = githubUrl?.replace(/\.git$/, "") || "";
-  const { owner, repo } = githubUrl
-    ? extractOwnerRepo(githubUrl)
-    : { owner: "", repo: "" };
-  const healthScore = deriveHealthScore(
-    stars ?? 0,
-    totalCommits ?? 0,
-    totalContributors ?? 0,
-    totalBranches ?? 0,
-  );
-
   return (
-    <div className="space-y-3">
-      {/* Back Navigation */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => router.push("/dashboard")}
-        className="text-muted-foreground hover:text-foreground group h-8 cursor-pointer gap-2 px-2"
-      >
-        <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" />
-        <span className="text-xs font-medium">Dashboard</span>
-      </Button>
-
-      {/* Header Card */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="border-border/50 bg-card/70 relative overflow-hidden rounded-2xl border backdrop-blur-xl"
-      >
-        {/* Gradient overlays */}
-        <div className="from-primary/5 pointer-events-none absolute inset-0 bg-linear-to-br via-transparent to-purple-500/5" />
-        <div className="bg-primary/6 pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full blur-3xl" />
-        <div className="via-border/60 pointer-events-none absolute right-0 bottom-0 left-0 h-px bg-linear-to-r from-transparent to-transparent" />
-
-        <div className="relative px-6 py-5 md:px-7 md:py-6">
-          <div className="flex items-start justify-between gap-4">
-            {/* Left block — project info */}
-            <div className="min-w-0 flex-1 space-y-3">
+    <header className="border-border bg-background/95 sticky top-0 z-30 border-b backdrop-blur-md">
+      <div className="mx-auto max-w-7xl px-5 pt-5 pb-5 sm:px-8 lg:px-10">
+        <div className="mb-6 flex h-8 items-center justify-between gap-3 pl-12 md:pl-0">
+          <nav
+            aria-label="Breadcrumb"
+            className="text-muted-foreground flex min-w-0 items-center gap-2 text-xs"
+          >
+            <Link
+              href="/dashboard"
+              className="hover:text-foreground focus-visible:outline-ring rounded focus-visible:outline-2"
+            >
+              Projects
+            </Link>
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <span aria-current="page" className="text-foreground truncate">
+              {projectName || "Project"}
+            </span>
+          </nav>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Open command palette"
+            onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_EVENT))}
+            className="text-muted-foreground shrink-0"
+          >
+            <Search className="size-4" />
+            <span className="hidden sm:inline">Search commands</span>
+            <kbd className="border-border hidden rounded border px-1.5 text-xs sm:inline">
+              ⌘ / Ctrl K
+            </kbd>
+          </Button>
+        </div>
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="border-border bg-muted/50 flex size-11 shrink-0 items-center justify-center rounded-xl border">
+              <FolderGit2 className="text-primary size-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
               {isLoading ? (
                 <>
-                  <Skeleton className="h-8 w-56" />
-                  <Skeleton className="h-4 w-48" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-6 w-18 rounded-full" />
-                    <Skeleton className="h-6 w-18 rounded-full" />
-                  </div>
+                  <Skeleton className="mb-2 h-8 w-48" />
+                  <Skeleton className="h-4 w-32" />
                 </>
               ) : (
                 <>
-                  {/* Status badge */}
-                  <IndexingStatusBadge
-                    embeddingStatus={embeddingStatus}
-                    totalFiles={totalFiles}
-                    indexedFileCount={indexedFileCount}
-                    totalFileCount={totalFileCount}
-                  />
-
-                  {/* Project Name */}
-                  <div>
-                    <h1 className="text-foreground text-2xl leading-tight font-bold tracking-tight md:text-3xl">
-                      {projectName || "Project Details"}
-                    </h1>
-                    {githubUrl && (
-                      <Link
-                        href={cleanUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground/60 hover:text-primary group/link mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-xs transition-colors"
-                      >
-                        <ExternalLink className="h-3 w-3 shrink-0" />
-                        <span className="opacity-70">{owner}/</span>
-                        <span className="text-muted-foreground font-medium underline-offset-4 group-hover/link:underline">
-                          {repo}
-                        </span>
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Quick stats pills */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatPill
-                      icon={<Star className="h-3 w-3 text-amber-400" />}
-                      value={stars ?? 0}
-                      label="stars"
+                  <h1 className="min-w-0">
+                    <EditableProjectName
+                      projectId={projectId}
+                      name={projectName || "Project"}
                     />
-                    <StatPill
-                      icon={<GitFork className="h-3 w-3 text-blue-400" />}
-                      value={forks ?? 0}
-                      label="forks"
-                    />
-                  </div>
+                  </h1>
+                  {githubUrl && (
+                    <a
+                      href={githubUrl.replace(/\.git$/, "")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground focus-visible:outline-ring mt-1 flex w-fit max-w-full items-center gap-1.5 rounded text-xs focus-visible:outline-2"
+                    >
+                      <span className="truncate">
+                        {githubUrl
+                          .replace(/^https?:\/\/github\.com\//, "")
+                          .replace(/\.git$/, "")}
+                      </span>
+                      <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                  )}
                 </>
-              )}
-            </div>
-
-            {/* Right block — health ring + actions */}
-            <div className="flex shrink-0 flex-col items-end gap-4">
-              {/* Health Ring */}
-              {!isLoading ? (
-                <div className="flex flex-col items-center gap-1">
-                  <HealthRing score={healthScore} />
-                  <div className="text-muted-foreground flex items-center gap-1 text-[10px]">
-                    <ShieldCheck className="h-3 w-3" />
-                    Repo Health
-                  </div>
-                </div>
-              ) : (
-                <Skeleton className="h-17 w-17 rounded-full" />
-              )}
-
-              {/* Action buttons */}
-              {!isLoading && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => router.push(`/chat/${projectId}`)}
-                    className="border-border/50 hover:border-primary/40 hover:bg-primary/5 hover:text-primary h-8 cursor-pointer gap-2 text-xs transition-all"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    Ask AI
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={onOpenCodeViewer}
-                    className="h-8 cursor-pointer gap-2 border-0 bg-linear-to-br from-[#F97316] to-[#EA580C] text-xs font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-[#EA580C] hover:to-[#F97316] hover:shadow-lg hover:shadow-orange-500/20"
-                  >
-                    <Code className="h-3.5 w-3.5" />
-                    Code Viewer
-                  </Button>
-
-                  <ProjectOptionsDropdown
-                    projectId={projectId!}
-                    projectName={projectName || ""}
-                  />
-                </div>
-              )}
-
-              {/* When the index was last current. Absent until a re-sync has
-                  run — a project that has never been re-synced says nothing
-                  rather than implying the import timestamp is a sync. */}
-              {!isLoading && lastSyncedAt && (
-                <p className="text-muted-foreground mt-1 text-right text-xs">
-                  Last synced{" "}
-                  {new Date(lastSyncedAt).toLocaleString(undefined, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
-                </p>
               )}
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isLoading && (
+              <IndexingStatusBadge
+                embeddingStatus={embeddingStatus}
+                totalFiles={totalFiles}
+                indexedFileCount={indexedFileCount}
+                totalFileCount={totalFileCount}
+              />
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={onOpenCodeViewer}
+            >
+              <Code />
+              Files
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={isLoading}
+              aria-label="Open project details"
+              onClick={onOpenDetails}
+            >
+              <PanelRight />
+            </Button>
+            <Button
+              size="sm"
+              disabled={isLoading}
+              onClick={() => router.push(`/chat/${projectId}`)}
+            >
+              <MessageSquare />
+              Ask AI
+            </Button>
+            {!isLoading && (
+              <ProjectOptionsDropdown
+                projectId={projectId}
+                projectName={projectName || "Project"}
+              />
+            )}
+          </div>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </header>
   );
 }
-
-function StatPill({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-}) {
-  return (
-    <div className="border-border/50 bg-muted/25 text-foreground/80 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs">
-      {icon}
-      <span className="font-semibold tabular-nums">
-        {value.toLocaleString()}
-      </span>
-      <span className="text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
 export default memo(ProjectHeader);

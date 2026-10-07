@@ -18,7 +18,10 @@ import {
   PanelLeftClose,
   PanelLeft,
   FileSearch,
+  Search,
 } from "lucide-react";
+import { Input } from "@/shared/components/ui/input";
+import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
@@ -35,12 +38,21 @@ interface CodeViewerProps {
 
 function CodeViewer({ projectId }: CodeViewerProps) {
   const { data, isLoading, error } = useProjectFiles(projectId);
+  const [search, setSearch] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Build tree from flat file list
   const files: FileEntry[] = useMemo(() => data?.files ?? [], [data?.files]);
-  const tree = useMemo(() => buildFileTree(files), [files]);
+  const tree = useMemo(
+    () =>
+      buildFileTree(
+        files.filter((file) =>
+          file.path.toLowerCase().includes(search.toLowerCase()),
+        ),
+      ),
+    [files, search],
+  );
 
   // ─── Deep link: ?file=<path>&line=<n> from chat citation badges ─────────
   // Pure derivation, no effect: the param wins until the user picks a file,
@@ -84,7 +96,12 @@ function CodeViewer({ projectId }: CodeViewerProps) {
     [files, activePath],
   );
 
-  const { data: fileContent } = useFileContent(projectId, selectedFile?.id);
+  const {
+    data: fileContent,
+    isLoading: isFileLoading,
+    isError: isFileError,
+    refetch: refetchFile,
+  } = useFileContent(projectId, selectedFile?.id);
 
   const handleSelect = useCallback((path: string) => {
     setSelectedPath(path);
@@ -121,6 +138,19 @@ function CodeViewer({ projectId }: CodeViewerProps) {
 
   return (
     <div>
+      <div className="relative mb-5 max-w-md">
+        <Search
+          className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2"
+          aria-hidden="true"
+        />
+        <Input
+          aria-label="Search repository files"
+          placeholder="Find a file by path…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="pl-9"
+        />
+      </div>
       {/* Section Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -190,6 +220,13 @@ function CodeViewer({ projectId }: CodeViewerProps) {
                       Explorer
                     </span>
                   </div>
+                  {tree.length === 0 && (
+                    <p className="text-muted-foreground p-4 text-sm">
+                      {search
+                        ? "No files match this path."
+                        : "No files available. Sync your repository to load files."}
+                    </p>
+                  )}
                   <FileTree
                     tree={tree}
                     selectedPath={activePath}
@@ -202,7 +239,26 @@ function CodeViewer({ projectId }: CodeViewerProps) {
 
           {/* Code Panel */}
           <div className="min-w-0 flex-1">
-            {selectedFile ? (
+            {selectedFile && isFileLoading ? (
+              <div role="status" className="space-y-4 p-6">
+                <span className="sr-only">Loading file content…</span>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-80 w-full" />
+              </div>
+            ) : selectedFile && isFileError ? (
+              <div role="alert" className="p-6">
+                <p className="text-muted-foreground text-sm">
+                  Couldn’t load this file.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => void refetchFile()}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : selectedFile ? (
               <CodePanel
                 filePath={selectedFile.path}
                 content={fileContent || ""}
@@ -214,7 +270,7 @@ function CodeViewer({ projectId }: CodeViewerProps) {
               /* Empty state */
               <div className="flex h-full items-center justify-center p-8 text-center">
                 <div>
-                  <FileSearch className="text-muted-foreground/30 mx-auto mb-4 h-12 w-12" />
+                  <FileSearch className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground text-sm">
                     Select a file from the explorer to view its content
                   </p>

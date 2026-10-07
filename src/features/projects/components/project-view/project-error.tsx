@@ -33,8 +33,8 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
       </Button>
 
       {/* Error Card */}
-      <div className="bg-card/80 mx-auto max-w-lg rounded-2xl border border-red-500/20 p-12 text-center shadow-xl backdrop-blur-xl">
-        <div className="mb-6 inline-flex rounded-2xl bg-red-500/10 p-4">
+      <div className="bg-card/80 mx-auto max-w-lg rounded-xl border border-red-500/20 p-12 text-center shadow-xl">
+        <div className="mb-6 inline-flex rounded-xl bg-red-500/10 p-4">
           <AlertCircle className="h-12 w-12 text-red-400" />
         </div>
 
@@ -58,7 +58,7 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
           </Button>
           <Button
             onClick={() => router.push("/dashboard")}
-            className="cursor-pointer gap-2 border-0 bg-linear-to-br from-[#F97316] to-[#EA580C] text-white"
+            className="from-primary to-primary text-primary-foreground cursor-pointer gap-2 border-0 bg-linear-to-br"
           >
             <ArrowLeft className="h-4 w-4" />
             Dashboard

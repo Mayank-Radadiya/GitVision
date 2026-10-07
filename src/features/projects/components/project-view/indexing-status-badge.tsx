@@ -1,14 +1,12 @@
 "use client";
 
-import { Badge } from "@/src/shared/components/ui/badge";
+import { Badge } from "@/shared/components/ui/badge";
+import { Loader2 } from "lucide-react";
 
 interface IndexingStatusBadgeProps {
   embeddingStatus: string | null | undefined;
-  /** File count GitHub reported at import time — a fallback denominator. */
   totalFiles?: number | null;
-  /** Files embedded by the current run, written by the pipeline. */
   indexedFileCount?: number | null;
-  /** Files the current run considered, written by the pipeline. */
   totalFileCount?: number | null;
 }
 
@@ -18,38 +16,40 @@ export function IndexingStatusBadge({
   indexedFileCount,
   totalFileCount,
 }: IndexingStatusBadgeProps) {
-  if (embeddingStatus === "partial") {
-    // Prefer the pipeline's own counts. They are authoritative; `totalFiles` is
-    // only a last resort for a row written before the counters existed.
-    const total = totalFileCount || totalFiles;
-    const indexed = indexedFileCount || 0;
-
-    return (
-      <Badge
-        variant="outline"
-        className="border-amber-500/50 text-amber-600 dark:text-amber-400 gap-1.5"
-      >
-        {total ? (
-          <>
-            Partial index — indexed {indexed} of {total} files
-          </>
-        ) : (
-          <>Partial index — some files not indexed</>
-        )}
-      </Badge>
-    );
-  }
-
+  const waiting =
+    embeddingStatus === "pending" || embeddingStatus === "processing";
+  const total = totalFileCount || totalFiles;
+  const label =
+    embeddingStatus === "completed"
+      ? "AI ready"
+      : embeddingStatus === "partial"
+        ? total
+          ? `Partial index — indexed ${indexedFileCount ?? 0} of ${total} files`
+          : "Partial index — some files not indexed"
+        : embeddingStatus === "failed"
+          ? "Indexing failed"
+          : embeddingStatus === "processing"
+            ? "Indexing"
+            : embeddingStatus === "pending"
+              ? "Queued for indexing"
+              : "Index status unavailable";
   return (
     <Badge
       variant="outline"
-      className="border-emerald-500/50 text-emerald-600 dark:text-emerald-400 gap-1.5"
+      className={`gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${embeddingStatus === "failed" ? "border-destructive/30 text-destructive" : "border-border bg-muted/40 text-foreground"}`}
     >
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-      </span>
-      AI Synced
+      {waiting ? (
+        <Loader2
+          className="size-3 animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      ) : (
+        <span
+          className={`size-1.5 rounded-full ${embeddingStatus === "failed" ? "bg-destructive" : embeddingStatus === "completed" ? "bg-primary" : "bg-muted-foreground"}`}
+          aria-hidden="true"
+        />
+      )}
+      {label}
     </Badge>
   );
 }

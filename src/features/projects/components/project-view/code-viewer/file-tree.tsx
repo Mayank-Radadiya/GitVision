@@ -60,21 +60,51 @@ function getFileIcon(node: TreeNode) {
     case "rust":
     case "go":
     case "java":
-      return <FileCode aria-hidden="true" className={cn(iconClass, "text-blue-400")} />;
+      return (
+        <FileCode
+          aria-hidden="true"
+          className={cn(iconClass, "text-primary")}
+        />
+      );
     case "json":
-      return <FileJson aria-hidden="true" className={cn(iconClass, "text-yellow-400")} />;
+      return (
+        <FileJson
+          aria-hidden="true"
+          className={cn(iconClass, "text-primary")}
+        />
+      );
     case "markdown":
     case "mdx":
     case "text":
-      return <FileText aria-hidden="true" className={cn(iconClass, "text-muted-foreground")} />;
+      return (
+        <FileText
+          aria-hidden="true"
+          className={cn(iconClass, "text-muted-foreground")}
+        />
+      );
     case "css":
     case "scss":
-      return <FileCode aria-hidden="true" className={cn(iconClass, "text-pink-400")} />;
+      return (
+        <FileCode
+          aria-hidden="true"
+          className={cn(iconClass, "text-primary")}
+        />
+      );
     case "html":
     case "xml":
-      return <FileCode aria-hidden="true" className={cn(iconClass, "text-orange-400")} />;
+      return (
+        <FileCode
+          aria-hidden="true"
+          className={cn(iconClass, "text-primary")}
+        />
+      );
     default:
-      return <FileIcon aria-hidden="true" className={cn(iconClass, "text-muted-foreground")} />;
+      return (
+        <FileIcon
+          aria-hidden="true"
+          className={cn(iconClass, "text-muted-foreground")}
+        />
+      );
   }
 }
 
@@ -132,9 +162,15 @@ function DirectoryNode({
           )}
         />
         {isOpen ? (
-          <FolderOpen aria-hidden="true" className="text-primary/70 h-4 w-4 shrink-0" />
+          <FolderOpen
+            aria-hidden="true"
+            className="text-primary/70 h-4 w-4 shrink-0"
+          />
         ) : (
-          <Folder aria-hidden="true" className="text-primary/70 h-4 w-4 shrink-0" />
+          <Folder
+            aria-hidden="true"
+            className="text-primary/70 h-4 w-4 shrink-0"
+          />
         )}
         <span className="truncate font-medium">{node.name}</span>
       </button>
@@ -312,9 +348,8 @@ function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
           activate();
           break;
         }
-        const parent = row.parentElement?.closest<HTMLElement>(
-          '[role="treeitem"]',
-        );
+        const parent =
+          row.parentElement?.closest<HTMLElement>('[role="treeitem"]');
         moveTo(parent && rows.includes(parent) ? parent : undefined);
         break;
       }

@@ -33,23 +33,6 @@ import type { Commit } from "@/features/projects/types/project.types";
 
 // ─── Hash-based dynamic color generator ──────────────────────────────────────
 
-const HASH_COLORS = [
-  "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20",
-  "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  "text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/20",
-  "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20",
-  "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20",
-  "text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-];
-
-function getHashColorClasses(hash: string) {
-  let num = 0;
-  for (let i = 0; i < hash.length; i++) {
-    num += hash.charCodeAt(i);
-  }
-  return HASH_COLORS[num % HASH_COLORS.length];
-}
-
 // ─── Date bucket labeling ─────────────────────────────────────────────────────
 
 function dateBucket(date: Date): string {
@@ -126,11 +109,11 @@ function CommitRow({
     commit.commitMessage.split("\n")[0]?.substring(0, 100) ?? "";
 
   // Assign a vibrant color based on commit hash
-  const colorClasses = getHashColorClasses(commit.commitHash);
+  const colorClasses = "text-primary bg-primary/10 border-primary/20";
 
   const placeholder = `https://ui-avatars.com/api/?name=${encodeURIComponent(commit.authorName)}&background=random&size=32`;
   const commitUrl = repoUrl
-    ? `${repoUrl}/commit/${commit.commitHash}`
+    ? `${repoUrl.replace(/\.git$/, "")}/commit/${commit.commitHash}`
     : undefined;
 
   return (
@@ -167,12 +150,12 @@ function CommitRow({
               height={16}
               className="rounded-full object-cover"
             />
-            <span className="text-muted-foreground pr-1 text-[10px] font-medium">
+            <span className="text-muted-foreground pr-1 text-xs font-medium">
               {commit.authorName}
             </span>
           </div>
 
-          <span className="text-muted-foreground text-[11px] font-medium">
+          <span className="text-muted-foreground text-xs font-medium">
             {formatDistanceToNow(new Date(commit.authorDate), {
               addSuffix: true,
             })}
@@ -184,13 +167,13 @@ function CommitRow({
               href={commitUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className={`ml-auto cursor-pointer rounded border px-2 py-0.5 font-mono text-[10px] opacity-70 transition-colors hover:opacity-100 ${colorClasses}`}
+              className={`ml-auto cursor-pointer rounded border px-2 py-0.5 font-mono text-xs opacity-70 transition-colors hover:opacity-100 ${colorClasses}`}
             >
               {commit.commitHash.slice(0, 7)}
             </a>
           ) : (
             <span
-              className={`ml-auto rounded border px-2 py-0.5 font-mono text-[10px] opacity-70 ${colorClasses}`}
+              className={`ml-auto rounded border px-2 py-0.5 font-mono text-xs opacity-70 ${colorClasses}`}
             >
               {commit.commitHash.slice(0, 7)}
             </span>
@@ -200,9 +183,9 @@ function CommitRow({
         {/* AI Summary */}
         <div className="mt-1">
           {isGenerating ? (
-            <div className="flex items-center gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-blue-600 dark:text-blue-400">
+            <div className="border-border bg-primary/10 text-primary flex items-center gap-2 rounded-md border px-3 py-2">
               <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-              <span className="text-[11px] font-semibold tracking-wide uppercase">
+              <span className="text-xs font-semibold tracking-wide uppercase">
                 Generating Analysis...
               </span>
             </div>
@@ -214,12 +197,12 @@ function CommitRow({
               </p>
             </div>
           ) : (
-            <div className="mt-0.5 flex opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <div className="mt-0.5 flex opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100">
               <Button
                 size="sm"
                 disabled={isAnyGenerating}
                 onClick={() => onGenerateSummary(commit.id)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground h-6 cursor-pointer gap-1.5 px-2.5 text-[11px] font-semibold shadow-sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground h-6 cursor-pointer gap-1.5 px-2.5 text-xs font-semibold shadow-sm"
               >
                 <Sparkles className="h-2.5 w-2.5" />
                 Analyze Commit
@@ -240,7 +223,7 @@ function DateGroupHeader({ label }: { label: string }) {
       <div className="flex w-8 items-center justify-center">
         <CalendarDays className="text-foreground/50 h-3.5 w-3.5" />
       </div>
-      <span className="text-foreground/75 text-xs font-bold tracking-wider uppercase">
+      <span className="text-foreground/75 text-xs font-semibold tracking-wider uppercase">
         {label}
       </span>
       <div className="bg-border/50 h-px flex-1" />
@@ -277,7 +260,7 @@ function PulseSkeleton() {
 function EmptyPulse() {
   return (
     <div className="border-border/50 bg-muted/20 flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
-      <GitCommit className="text-muted-foreground/40 mb-3 h-8 w-8" />
+      <GitCommit className="text-muted-foreground mb-3 h-8 w-8" />
       <p className="text-foreground text-sm font-semibold">
         No commits tracked
       </p>
@@ -333,14 +316,14 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-600/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400">
+          <div className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
             <TrendingUp className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-foreground text-base leading-tight font-bold tracking-tight">
+            <h3 className="text-foreground text-base leading-tight font-semibold tracking-tight">
               Project Pulse
             </h3>
-            <p className="text-muted-foreground mt-0.5 text-[11px] font-medium">
+            <p className="text-muted-foreground mt-0.5 text-xs font-medium">
               {commits.length > 0
                 ? `${commits.length} commit${commits.length !== 1 ? "s" : ""} recorded`
                 : "Activity timeline"}
@@ -354,7 +337,7 @@ function ProjectPulseWidget({ projectId, repoUrl }: ProjectPulseWidgetProps) {
         <div className="border-border/40 bg-card mb-6 rounded-xl border p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-1.5">
             <div className="bg-primary h-2 w-2 rounded-full" />
-            <p className="text-foreground text-[10px] font-bold tracking-wider uppercase">
+            <p className="text-foreground text-xs font-semibold tracking-wider uppercase">
               Last 7 days
             </p>
           </div>
