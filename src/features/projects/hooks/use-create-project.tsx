@@ -28,6 +28,11 @@ export function useCreateProject() {
       // useDashboardInfo, usePickUpWhereYouLeftOff, ...) is a projection of
       // the single getDashboardData query, so invalidating the individual
       // procedures below left the dashboard showing stale data.
+      // `getCredits` is a standalone procedure with its own 60s staleTime, so
+      // the dashboard invalidation above leaves the credit readout showing the
+      // pre-spend balance until that lapses. Creation always spends, so it is
+      // always invalidated here.
+      utils.project.getCredits.invalidate();
       utils.project.getDashboardData.invalidate();
       utils.project.getAll.invalidate();
 

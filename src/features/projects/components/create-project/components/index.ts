@@ -5,12 +5,9 @@
  */
 
 export { BackLink } from "./BackLink";
-export { CreditsGauge } from "./CreditsGauge";
-export { FeatureChips } from "./FeatureChips";
-export { Field } from "./Field";
-export { FormHeader } from "./FormHeader";
+export { ConfirmationCard } from "./ConfirmationCard";
+export { PageHeader } from "./PageHeader";
+export { PresetPills } from "./PresetPills";
 export { ProjectNameField } from "./ProjectNameField";
 export { RepositoryUrlField } from "./RepositoryUrlField";
-export { StepTimeline } from "./StepTimeline";
 export { SubmitButton } from "./SubmitButton";
-export { LiveRepoPreview } from "./LiveRepoPreview";

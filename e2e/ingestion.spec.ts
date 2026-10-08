@@ -129,23 +129,20 @@ test.describe("ingestion", () => {
     page,
   }) => {
     // Generous: a cold first compile on CI, then a real GitHub tarball fetch,
-    // then a real embedding round-trip. The stock 5s expect timeout is
-    // smaller than the pipeline it is waiting on — the UI quotes "~15s" for
-    // indexing before either of those (`LiveRepoPreview.tsx:94`).
+    // then a real embedding round-trip. The stock 5s expect timeout is smaller
+    // than the pipeline it is waiting on.
     test.setTimeout(240_000);
 
     // ── Submit ────────────────────────────────────────────────────────────
     await page.goto("/create-project");
 
-    await page.getByLabel("GitHub Repository URL").fill(REPO_URL);
-    await page.getByLabel("Project Name").fill(PROJECT_NAME);
+    await page.getByLabel("GitHub URL").fill(REPO_URL);
 
-    const submit = page.getByRole("button", {
-      name: /Connect & Add Repository/,
-    });
-    // The button is `disabled` until react-hook-form validates, and repo
-    // validation is debounced 250ms (`add-repo.tsx:67,94`) — clicking before
-    // that is a no-op, not a failure.
+    const submit = page.getByRole("button", { name: /Index Repository/ });
+    // The CTA is not rendered at all until the URL parses and the reveal gate
+    // opens, then it stays `disabled` until react-hook-form validates — so
+    // `toBeEnabled` covers both the gate and the debounce.
+    await page.getByLabel("Project name").fill(PROJECT_NAME);
     await expect(submit).toBeEnabled();
     await submit.click();
 

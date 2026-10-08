@@ -57,4 +57,15 @@ describe("useCreateProject", () => {
     expect(h.invalidate).toHaveBeenCalledWith("getDashboardData");
     expect(h.invalidate).toHaveBeenCalledWith("getAll");
   });
+
+  it("invalidates getCredits, which is a standalone query with its own staleTime", () => {
+    renderHook(() => useCreateProject());
+
+    h.mutationOpts?.onSuccess?.();
+
+    // Creation always spends credits, but getCredits is not part of
+    // getDashboardData — without this the credit readout keeps showing the
+    // pre-spend balance until its 60s staleTime lapses.
+    expect(h.invalidate).toHaveBeenCalledWith("getCredits");
+  });
 });

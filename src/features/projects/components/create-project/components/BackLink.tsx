@@ -1,24 +1,20 @@
 /**
- * =============================================================================
- * BACK LINK — Quiet Ghost Link
- * =============================================================================
+ * BACK LINK — Fast Navigation to Projects Dashboard
  */
 
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export function BackLink() {
-  const router = useRouter();
   return (
-    <button
-      type="button"
-      onClick={() => router.push("/dashboard")}
-      className="group font-gv-mono text-gv-fog hover:text-gv-bone inline-flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-xs transition-colors duration-200"
+    <Link
+      href="/dashboard"
+      className="group font-gv-mono text-gv-fog hover:text-gv-bone focus-visible:text-gv-bone inline-flex items-center gap-2 rounded-md py-1 text-xs font-medium transition-colors duration-200 focus-visible:outline-none"
     >
-      <ArrowLeft className="text-gv-fog group-hover:text-gv-amber h-3.5 w-3.5 transition-all duration-200 group-hover:-translate-x-0.5" />
+      <ArrowLeft className="text-gv-fog/70 group-hover:text-gv-amber group-focus-visible:text-gv-amber h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-x-1" />
       <span>Back to Projects</span>
-    </button>
+    </Link>
   );
 }

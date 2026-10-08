@@ -8,15 +8,13 @@
  */
 
 import { Suspense } from "react";
-
 import CreateNewProjectForm from "@/features/projects/components/create-project/add-repo";
+import Loading from "./loading";
 
 export default function CreateProjectPage() {
   return (
-    <main>
-      <Suspense fallback={null}>
-        <CreateNewProjectForm />
-      </Suspense>
-    </main>
+    <Suspense fallback={<Loading />}>
+      <CreateNewProjectForm />
+    </Suspense>
   );
 }

@@ -1,12 +1,12 @@
 /**
  * The two credit readouts must not drag the whole dashboard payload with them.
  *
- * `SidebarCredits` and `CreditsGauge` each display a single integer, but both
+ * `SidebarCredits` and `ConfirmationCard` each display a single integer, but both
  * read it through `useDashboardInfo()` — a projection of `getDashboardData`,
  * which runs seven queries and ships every project, every recent commit, the
  * commit chart, the language breakdown and the attention list. The create-project
- * page renders `CreditsGauge` and never touches the dashboard otherwise, so it
- * paid for all of it.
+ * page renders `ConfirmationCard` and never touches the dashboard otherwise, so
+ * it paid for all of it.
  *
  * This pins the cheaper shape: one indexed column read behind a dedicated
  * `getCredits` procedure, which both components point at.
@@ -97,7 +97,7 @@ import { createProjectService } from "@/src/features/dashboard/server/router/ser
 import { projectRouter } from "@/src/features/dashboard/server/router/project";
 import { createCallerFactory } from "@/src/lib/trpc/init";
 import { SidebarCredits } from "@/src/features/dashboard/components/sidebar/components/SidebarCredits";
-import { CreditsGauge } from "@/src/features/projects/components/create-project/components/CreditsGauge";
+import { ConfirmationCard } from "@/features/projects/components/create-project/components/ConfirmationCard";
 
 const CREDITS = 42;
 
@@ -143,8 +143,8 @@ describe("credit readouts", () => {
     expect(screen.getByText(String(CREDITS))).toBeInTheDocument();
   });
 
-  it("CreditsGauge reads getCredits, not the dashboard", () => {
-    render(<CreditsGauge />);
+  it("ConfirmationCard reads getCredits, not the dashboard", () => {
+    render(<ConfirmationCard repoInfo={{ owner: "facebook", repo: "react" }} />);
 
     expect(queried).toContain("project.getCredits");
     expect(queried).not.toContain("project.getDashboardData");

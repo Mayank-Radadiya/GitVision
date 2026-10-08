@@ -1,59 +1,63 @@
 "use client";
 
 /**
- * Create New Project — Form Orchestrator & Dual-Pane Layout
+ * CREATE NEW PROJECT — Single-Column Progressive Reveal
+ *
+ * The URL field is the only input present while idle. Everything else — project
+ * name, the credit ledger, and the CTA — reveals from it once the URL parses to
+ * owner/repo, so the page never shows two questions at once.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectCreateSchema } from "@/src/lib/validation/schemas";
+import { useCredits } from "@/features/dashboard/hooks/use-dashboard";
 
-import { CreateProjectInput, RepoInfo, PRESETS } from "./add-repo.constants";
-import { extractRepoInfo } from "./add-repo.utils";
+import {
+  CreateProjectInput,
+  RepoInfo,
+  PRESETS,
+  PROJECT_CREATION_COST,
+} from "./add-repo.constants";
+import { extractRepoInfo, deriveProjectName } from "./add-repo.utils";
 import { useCreateProject } from "@/features/projects/hooks/use-create-project";
 import {
   BackLink,
-  CreditsGauge,
-  FormHeader,
+  ConfirmationCard,
+  PageHeader,
+  PresetPills,
   ProjectNameField,
   RepositoryUrlField,
-  StepTimeline,
   SubmitButton,
-  LiveRepoPreview,
 } from "./components";
 
-const EXPO_OUT = [0.16, 1, 0.3, 1] as const;
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.04,
-    },
-  },
+const REVEAL_OUT = { opacity: 0, y: 8 };
+const REVEAL_IN = {
+  opacity: 1,
+  y: 0,
+  transition: { duration: 0.22, ease: EASE_OUT_EXPO },
 };
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.35,
-      ease: EXPO_OUT,
-    },
-  },
+const HIDE_OUT = {
+  opacity: 0,
+  y: 4,
+  transition: { duration: 0.15, ease: "easeIn" as const },
 };
 
 export default function CreateNewProjectForm() {
   const createProject = useCreateProject();
+  const { data: credits } = useCredits();
+  const reduced = useReducedMotion();
 
-  // ─── Form Setup ──────────────────────────────────────────────────────────
+  // While the balance is in flight it is unknown, not zero. Treating it as
+  // anything concrete either blocks a paying user or waves through a broke one,
+  // so the gate stays open and ConfirmationCard renders a dash instead.
+  const hasEnoughCredits = credits === undefined || credits >= PROJECT_CREATION_COST;
+
   const {
     register,
     handleSubmit,
@@ -71,72 +75,65 @@ export default function CreateNewProjectForm() {
   const repoUrl = watch("repoUrl");
 
   // ─── Deep Link: ?url= from the landing hero ──────────────────────────────
-  // Prefills the field only. The user still reviews and submits, so no credit
-  // is spent until they press the button.
   const searchParams = useSearchParams();
   const urlParam = searchParams.get("url")?.trim() ?? "";
 
   useEffect(() => {
     if (!urlParam) return;
-    reset((prevValues) => ({ ...prevValues, repoUrl: urlParam }));
+    const info = extractRepoInfo(urlParam);
+    const derived = info ? deriveProjectName(info.repo) : "";
+
+    reset((prevValues) => ({
+      ...prevValues,
+      repoUrl: urlParam,
+      projectName: prevValues.projectName || derived,
+    }));
   }, [urlParam, reset]);
 
-  // ─── Repo Validation & Live Graph Feed ──────────────────────────────────
-  const [repoPreview, setRepoPreview] = useState<RepoInfo | null>(null);
-  const [repoValid, setRepoValid] = useState(false);
+  // ─── Debounced repo parse — the reveal trigger ───────────────────────────
+  const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
 
   useEffect(() => {
-    if (!repoUrl) {
-      setRepoPreview(null);
-      setRepoValid(false);
+    if (!repoUrl || errors.repoUrl) {
+      setRepoInfo(null);
       return;
     }
-    const t = setTimeout(() => {
-      if (!errors.repoUrl) {
-        const info = extractRepoInfo(repoUrl);
-        setRepoPreview(info);
-        setRepoValid(!!info);
-      } else {
-        setRepoPreview(null);
-        setRepoValid(false);
-      }
-    }, 250);
+    const t = setTimeout(() => setRepoInfo(extractRepoInfo(repoUrl)), 200);
     return () => clearTimeout(t);
   }, [repoUrl, errors.repoUrl]);
 
-  // Handle Preset selection
+  const repoValid = repoInfo !== null;
+
+  // ─── Presets ────────────────────────────────────────────────────────────
   const handleSelectPreset = useCallback(
     (url: string, name: string) => {
       setValue("repoUrl", url, { shouldValidate: true, shouldTouch: true });
-      if (!projectName) {
-        setValue("projectName", name, {
-          shouldValidate: true,
-          shouldTouch: true,
-        });
-      }
+      setValue("projectName", name, {
+        shouldValidate: true,
+        shouldTouch: true,
+      });
     },
-    [setValue, projectName],
+    [setValue],
   );
 
   const onSubmit = useCallback(
     (data: CreateProjectInput) => {
+      if (!hasEnoughCredits) return;
       createProject.mutate(data);
     },
-    [createProject],
+    [createProject, hasEnoughCredits],
   );
 
-  // ─── Keyboard Shortcuts (⌘/Ctrl+Enter submit & 1-3 presets) ────────────
+  // ─── Keyboard Shortcuts (⌘/Ctrl+Enter submit & 1-3 presets) ──────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ⌘ + Enter to submit
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        if (isValid && !createProject.isPending) {
+        if (isValid && hasEnoughCredits && !createProject.isPending) {
           e.preventDefault();
           handleSubmit(onSubmit)();
         }
       }
 
-      // Quick 1, 2, 3 preset trigger if no input is active
       const activeElement = document.activeElement;
       const isInputActive =
         activeElement &&
@@ -157,54 +154,69 @@ export default function CreateNewProjectForm() {
   }, [
     handleSubmit,
     isValid,
+    hasEnoughCredits,
     createProject.isPending,
     onSubmit,
     handleSelectPreset,
   ]);
 
-  // Derive step state
-  const currentStep = createProject.isPending
-    ? 2
-    : createProject.isSuccess
-      ? 3
-      : 1;
   const isLoading = createProject.isPending;
 
   return (
-    <div className="gv-page relative min-h-screen">
-      {/* Background branch graph SVG */}
-      {/* <GitGraphBackground
-        projectName={projectName}
-        repoValid={repoValid}
-        repoInfo={repoPreview}
-        isSubmitting={createProject.isPending}
-        isSubmitted={createProject.isSuccess}
-      /> */}
+    <div className="gv-page relative min-h-screen overflow-hidden">
+      <div
+        aria-hidden
+        className="bg-grid-small-white pointer-events-none absolute inset-0 opacity-40"
+      />
 
-      {/* Main Content Layout */}
-      <div className="relative z-10 mx-auto w-full max-w-330 px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
-        <BackLink />
+      <div className="relative mx-auto w-full max-w-[600px] px-5 py-8 sm:px-6 sm:py-12">
+        <div className="mb-6">
+          <BackLink />
+        </div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="mt-6 grid grid-cols-1 gap-8 lg:mt-8 lg:grid-cols-12"
-        >
-          {/* ─── Left Column: Primary Form Card (7 Cols) ──────────────────── */}
-          <section className="lg:col-span-7">
-            <div className="gv-card p-6 sm:p-8">
-              <FormHeader />
+        <div className="space-y-6">
+          <PageHeader />
 
-              <div className="mt-7">
-                <StepTimeline currentStep={currentStep} />
-              </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <RepositoryUrlField
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              value={repoUrl}
+              isLoading={isLoading}
+              repoPreview={repoInfo}
+            />
 
-              <form
-                onSubmit={handleSubmit(onSubmit)}
-                className="mt-8 space-y-6"
-              >
-                <motion.div variants={itemVariants}>
+            {/* Presets are the idle affordance; once a repo is parsed the rest
+                of the form takes over the same slot. */}
+            <AnimatePresence initial={false} mode="wait">
+              {!repoValid ? (
+                <motion.div
+                  key="presets"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <PresetPills
+                    presets={PRESETS}
+                    repoInfo={repoInfo}
+                    onSelectPreset={handleSelectPreset}
+                    disabled={isLoading}
+                  />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+
+            <AnimatePresence initial={false}>
+              {repoValid ? (
+                <motion.div
+                  key="revealed"
+                  className="space-y-6"
+                  initial={reduced ? false : REVEAL_OUT}
+                  animate={REVEAL_IN}
+                  exit={reduced ? undefined : HIDE_OUT}
+                >
                   <ProjectNameField
                     register={register}
                     setValue={setValue}
@@ -213,39 +225,19 @@ export default function CreateNewProjectForm() {
                     repoUrl={repoUrl}
                     isLoading={isLoading}
                   />
-                </motion.div>
 
-                <motion.div variants={itemVariants}>
-                  <RepositoryUrlField
-                    register={register}
-                    setValue={setValue}
-                    errors={errors}
-                    value={repoUrl}
+                  <ConfirmationCard repoInfo={repoInfo} />
+
+                  <SubmitButton
                     isLoading={isLoading}
-                    repoPreview={repoPreview}
+                    isValid={isValid}
+                    disabled={!hasEnoughCredits}
                   />
                 </motion.div>
-
-                <motion.div variants={itemVariants} className="pt-2">
-                  <SubmitButton isLoading={isLoading} isValid={isValid} />
-                </motion.div>
-              </form>
-
-              <div className="border-gv-hairline/80 mt-8 border-t pt-6">
-                <CreditsGauge />
-              </div>
-            </div>
-          </section>
-
-          {/* ─── Right Column: Live Repository Intelligence (5 Cols) ─────── */}
-          <motion.aside variants={itemVariants} className="lg:col-span-5">
-            <LiveRepoPreview
-              repoInfo={repoPreview}
-              repoValid={repoValid}
-              onSelectPreset={handleSelectPreset}
-            />
-          </motion.aside>
-        </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </form>
+        </div>
       </div>
     </div>
   );

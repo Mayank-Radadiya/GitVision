@@ -1,37 +1,40 @@
 /**
- * Create Project — Branded Loading Skeleton
+ * Create Project — Loading Skeleton
  *
- * Quiet dark-page skeleton that mirrors the dual-pane form layout.
+ * Matches the single-column layout: back link, header, URL field, and preset
+ * pills. Nothing below the URL field renders until it parses, so the skeleton
+ * stops there too.
  */
 
 export default function Loading() {
   return (
-    <div className="gv-page min-h-screen">
-      <div className="mx-auto w-full max-w-[1320px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-14">
-        {/* Back link placeholder */}
-        <div className="h-4 w-24 rounded bg-gv-hairline/70 animate-pulse" />
+    <div className="gv-page relative min-h-screen overflow-hidden">
+      <div className="bg-grid-small-white pointer-events-none absolute inset-0 opacity-40" />
 
-        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
-          {/* Left — form card skeleton */}
-          <div className="lg:col-span-7">
-            <div className="gv-card space-y-5 p-6 sm:p-8">
-              <div className="h-9 w-3/5 rounded bg-gv-hairline/70 animate-pulse" />
-              <div className="h-4 w-4/5 rounded bg-gv-hairline/50 animate-pulse" />
+      <div className="relative mx-auto w-full max-w-[600px] px-5 py-8 sm:px-6 sm:py-12">
+        <div className="mb-6 h-4 w-28 rounded bg-gv-hairline/60 animate-pulse" />
 
-              <div className="mt-10 space-y-6">
-                <div className="h-11 w-full rounded-lg bg-gv-graphite-2 animate-pulse" />
-                <div className="h-11 w-full rounded-lg bg-gv-graphite-2 animate-pulse" />
-                <div className="h-12 w-full rounded-xl bg-gv-graphite-2 animate-pulse" />
-              </div>
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="h-6 w-44 rounded-full bg-gv-hairline/60 animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-8 w-64 rounded-lg bg-gv-hairline/70 animate-pulse" />
+              <div className="h-4 w-5/6 rounded bg-gv-hairline/40 animate-pulse" />
             </div>
           </div>
 
-          {/* Right — preview rail skeleton */}
-          <div className="hidden lg:col-span-5 lg:block">
-            <div className="gv-card space-y-4 p-6">
-              <div className="h-4 w-1/3 rounded bg-gv-hairline/70 animate-pulse" />
-              <div className="h-24 w-full rounded-lg bg-gv-graphite-2 animate-pulse" />
-              <div className="h-24 w-full rounded-lg bg-gv-graphite-2 animate-pulse" />
+          <div className="space-y-2.5">
+            <div className="h-4 w-24 rounded bg-gv-hairline/50 animate-pulse" />
+            <div className="h-12 w-full rounded-xl bg-gv-graphite-2 animate-pulse" />
+            <div className="h-3 w-56 rounded bg-gv-hairline/30 animate-pulse" />
+          </div>
+
+          <div className="space-y-3">
+            <div className="h-3 w-28 rounded bg-gv-hairline/30 animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-8 w-24 rounded-full bg-gv-graphite-2 animate-pulse" />
+              <div className="h-8 w-28 rounded-full bg-gv-graphite-2 animate-pulse" />
+              <div className="h-8 w-32 rounded-full bg-gv-graphite-2 animate-pulse" />
             </div>
           </div>
         </div>

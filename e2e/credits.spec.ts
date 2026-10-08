@@ -109,11 +109,14 @@ test.describe("Credit exhaustion", () => {
   test("blocks project creation and explains why", async ({ page }) => {
     await page.goto("/create-project");
 
-    await page.getByLabel("Project Name").fill(BLOCKED_PROJECT_NAME);
-    await page.getByLabel("GitHub Repository URL").fill(TINY_REPO_URL);
-    await expect(page.getByText("Verified")).toBeVisible();
+    await page.getByLabel("GitHub URL").fill(TINY_REPO_URL);
 
-    await page.getByRole("button", { name: "Connect & Add Repository" }).click();
+    // The URL field is the only input until it parses, so a visible CTA is the
+    // assertion that the reveal gate has opened.
+    await expect(page.getByRole("button", { name: "Index Repository" })).toBeVisible();
+    await page.getByLabel("Project name").fill(BLOCKED_PROJECT_NAME);
+
+    await page.getByRole("button", { name: "Index Repository" }).click();
 
     // `useCreateProject` surfaces `error.message` through a toast and nothing
     // else, so the toast is the only place this explanation exists in the DOM.

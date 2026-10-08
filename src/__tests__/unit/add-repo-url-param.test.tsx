@@ -62,7 +62,7 @@ function renderForm() {
 }
 
 function repoInput() {
-  return screen.getByLabelText("GitHub Repository URL");
+  return screen.getByLabelText("GitHub URL");
 }
 
 beforeEach(() => {
@@ -89,13 +89,17 @@ describe("F-01 — create-project ?url= deep link", () => {
     expect(repoInput()).toHaveValue("");
   });
 
-  it("3. preset selection still populates repoUrl and projectName", () => {
+  it("3. preset selection still populates repoUrl and projectName", async () => {
     renderForm();
 
-    fireEvent.click(screen.getByText("facebook/react"));
+    fireEvent.click(screen.getByRole("button", { name: /React/ }));
 
     expect(repoInput()).toHaveValue("https://github.com/facebook/react");
-    expect(screen.getByLabelText("Project Name")).toHaveValue("React");
+
+    // The name field is behind the reveal gate, which opens on a 200ms debounce
+    // over the parsed URL — it is not in the DOM until then.
+    const nameInput = await screen.findByLabelText("Project name");
+    expect(nameInput).toHaveValue("React");
   });
 
   it("4. never creates a project on mount, so no credits are spent", () => {
