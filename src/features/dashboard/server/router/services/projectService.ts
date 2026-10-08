@@ -4,6 +4,7 @@ import {
   projectTables,
   commitsTable,
   projectFiles,
+  codeEmbeddings,
   issuesTable,
   issueCommentsTable,
   projectChats,
@@ -109,6 +110,63 @@ function aggregateLanguages(
       size,
       percentage: totalBytes > 0 ? Math.round((size / totalBytes) * 1000) / 10 : 0,
     }));
+}
+
+/** Windows the activity chart offers, in days. */
+export const INSIGHT_WINDOWS = [7, 30, 90] as const;
+export type InsightWindow = (typeof INSIGHT_WINDOWS)[number];
+
+/**
+ * Bot and service-account authors, excluded from contributor rankings.
+ *
+ * This has to be a SQL predicate and not a JS filter: the contributor query
+ * groups and sorts in the database, so a bot removed afterwards would already
+ * have displaced a human from the top N. The patterns mirror the ones
+ * `contributor-widget.tsx` and `team-tab.tsx` applied client-side before the
+ * contributor counts moved server-side — one vocabulary, so the two surfaces
+ * cannot disagree about who counts as a person.
+ */
+const BOT_AUTHOR_FILTER = sql`(
+  ${commitsTable.authorName} !~* '(bot@|github-actions|vercel|dependabot|renovate|\\[bot\\])'
+  AND ${commitsTable.authorEmail} !~* '(bot@|github-actions|dependabot|renovate|\\[bot\\])'
+)`;
+
+/** `YYYY-MM-DD` in UTC — the same key `date_trunc('day', …)::date::text` yields. */
+function utcDayKey(date: Date): string {
+  return date.toISOString().split("T")[0]!;
+}
+
+/**
+ * Expands a sparse `GROUP BY day` result into a dense ascending series.
+ *
+ * Postgres omits days with no rows, so the gaps are exactly the days the chart
+ * most needs to draw — a quiet Tuesday has to render as a zero-height point,
+ * not be absent and silently shorten the x-axis. The key format has to match
+ * the SQL side (`utcDayKey` above), which is also why this lives next to the
+ * query rather than in the component: a client/server timezone disagreement
+ * here would shift every bucket by a day and look like a plausible chart.
+ */
+function densifyDailySeries(
+  rows: { date: string; commits: number }[],
+  since: Date,
+  until: Date,
+): { date: string; commits: number }[] {
+  const byDay = new Map(rows.map((row) => [row.date, Number(row.commits)]));
+  const series: { date: string; commits: number }[] = [];
+  const cursor = new Date(
+    Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate()),
+  );
+  const end = Date.UTC(
+    until.getUTCFullYear(),
+    until.getUTCMonth(),
+    until.getUTCDate(),
+  );
+  while (cursor.getTime() <= end) {
+    const key = utcDayKey(cursor);
+    series.push({ date: key, commits: byDay.get(key) ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return series;
 }
 
 export function createProjectService() {
@@ -918,6 +976,218 @@ export function createProjectService() {
         .orderBy(sql`date_trunc('day', ${commitsTable.authorDate})`);
 
       return result.map((r) => ({ date: r.date, commits: Number(r.commits) }));
+    },
+
+    /**
+     * Per-project aggregates for the overview dashboard, in one round-trip.
+     *
+     * This exists because every number the overview shows was previously either
+     * absent or wrong. `getCommitChart` aggregates across *all* of a user's
+     * projects, so it cannot answer "how busy was this one". And the project
+     * page's own charts were fed by `useProjectCommits`, whose first page is
+     * ten rows — so a "last 7 days" chart was really "the last 10 commits,
+     * bucketed", which silently stops being a chart once a project has more
+     * than ten commits. The contributor widget and the team table read that
+     * same slice, so their counts were fiction too.
+     *
+     * ── What is deliberately NOT selected ─────────────────────────────────────
+     * `commits.commit_message`, nothing else. That column averages 1,092 bytes
+     * and reaches 65,536 on a single row; `getDashboardData` documents at
+     * length that this is wire width rather than a slow plan (EXPLAIN puts the
+     * database side at 0.134 ms). A daily aggregate needs one number per day,
+     * so pulling the message text to throw it away would buy nothing.
+     *
+     * ── Why the window is a parameter ─────────────────────────────────────────
+     * The prior-period comparison, the contributor counts and the daily series
+     * all have to describe the *same* window, or the trend line disagrees with
+     * the bars beside it. Fetching one wide range and slicing it client-side
+     * would let those drift, so the window is chosen server-side and every
+     * figure is derived from the same slice. The refetch on switch is one small
+     * payload — two integers and at most 90 rows.
+     *
+     * ── Batch ─────────────────────────────────────────────────────────────────
+     * Five statements in one `db.batch`, the same shape and rationale as
+     * `getDashboardData` (T-029/T-030: 10 round-trips / 717 ms → 1 / 424 ms).
+     * There is no transaction here and none is needed: `neon-http` is
+     * stateless (D-11), and every statement below is an independent read that
+     * is individually correct, so a partially-applied batch degrades a metric
+     * rather than corrupting state.
+     */
+    async getProjectInsights(
+      projectId: string,
+      userId: string,
+      days: number = 30,
+    ) {
+      await assertProjectOwnership(projectId, userId);
+
+      const safeDays = (INSIGHT_WINDOWS as readonly number[]).includes(days)
+        ? days
+        : 30;
+
+      const now = new Date();
+      // Twice the window: the second half is the prior period the trend is
+      // compared against. Clamped to a whole day so the series lines up with
+      // the `date_trunc('day', …)` buckets the database produces.
+      const windowStart = new Date(now);
+      windowStart.setUTCDate(windowStart.getUTCDate() - safeDays);
+      const seriesStart = new Date(now);
+      seriesStart.setUTCDate(seriesStart.getUTCDate() - safeDays * 2);
+
+      const [
+        dailyRows,
+        workRows,
+        contributorRows,
+        indexRows,
+        fileLanguageRows,
+        lastCommitRows,
+      ] = await db.batch([
+        // 1. Commits per day across both windows, so the prior period is free.
+        db
+          .select({
+            date: sql<string>`date_trunc('day', ${commitsTable.authorDate})::date::text`,
+            commits: count(commitsTable.id),
+          })
+          .from(commitsTable)
+          .where(
+            and(
+              eq(commitsTable.projectId, projectId),
+              gte(commitsTable.authorDate, seriesStart),
+            ),
+          )
+          .groupBy(sql`date_trunc('day', ${commitsTable.authorDate})`)
+          .orderBy(sql`date_trunc('day', ${commitsTable.authorDate})`),
+
+        // 2. Open/closed work-item counts plus how long the open ones have been
+        //    open. One statement with conditional SUMs rather than four, so the
+        //    four numbers can never be from four different points in time.
+        db
+          .select({
+            openIssues: sql<number>`SUM(CASE WHEN ${issuesTable.isPullRequest} = false AND ${issuesTable.state} = 'open' THEN 1 ELSE 0 END)::int`,
+            closedIssues: sql<number>`SUM(CASE WHEN ${issuesTable.isPullRequest} = false AND ${issuesTable.state} = 'closed' THEN 1 ELSE 0 END)::int`,
+            openPullRequests: sql<number>`SUM(CASE WHEN ${issuesTable.isPullRequest} = true AND ${issuesTable.state} = 'open' THEN 1 ELSE 0 END)::int`,
+            mergedPullRequests: sql<number>`SUM(CASE WHEN ${issuesTable.isPullRequest} = true AND ${issuesTable.state} = 'closed' THEN 1 ELSE 0 END)::int`,
+            // `github_created_at` is the authoritative age; `created_at` is the
+            // row's own insert time, which for a synced issue is the same day.
+            // COALESCE to the latter so a partially-synced row still reports an
+            // age instead of dropping out of the median.
+            medianOpenAgeDays: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (
+              ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(${issuesTable.githubCreatedAt}, ${issuesTable.createdAt}))) / 86400
+            ) FILTER (WHERE ${issuesTable.state} = 'open')`,
+          })
+          .from(issuesTable)
+          .where(eq(issuesTable.projectId, projectId)),
+
+        // 3. Commit counts per person, window-scoped and bot-filtered in SQL.
+        //    Grouped on the lowercased email because one person commits under
+        //    several `authorName` spellings — that mismatch was the original
+        //    "3 contributors" bug, and the fix belongs where the grouping is.
+        db
+          .select({
+            email: sql<string>`LOWER(${commitsTable.authorEmail})`,
+            name: sql<string>`MAX(${commitsTable.authorName})`,
+            avatar: sql<string | null>`MAX(${commitsTable.authorAvatar})`,
+            commits: count(commitsTable.id),
+          })
+          .from(commitsTable)
+          .where(
+            and(
+              eq(commitsTable.projectId, projectId),
+              gte(commitsTable.authorDate, windowStart),
+              BOT_AUTHOR_FILTER,
+            ),
+          )
+          .groupBy(sql`LOWER(${commitsTable.authorEmail})`)
+          .orderBy(desc(count(commitsTable.id)))
+          .limit(12),
+
+        // 4. Index footprint. `code_embeddings` is the searchable index, so its
+        //    token total is the real cost of what the project can be asked
+        //    about — a number that was already in `projects.estimatedTokens`
+        //    but never rendered anywhere.
+        db
+          .select({
+            chunks: count(codeEmbeddings.id),
+            tokens: sum(codeEmbeddings.tokenCount),
+          })
+          .from(codeEmbeddings)
+          .where(eq(codeEmbeddings.projectId, projectId)),
+
+        // 5. Files per language, for a composition that reflects what is
+        //    actually stored rather than GitHub's byte-size estimate. The
+        //    estimate stays authoritative for the colour and the bar; this is
+        //    the count of files we hold.
+        db
+          .select({
+            language: projectFiles.language,
+            files: count(projectFiles.id),
+          })
+          .from(projectFiles)
+          .where(
+            and(
+              eq(projectFiles.projectId, projectId),
+              sql`${projectFiles.language} IS NOT NULL`,
+            ),
+          )
+          .groupBy(projectFiles.language)
+          .orderBy(desc(count(projectFiles.id)))
+          .limit(8),
+
+        // 6. Most recent commit of any age. Separate from the daily series
+        //    because that one only covers two windows: a repository quiet for a
+        //    month still needs to say "last commit 31 days ago" rather than
+        //    "never".
+        db
+          .select({ at: sql<Date | null>`MAX(${commitsTable.authorDate})` })
+          .from(commitsTable)
+          .where(eq(commitsTable.projectId, projectId)),
+      ]);
+
+      const series = densifyDailySeries(dailyRows, seriesStart, now);
+      const windowSeries = series.slice(-safeDays);
+      const priorSeries = series.slice(-safeDays * 2, -safeDays);
+      const work = workRows[0];
+
+      return {
+        days: safeDays,
+        series: windowSeries,
+        // Returned as a series rather than only as a total, because the chart
+        // draws the prior period as a dashed ghost line and a single number
+        // cannot be turned back into a shape. It is the same `densifyDailySeries`
+        // output sliced once more, so no extra statement is needed.
+        priorSeries,
+        totals: {
+          commitsInWindow: windowSeries.reduce((sum, d) => sum + d.commits, 0),
+          priorWindowCommits: priorSeries.reduce((sum, d) => sum + d.commits, 0),
+          activeDays: windowSeries.filter((d) => d.commits > 0).length,
+        },
+        lastActivityAt: lastCommitRows[0]?.at ?? null,
+        work: {
+          openIssues: Number(work?.openIssues ?? 0),
+          closedIssues: Number(work?.closedIssues ?? 0),
+          openPullRequests: Number(work?.openPullRequests ?? 0),
+          mergedPullRequests: Number(work?.mergedPullRequests ?? 0),
+          medianOpenAgeDays:
+            work?.medianOpenAgeDays === null || work?.medianOpenAgeDays === undefined
+              ? null
+              : Math.round(Number(work.medianOpenAgeDays)),
+        },
+        contributors: contributorRows.map((row) => ({
+          email: row.email,
+          name: row.name,
+          avatar: row.avatar,
+          commits: Number(row.commits),
+        })),
+        index: {
+          chunks: Number(indexRows[0]?.chunks ?? 0),
+          tokens: Number(indexRows[0]?.tokens ?? 0),
+        },
+        fileLanguages: fileLanguageRows
+          .filter((row) => row.language !== null)
+          .map((row) => ({
+            language: row.language as string,
+            files: Number(row.files),
+          })),
+      };
     },
 
     async generateAiSummary(

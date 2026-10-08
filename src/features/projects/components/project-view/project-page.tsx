@@ -1,19 +1,43 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+/**
+ * Project workspace shell — header, rail, and lazily-mounted sections.
+ *
+ * Three changes from the version this replaces, and one behaviour deliberately
+ * left alone.
+ *
+ * Removed: the horizontal `ProjectTabs`, replaced by `SectionRail`; the
+ * `WorkspaceSummary` strip, whose five equal-weight tiles ranked "branches" level
+ * with AI index coverage and printed coverage as a bare string with no bar; and the
+ * block that reprinted the active section's own `label` and `description`
+ * directly under the tablist it had just been selected from — the tab already said
+ * that, in a control the user had just touched.
+ *
+ * Removed: a second `useProjectCommits` subscription. `project-pulse-widget` called
+ * the hook itself while this component also called it and threaded `commits` down
+ * for the same widget to re-consume, so one infinite query was mounted twice. The
+ * pulse widget's chart is now the real aggregate from `getInsights`, and its feed
+ * is `CommitsTab`, which owns the only remaining subscription.
+ *
+ * Kept: `visited` panels stay mounted once opened, so a search term typed in the
+ * commit feed, an expanded commit body, and a selected file all survive navigating
+ * away and back. Heavy sections still load only on first visit, via `dynamic` +
+ * `SectionSkeleton`. That is the one piece of this file that is load-bearing
+ * rather than cosmetic, and it is unchanged.
+ */
+
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { MotionConfig } from "framer-motion";
 import {
   useProjectDetails,
-  useProjectCommits,
+  useProjectInsights,
 } from "@/features/projects/hooks/use-project";
 import ProjectHeader from "./project-header";
-import ProjectTabs, { tabId, tabPanelId } from "./project-tabs";
+import SectionRail, { tabId, tabPanelId } from "./rail/section-rail";
 import ProjectError from "./project-error";
-import BentoGrid from "./bento-grid";
-import WorkspaceSummary from "./workspace-summary";
 import { SectionSkeleton } from "./workspace-skeleton";
 import {
   PROJECT_COMMAND_EVENT,
@@ -21,7 +45,11 @@ import {
   type ProjectCommand,
 } from "./workspace-navigation";
 import type { ProjectTab } from "@/features/projects/types/project.types";
+import type { ActivityWindow } from "./overview/activity-panel";
 
+const OverviewDashboard = dynamic(() => import("./overview"), {
+  loading: SectionSkeleton,
+});
 const CodeViewer = dynamic(() => import("./code-viewer"), {
   loading: SectionSkeleton,
 });
@@ -49,6 +77,7 @@ export default function ProjectPage() {
   const projectId = params.projectId;
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activityWindow, setActivityWindow] = useState<ActivityWindow>(30);
   const [visited, setVisited] = useState<Set<ProjectTab>>(
     () => new Set(["overview"]),
   );
@@ -59,11 +88,16 @@ export default function ProjectPage() {
     error,
     refetch,
   } = useProjectDetails(projectId);
-  const { data: commitsData } = useProjectCommits(projectId);
-  const commits = useMemo(
-    () => commitsData?.pages.flatMap((page) => page.commits) ?? [],
-    [commitsData],
-  );
+
+  // Fetched at the shell rather than inside `OverviewDashboard` so the rail can
+  // badge its sections with the same counts the Overview renders — one query,
+  // two consumers, and no chance of the badge and the panel disagreeing.
+  const {
+    data: insights,
+    isLoading: insightsLoading,
+    isFetching: insightsFetching,
+  } = useProjectInsights(projectId, activityWindow);
+
   const navigate = useCallback((tab: ProjectTab) => {
     setActiveTab(tab);
     setVisited((previous) =>
@@ -122,7 +156,11 @@ export default function ProjectPage() {
       />
     );
 
-  const current = PROJECT_SECTIONS.find((section) => section.id === activeTab)!;
+  const work = insights?.work;
+  const railCounts = work
+    ? { issues: work.openIssues, "pull-requests": work.openPullRequests }
+    : undefined;
+
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.2 }}>
       <div
@@ -141,90 +179,92 @@ export default function ProjectPage() {
           indexedFileCount={project?.indexedFileCount}
           totalFileCount={project?.totalFileCount}
         />
-        <div className="mx-auto max-w-7xl space-y-7 px-5 pt-7 pb-12 sm:px-8 lg:px-10">
-          <WorkspaceSummary
-            isLoading={isLoading}
-            totalCommits={project?.totalCommits}
-            totalContributors={project?.totalContributors}
-            totalBranches={project?.totalBranches}
-            indexedFileCount={project?.indexedFileCount}
-            totalFileCount={project?.totalFileCount}
-            embeddingStatus={project?.embeddingStatus}
-            lastSyncedAt={project?.lastSyncedAt}
-            onNavigate={navigate}
-            onOpenDetails={openDetails}
-          />
-          <ProjectTabs activeTab={activeTab} onTabChange={navigate} />
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">
-                {current.label}
-              </h2>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {current.description}
+        <div className="mx-auto max-w-7xl px-5 pt-5 pb-12 sm:px-8 lg:px-10">
+          <div className="lg:flex lg:gap-8">
+            <SectionRail
+              activeTab={activeTab}
+              onTabChange={navigate}
+              counts={railCounts}
+            />
+
+            {/* `flex-1` rather than a fixed width: the rail collapses to a
+                horizontal row below `lg`, so the content column has to be allowed
+                to reclaim the full width rather than sit beside an empty gutter. */}
+            <div className="min-w-0 flex-1 pt-6 lg:pt-0">
+              {PROJECT_SECTIONS.map(({ id }) => (
+                <div
+                  key={id}
+                  id={tabPanelId(id)}
+                  role="tabpanel"
+                  aria-labelledby={tabId(id)}
+                  tabIndex={0}
+                  hidden={activeTab !== id}
+                  className="project-section focus-visible:ring-ring min-w-0 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {visited.has(id) &&
+                    (isLoading ? (
+                      <SectionSkeleton />
+                    ) : (
+                      <>
+                        {id === "overview" && (
+                          <OverviewDashboard
+                            insights={insights}
+                            isInsightsLoading={insightsLoading}
+                            isInsightsFetching={insightsFetching}
+                            window={activityWindow}
+                            onWindowChange={setActivityWindow}
+                            embeddingStatus={project?.embeddingStatus}
+                            indexedFileCount={project?.indexedFileCount}
+                            totalFileCount={project?.totalFileCount}
+                            totalFiles={project?.totalFiles}
+                            embeddingProgress={project?.embeddingProgress}
+                            embeddingError={project?.embeddingError}
+                            lastEmbeddingAttempt={project?.lastEmbeddingAttempt}
+                            totalCommits={project?.totalCommits}
+                            totalContributors={project?.totalContributors}
+                            estimatedTokens={project?.estimatedTokens}
+                            languages={project?.languages ?? []}
+                            briefing={project?.briefing ?? null}
+                            onNavigate={navigate}
+                          />
+                        )}
+                        {id === "commits" && (
+                          <CommitsTab repoUrl={project?.githubUrl} />
+                        )}
+                        {id === "pull-requests" && (
+                          <PullRequestsTab
+                            projectId={projectId}
+                            repoUrl={project?.githubUrl}
+                          />
+                        )}
+                        {id === "issues" && (
+                          <IssuesTab
+                            projectId={projectId}
+                            repoUrl={project?.githubUrl}
+                          />
+                        )}
+                        {id === "files" && <CodeViewer projectId={projectId} />}
+                        {id === "team" && (
+                          <TeamTab
+                            projectId={projectId}
+                            totalContributors={project?.totalContributors ?? 0}
+                          />
+                        )}
+                        {id === "settings" && project && (
+                          <SettingsTab project={project} />
+                        )}
+                      </>
+                    ))}
+                </div>
+              ))}
+
+              <p className="text-muted-foreground mt-10 hidden text-xs lg:block">
+                <kbd className="font-mono">Shift D</kbd> details
+                <span className="mx-2">·</span>
+                <kbd className="font-mono">Shift F</kbd> files
               </p>
             </div>
-            <p className="text-muted-foreground hidden pt-1 text-xs lg:block">
-              Shift D · Details<span className="mx-2">/</span>Shift F · Files
-            </p>
           </div>
-          {/* Visited panels remain mounted to preserve search, expansion and
-              file selection. Heavy sections load only on their first visit. */}
-          {PROJECT_SECTIONS.map(({ id }) => (
-            <div
-              key={id}
-              id={tabPanelId(id)}
-              role="tabpanel"
-              aria-labelledby={tabId(id)}
-              tabIndex={0}
-              hidden={activeTab !== id}
-              className="project-section focus-visible:ring-ring min-h-80 min-w-0 rounded-md focus-visible:ring-2 focus-visible:outline-none"
-            >
-              {visited.has(id) &&
-                (isLoading ? (
-                  <SectionSkeleton />
-                ) : (
-                  <>
-                    {id === "overview" && (
-                      <BentoGrid
-                        projectId={projectId}
-                        repoUrl={project?.githubUrl || ""}
-                        commits={commits}
-                        totalContributors={project?.totalContributors ?? 0}
-                        languages={project?.languages ?? []}
-                        briefing={project?.briefing ?? null}
-                        embeddingStatus={project?.embeddingStatus ?? null}
-                      />
-                    )}
-                    {id === "commits" && (
-                      <CommitsTab repoUrl={project?.githubUrl} />
-                    )}
-                    {id === "pull-requests" && (
-                      <PullRequestsTab
-                        projectId={projectId}
-                        repoUrl={project?.githubUrl}
-                      />
-                    )}
-                    {id === "issues" && (
-                      <IssuesTab
-                        projectId={projectId}
-                        repoUrl={project?.githubUrl}
-                      />
-                    )}
-                    {id === "files" && <CodeViewer projectId={projectId} />}
-                    {id === "team" && (
-                      <TeamTab
-                        projectId={projectId}
-                        totalContributors={project?.totalContributors ?? 0}
-                      />
-                    )}
-                    {id === "settings" && project && (
-                      <SettingsTab project={project} />
-                    )}
-                  </>
-                ))}
-            </div>
-          ))}
         </div>
         {project && detailsOpen && (
           <ProjectDetailsDrawer

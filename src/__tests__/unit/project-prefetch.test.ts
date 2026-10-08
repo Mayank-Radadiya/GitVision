@@ -28,6 +28,7 @@ vi.mock("@/src/lib/trpc/server", () => ({
       getDetails: h.proc("getDetails"),
       getCommits: h.proc("getCommits"),
       getIssues: h.proc("getIssues"),
+      getInsights: h.proc("getInsights"),
     },
   },
   prefetch: vi.fn(async (options: { queryKey: unknown[] }) => {
@@ -60,7 +61,24 @@ describe("prefetchProject", () => {
       "getCommits",
       "getIssues",
       "getIssues",
+      "getInsights",
     ]);
+  });
+
+  it("prefetches the insights aggregate at the window the client opens with", async () => {
+    await prefetchProject("p1");
+
+    // The overview hero charts from `getInsights`, and the client's
+    // `useProjectInsights` defaults to a 30-day window. A prefetch at any other
+    // window produces a different query key, so the page ships an empty cache
+    // for the chart it is about to draw and pays for a second round trip.
+    const insights = h.calls.filter((c) => {
+      const input = c.input as { projectId?: string; days?: number };
+      return input.projectId === "p1" && input.days !== undefined;
+    });
+    expect(insights).toHaveLength(1);
+    expect(insights[0].kind).toBe("query");
+    expect((insights[0].input as { days: number }).days).toBe(30);
   });
 
   it("builds the commits prefetch as an infinite query so the key matches useInfiniteQuery", async () => {

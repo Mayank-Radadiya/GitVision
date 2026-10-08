@@ -45,5 +45,12 @@ export async function prefetchProject(projectId: string) {
         isPullRequest: true,
       }),
     ),
+
+    // The overview dashboard's aggregates, at its default window. Prefetched
+    // for the same reason as everything above: the hero chart is the first
+    // thing painted, and a query that lands after hydration shows an empty
+    // chart on a page that was supposed to render with data. A different window
+    // fetches on the client, which is the intended behaviour of the switcher.
+    prefetch(trpc.project.getInsights.queryOptions({ projectId, days: 30 })),
   ]);
 }

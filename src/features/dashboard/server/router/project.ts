@@ -111,6 +111,31 @@ export const projectRouter = createTRPCRouter({
       );
     }),
 
+  /**
+   * Per-project aggregates for the overview dashboard.
+   *
+   * The window is an enum rather than a free number because the service derives
+   * a prior-period comparison, contributor counts and a daily series from it,
+   * all of which must describe the same range. The service clamps an
+   * unrecognised value to 30; the router rejects it instead, so a bad
+   * `days` is visible at the gate rather than silently answered with different
+   * data than the caller asked for.
+   */
+  getInsights: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.uuid(),
+        days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      return projectService.getProjectInsights(
+        input.projectId,
+        ctx.userId,
+        input.days,
+      );
+    }),
+
   getFileContent: protectedProcedure
     // `.uuid()` to match getProjectDetails and getCommits, as the task asks.
     // Both columns are `uuid` in Postgres, so a bare string reached the query as

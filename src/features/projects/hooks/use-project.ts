@@ -50,6 +50,29 @@ export function useProjectCommits(projectId: string) {
 }
 
 /**
+ * Per-project aggregates for the overview dashboard.
+ *
+ * `days` selects the window the server aggregates over, so switching 7 / 30 /
+ * 90 refetches rather than re-slicing: the prior-period trend, the contributor
+ * counts and the daily series all have to describe the same range, and slicing
+ * one wide series client-side is exactly how they drift apart.
+ *
+ * Stale time is short because this is the surface whose whole job is showing
+ * that something changed. `placeholderData` keeps the previous window's shape on
+ * screen during the switch instead of collapsing the chart to nothing.
+ */
+export function useProjectInsights(projectId: string, days: 7 | 30 | 90 = 30) {
+  return trpc.project.getInsights.useQuery(
+    { projectId, days },
+    {
+      enabled: !!projectId,
+      staleTime: 60 * 1000,
+      placeholderData: (previous) => previous,
+    },
+  );
+}
+
+/**
  * Fetches project files for the code viewer (Shiki).
  * Stale time: 10 minutes — files change less often than commits.
  */
