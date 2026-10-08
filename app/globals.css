@@ -546,3 +546,110 @@ body {
 .project-workspace [data-slot="button"].from-primary {
   color: var(--primary-foreground);
 }
+
+/* Landing hero: local semantic aliases preserve the rest of the application. */
+.gitvision-hero {
+  --hero-accent: color-mix(in srgb, var(--primary) 78%, var(--foreground));
+  --hero-wire: color-mix(in oklch, var(--wire-400) 50%, var(--foreground));
+  --hero-add: color-mix(in oklch, var(--diff-add-500) 50%, var(--foreground));
+  --hero-remove: color-mix(in oklch, var(--diff-remove-500) 65%, var(--foreground));
+  --hero-ember: color-mix(in oklch, var(--ember-500) 45%, var(--foreground));
+  --muted-foreground: oklch(0.46 0.018 260);
+  --hero-shadow: color-mix(in srgb, var(--foreground) 14%, transparent);
+  --ring: var(--hero-accent);
+}
+.dark .gitvision-hero {
+  --background: var(--ink-950);
+  --card: var(--ink-900);
+  --muted: var(--ink-800);
+  --border: var(--gv-hairline);
+  --muted-foreground: oklch(0.73 0.018 260);
+  --hero-accent: color-mix(in srgb, var(--primary) 65%, var(--foreground));
+  --hero-wire: var(--wire-400);
+  --hero-add: var(--diff-add-500);
+  --hero-remove: var(--diff-remove-500);
+  --hero-ember: var(--ember-500);
+  --hero-shadow: color-mix(in srgb, var(--background) 80%, transparent);
+}
+.gitvision-hero .hero-accent { color: var(--hero-accent); }
+.gitvision-hero .hero-wire, .gitvision-hero .hero-syntax-function { color: var(--hero-wire); }
+.gitvision-hero .hero-diff-add { color: var(--hero-add); }
+.gitvision-hero .hero-diff-remove { color: var(--hero-remove); }
+.gitvision-hero .hero-syntax-keyword { color: var(--hero-accent); }
+.gitvision-hero .hero-syntax-string { color: var(--hero-ember); }
+.gitvision-hero .hero-syntax-muted { color: var(--muted-foreground); }
+.gitvision-hero .hero-grid {
+  background-image: linear-gradient(color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 65% 48% at 50% 22%, black, transparent);
+}
+.gitvision-hero .hero-noise {
+  opacity: 0.025;
+  background-image: repeating-radial-gradient(circle at 17% 32%, var(--foreground) 0 0.5px, transparent 0.5px 3px);
+  background-size: 7px 11px;
+  mask-image: linear-gradient(black, transparent 70%);
+}
+.gitvision-hero .hero-spotlight {
+  background: radial-gradient(ellipse 50% 35% at 50% 20%, color-mix(in oklch, var(--primary) 8%, transparent), transparent);
+}
+.gitvision-hero .hero-workbench {
+  box-shadow: 0 30px 80px -30px var(--hero-shadow), 0 0 0 5px color-mix(in srgb, var(--border) 20%, transparent);
+}
+.gitvision-hero .hero-control {
+  position: relative;
+  cursor: pointer;
+  transition: transform var(--hero-feedback) ease-out, opacity var(--hero-feedback) ease-out;
+}
+.gitvision-hero .hero-control::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border-top: 1px solid var(--hero-accent);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--hero-sweep) ease-out, opacity var(--hero-feedback) ease-out;
+}
+.gitvision-hero .hero-control:active:not(:disabled) { transform: scale(var(--hero-press)); }
+.gitvision-hero .hero-control:disabled::after { display: none; }
+.gitvision-hero :where(a, button, input):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.gitvision-hero .hero-primary {
+  background: var(--primary);
+  color: var(--ink-950);
+}
+.gitvision-hero .hero-search {
+  transition: border-color var(--hero-feedback) ease-out, box-shadow var(--hero-feedback) ease-out;
+}
+.gitvision-hero .hero-search :where(input):focus-visible { outline: none; }
+.gitvision-hero .hero-search:focus-within {
+  border-color: var(--hero-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hero-accent) 35%, transparent);
+}
+.gitvision-hero .hero-search[data-invalid="true"] { border-style: dashed; border-color: var(--foreground); }
+.gitvision-hero .hero-tree-highlight {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--hero-accent);
+}
+.gitvision-hero .hero-line-add { background: color-mix(in srgb, var(--hero-add) 7%, transparent); }
+.gitvision-hero .hero-line-remove { background: color-mix(in srgb, var(--hero-remove) 7%, transparent); }
+@media (hover: hover) and (pointer: fine) {
+  .gitvision-hero .hero-spotlight {
+    background: radial-gradient(ellipse 50% 35% at var(--spotlight-x, 50%) var(--spotlight-y, 20%), color-mix(in oklch, var(--primary) 8%, transparent), transparent);
+  }
+  .gitvision-hero .hero-control:hover::after { transform: scaleX(1); opacity: 0.8; }
+}
+@media (hover: none), (pointer: coarse) {
+  .gitvision-hero .hero-pointer-motion { transform: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gitvision-hero *, .gitvision-hero *::before, .gitvision-hero *::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

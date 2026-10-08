@@ -15,7 +15,7 @@ import {
 import { enforceLimits } from "@/src/lib/rate-limit";
 import { createProjectService } from "./services/projectService";
 import { db } from "@/db";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { projectTables, commitsTable, chatMessages } from "@/db/schema";
 
 // Instantiate the service once, saving memory and CPU cycles
@@ -266,7 +266,9 @@ export const projectRouter = createTRPCRouter({
     const [projects, commits, messages] = await Promise.all([
       db.select({ count: count().mapWith(Number) }).from(projectTables),
       db.select({ count: count().mapWith(Number) }).from(commitsTable),
-      db.select({ count: count().mapWith(Number) }).from(chatMessages),
+      db.select({ count: count().mapWith(Number) })
+        .from(chatMessages)
+        .where(eq(chatMessages.role, "assistant")),
     ]);
 
     return {

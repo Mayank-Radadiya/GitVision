@@ -19,7 +19,7 @@ export const validators = {
     .string()
     .url("Invalid URL format")
     .regex(
-      /^https:\/\/github\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+(\.git)?$/,
+      /^https:\/\/github\.com\/[a-zA-Z0-9_-]+\/(?!\.+$)[a-zA-Z0-9_.-]+(\.git)?$/,
       "Invalid GitHub URL. Expected format: https://github.com/owner/repo",
     ),
 

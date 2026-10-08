@@ -12,15 +12,12 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   // The hero stats are real `COUNT(*)`s now, not literals. They have to be
-  // fetched here rather than from the browser: `proxy.ts` runs `auth.protect()`
-  // on the whole `/api/trpc` prefix, and a signed-out visitor on this page has
-  // no session, so a client-side fetch of `getPublicStats` would be redirected
-  // to sign-in instead of returning numbers. The server caller has no such
-  // problem, and the landing page is already `force-dynamic`, so this costs
-  // one query per request.
+  // fetched here for the initial HTML. `proxy.ts` also allowlists the exact
+  // public stats endpoint, so signed-out visitors can refetch when stale.
+  // The landing page is already `force-dynamic`: one query per request.
   //
   // Must settle before `HydrateClient` dehydrates, or `hero-stats.tsx` ships
-  // an empty cache and refetches into the same wall.
+  // an empty cache and needs another request for the first numbers.
   await prefetch(trpc.project.getPublicStats.queryOptions());
 
   return (

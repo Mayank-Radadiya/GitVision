@@ -1,18 +1,26 @@
-import { render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HeroContent } from "@/src/features/landing/components/hero-section/hero-content";
+import { HeroHeader } from "@/features/landing/components/hero-section/hero-header";
+import { HeroMotionProvider } from "@/features/landing/components/hero-section/hero-motion";
+import { HERO_HEADLINE } from "@/features/landing/components/hero-section/constants";
 
-/**
- * The <h1> is the LCP element on `/`. The server ships the framer-motion
- * `initial="hidden"` state as inline CSS, so anything that hides the
- * headline before JS runs delays LCP by the whole hydration round-trip.
- */
-describe("HeroContent", () => {
-  it("does not render the headline at opacity 0 before hydration", () => {
-    render(<HeroContent />);
-
-    const headline = screen.getByRole("heading", { level: 1 });
-
-    expect(headline.style.opacity).not.toBe("0");
+describe("hero first paint", () => {
+  it("ships a complete, visible headline before JavaScript runs", () => {
+    const html = renderToStaticMarkup(
+      <HeroMotionProvider>
+        <HeroHeader />
+      </HeroMotionProvider>,
+    );
+    const document = new DOMParser().parseFromString(html, "text/html");
+    const heading = document.querySelector("h1")!;
+    expect(document.querySelectorAll("h1")).toHaveLength(1);
+    expect(heading.textContent?.replace("codebaseat", "codebase at")).toBe(
+      HERO_HEADLINE,
+    );
+    expect(html).not.toMatch(/opacity:\s*0(?:;|"|\b)/);
+    expect(html).not.toContain("visibility:hidden");
+    expect(heading.querySelector(".hero-accent")?.textContent).toBe(
+      "speed of thought",
+    );
   });
 });

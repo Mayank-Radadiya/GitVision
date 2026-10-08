@@ -1,34 +1,32 @@
+"use client";
+
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowRightIcon } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { GlowingButton } from "@/shared/components/effects/glowing-button";
-import { fadeInUpVariants } from "./variants";
+import { ArrowRight, Play } from "lucide-react";
+import { HeroMagnetic, HeroReveal } from "./hero-motion";
 
 export function HeroCtas() {
   return (
-    <motion.div
-      variants={fadeInUpVariants}
-      initial="hidden"
-      animate="visible"
-      custom={0.4}
-      className="flex flex-col items-center justify-center gap-4 sm:flex-row"
+    <HeroReveal
+      order={4}
+      className="mx-auto mt-5 flex max-w-xl flex-col justify-center gap-3 sm:flex-row"
     >
-      <Link href="/sign-up" aria-label="Sign up for free access">
-        <GlowingButton className="group z-12 cursor-pointer gap-2 rounded-full text-white">
-          Get started for free
-          <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-        </GlowingButton>
-      </Link>
-      <Link href="#features" aria-label="View features">
-        <Button
-          variant="outline"
-          size="lg"
-          className="border-border/60 bg-background/60 hover:bg-background/80 cursor-pointer rounded-full backdrop-blur-sm transition-all duration-300"
+      <HeroMagnetic>
+        <Link
+          href="/sign-up"
+          className="hero-control hero-primary inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-lg border border-transparent px-6 text-sm font-semibold"
         >
-          See how it works
-        </Button>
-      </Link>
-    </motion.div>
+          Get started for free{" "}
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
+      </HeroMagnetic>
+      <HeroMagnetic>
+        <Link
+          href="#features"
+          className="hero-control border-border bg-card text-foreground inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-lg border px-6 text-sm font-medium"
+        >
+          <Play aria-hidden="true" className="size-3.5" /> See how it works
+        </Link>
+      </HeroMagnetic>
+    </HeroReveal>
   );
 }
