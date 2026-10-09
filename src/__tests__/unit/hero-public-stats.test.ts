@@ -33,7 +33,7 @@ describe("public stats semantics", () => {
     filters.length = 0;
     const caller = createCallerFactory(projectRouter)({
       userId: null,
-      req: null,
+      req: undefined,
       requestId: "hero-stats-test",
     });
     expect(await caller.getPublicStats()).toEqual({

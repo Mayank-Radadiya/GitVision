@@ -39,22 +39,25 @@ describe("RepoBriefingSection", () => {
   it("tells a user mid-index that the briefing is still being written", () => {
     const html = render({ briefing: null, embeddingStatus: "processing" });
 
-    expect(html).toContain("Briefing is being generated");
-    expect(html).not.toContain("No briefing available");
+    expect(html).toContain("is being prepared");
+    expect(html).not.toContain("No repository briefing yet");
   });
 
   it("distinguishes a finished project with no briefing from one still indexing", () => {
     const html = render({ briefing: null, embeddingStatus: "completed" });
 
-    expect(html).toContain("No briefing available");
-    expect(html).not.toContain("being generated");
+    expect(html).toContain("No repository briefing yet");
+    expect(html).not.toContain("being prepared");
   });
 
   it("explains a missing briefing when indexing itself failed", () => {
     const html = render({ briefing: null, embeddingStatus: "failed" });
 
-    expect(html).toContain("No briefing available");
-    expect(html).toContain("Indexing this repository did not complete");
+    // A failed index has its own wording, and it must not collapse into the
+    // plain "no briefing" state — the two need different things from the reader.
+    expect(html).toContain("Repository briefing unavailable");
+    expect(html).toContain("Indexing did not complete");
+    expect(html).not.toContain("No repository briefing yet");
   });
 
   it("treats an unrecognised status as a genuine absence rather than a wait", () => {
@@ -62,7 +65,8 @@ describe("RepoBriefingSection", () => {
     // migration must not be misread as "still working".
     const html = render({ briefing: null, embeddingStatus: "queued" });
 
-    expect(html).toContain("No briefing available");
+    expect(html).toContain("No repository briefing yet");
+    expect(html).not.toContain("being prepared");
   });
 
   it("omits the tech stack section entirely when the model returned none", () => {

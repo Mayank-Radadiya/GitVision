@@ -1,39 +1,14 @@
 "use client";
 
-/**
- * Composition — what this repository is made of.
- *
- * Fixes the defect that made the old "tech stack" widget unreadable: it received
- * `LanguageEntry[]`, which carries GitHub's real per-language colour hex, and
- * threw it away in favour of `var(--primary)` for every row, then faded opacity
- * by index. The result was a single blue bar with descending opacity — one
- * progress bar, not a language breakdown — on a card whose entire job was to
- * distinguish languages from each other.
- *
- * Colour is used here the way it is in the rest of the redesign: to encode
- * identity, not to decorate. GitHub's colours are the language's own, so the
- * segments are recognisable, and the fallbacks are deterministic rather than
- * indexed so two languages never silently share a hue.
- */
-
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { LanguageEntry } from "@/db/schema";
 import { formatBytes, formatCount } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 
-/**
- * Fallback hue for a language GitHub reported without a colour.
- *
- * Hashed from the name so the same language is the same colour across projects
- * and across reloads. Deliberately achromatic: the `gv-*` tokens on this page
- * mean "ready", "ageing", "stale", so a hue borrowed from that vocabulary would
- * make an unnamed language read as a status indicator.
- */
 function fallbackColor(name: string): string {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
+  for (let i = 0; i < name.length; i++)
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  }
   return `hsl(0 0% ${32 + (hash % 28)}%)`;
 }
 
@@ -43,7 +18,6 @@ export function colorFor(entry: LanguageEntry): string {
 
 interface CompositionProps {
   languages: LanguageEntry[];
-  /** Files per language we actually hold, from the insights query. */
   fileCounts?: { language: string; files: number }[];
   className?: string;
 }
@@ -53,81 +27,102 @@ function Composition({
   fileCounts = [],
   className,
 }: CompositionProps) {
-  if (languages.length === 0) {
+  const [expanded, setExpanded] = useState(false);
+  if (languages.length === 0)
     return (
-      <div className="flex flex-col items-center justify-center py-6 text-center">
-        <p className="text-sm font-medium">No language data</p>
-        <p className="text-muted-foreground mt-1 max-w-56 text-xs">
-          GitHub reported no language breakdown for this repository.
+      <div className="py-3">
+        <p className="text-xs font-medium">No language data yet</p>
+        <p className="text-muted-foreground mt-1 text-[11px] leading-relaxed">
+          A source breakdown will appear when GitHub reports languages for this
+          repository.
         </p>
       </div>
     );
-  }
 
+  const sorted = [...languages].sort((a, b) => b.size - a.size);
+  const totalBytes = sorted.reduce(
+    (sum, entry) => sum + Math.max(entry.size || 0, 0),
+    0,
+  );
+  const share = (entry: LanguageEntry) =>
+    totalBytes > 0 ? (Math.max(entry.size || 0, 0) / totalBytes) * 100 : 0;
+  const shown = expanded ? sorted : sorted.slice(0, 5);
+  const remainderBytes = sorted
+    .slice(5)
+    .reduce((sum, entry) => sum + Math.max(entry.size || 0, 0), 0);
   const filesByLanguage = new Map(
     fileCounts.map((row) => [row.language, row.files]),
   );
-  // Percentages are recomputed against the languages actually shown. The old
-  // widget sliced to six rows *after* computing percentages over the full set, so
-  // a ten-language repository drew a bar summing to 60% and left the rest blank
-  // with nothing to explain the gap.
-  const shown = languages.slice(0, 6);
-  const shownBytes = shown.reduce((sum, entry) => sum + (entry.size || 0), 0);
-  const remainder = languages.length - shown.length;
 
   return (
     <div className={cn("space-y-3", className)}>
       <div
-        className="flex h-2 gap-px overflow-hidden rounded-full"
+        className="flex h-2 gap-px overflow-hidden rounded-sm"
         role="img"
-        aria-label={shown
-          .map((entry) => `${entry.name} ${(entry.percentage ?? 0).toFixed(1)}%`)
-          .join(", ")}
+        aria-label={`Language share by source bytes: ${sorted.map((entry) => `${entry.name} ${share(entry).toFixed(1)}%`).join(", ")}`}
       >
-        {shown.map((entry) => (
+        {sorted.slice(0, 5).map((entry) => (
           <span
             key={entry.name}
-            className="h-full first:rounded-l-full last:rounded-r-full"
+            className="h-full transition-opacity hover:opacity-70"
             style={{
-              width: `${shownBytes > 0 ? ((entry.size || 0) / shownBytes) * 100 : 0}%`,
+              width: `${share(entry)}%`,
               backgroundColor: colorFor(entry),
             }}
-            title={`${entry.name} — ${formatBytes(entry.size || 0)}`}
+            title={`${entry.name}: ${share(entry).toFixed(1)}% · ${formatBytes(entry.size)}`}
           />
         ))}
-      </div>
-
-      <ul className="space-y-1.5">
-        {shown.map((entry) => {
-          const files = filesByLanguage.get(entry.name);
-          return (
-            <li key={entry.name} className="flex items-center gap-2 text-xs">
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: colorFor(entry) }}
-                aria-hidden="true"
-              />
-              <span className="text-foreground min-w-0 flex-1 truncate font-medium">
-                {entry.name}
-              </span>
-              {files !== undefined && (
-                <span className="text-muted-foreground tabular-nums">
-                  {formatCount(files)} files
-                </span>
-              )}
-              <span className="text-muted-foreground w-16 shrink-0 text-right tabular-nums">
-                {formatBytes(entry.size || 0)}
-              </span>
-            </li>
-          );
-        })}
-        {remainder > 0 && (
-          <li className="text-muted-foreground text-[11px]">
-            +{remainder} more{" "}
-            {remainder === 1 ? "language" : "languages"} not shown
-          </li>
+        {remainderBytes > 0 && (
+          <span
+            className="bg-muted-foreground/40 h-full"
+            style={{
+              width: `${totalBytes > 0 ? (remainderBytes / totalBytes) * 100 : 0}%`,
+            }}
+            title={`${sorted.length - 5} other languages`}
+          />
         )}
+      </div>
+      <ul className="space-y-2.5">
+        {shown.map((entry) => (
+          <li
+            key={entry.name}
+            className="flex items-center gap-2 text-[11px]"
+            title={`${formatBytes(entry.size)}${filesByLanguage.has(entry.name) ? ` · ${formatCount(filesByLanguage.get(entry.name)!)} stored files` : ""}`}
+          >
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: colorFor(entry) }}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {entry.name}
+            </span>
+            {filesByLanguage.has(entry.name) && (
+              <span className="text-muted-foreground text-[10px] tabular-nums">
+                {formatCount(filesByLanguage.get(entry.name)!)} files
+              </span>
+            )}
+            <span className="text-muted-foreground w-12 shrink-0 text-right font-mono text-[10px] tabular-nums">
+              {share(entry).toFixed(1)}%
+            </span>
+          </li>
+        ))}
       </ul>
+      {sorted.length > 5 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
+        >
+          {expanded
+            ? "Show fewer languages"
+            : `+ ${sorted.length - 5} more languages`}
+        </button>
+      )}
+      <p className="text-muted-foreground border-border border-t pt-3 text-[10px]">
+        {formatBytes(totalBytes)} of source · share by bytes, from GitHub
+      </p>
     </div>
   );
 }

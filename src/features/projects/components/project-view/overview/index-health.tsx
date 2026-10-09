@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * Index health — the one sentence that says whether this project can be asked
- * anything useful.
- *
- * This leads the overview because it is the product's actual precondition. A
- * repo at `failed` answers every question wrongly; a repo at `partial` answers
- * them about a subset and says so. Everything else on this page is commentary on
- * those two facts.
- *
- * The mapping from `embeddingStatus` to wording lives in `describeIndexHealth`
- * below, exported and pure, so the five states are testable without rendering
- * anything and cannot drift apart between this component and the tone it paints.
- */
-
 import { memo } from "react";
 import {
   AlertTriangle,
@@ -25,7 +11,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { isIndexingInFlight } from "@/src/lib/indexing-status";
-import { formatCount, formatRelativeShort } from "@/shared/lib/format";
+import {
+  formatCount,
+  formatRelativeShort,
+  formatTokens,
+} from "@/shared/lib/format";
+import { useNow } from "./use-now";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { CoverageMeter } from "../charts/coverage-meter";
 
@@ -124,6 +115,41 @@ export function describeIndexHealth(
   }
 }
 
+/**
+ * What one indexed unit actually costs.
+ *
+ * `index.chunks` and `index.tokens` were two integers sharing a single metric
+ * tile labelled "Index footprint", which answered neither question a reader has:
+ * *how much is indexed* was already the coverage meter's job, and *how big is each
+ * piece* was invisible. Splitting the ratio out makes the chunker legible — a
+ * tokens-per-chunk figure an order of magnitude above the usual band means files
+ * were not being split, and a very low one means the opposite waste.
+ *
+ * Returns `null` whenever the ratio would be undefined or meaningless. A `null` is
+ * not rendered as `0` or `—`: the row is omitted instead, because an empty pair of
+ * figures reads as "we measured this and it was zero".
+ */
+export function describeIndexEconomy(input: {
+  chunks?: number | null;
+  tokens?: number | null;
+  indexedFiles?: number | null;
+}): { tokensPerChunk: number; chunksPerFile: number | null } | null {
+  const chunks = input.chunks ?? 0;
+  const tokens = input.tokens ?? 0;
+  if (!(chunks > 0) || !(tokens > 0)) return null;
+  const indexedFiles = input.indexedFiles ?? 0;
+  return {
+    tokensPerChunk: Math.round(tokens / chunks),
+    // Chunks-per-file is the chunker's packing density — how finely a file was
+    // split. It was briefly written the other way round, as files-per-chunk,
+    // which is the wrong way to read a real index: a 1,255-token chunker puts
+    // roughly forty chunks in one file, so files-per-chunk is ~0.03 and renders
+    // as a flat "0.0" on every project that is actually indexed properly. The
+    // null is "no file count known", which is a different fact from zero.
+    chunksPerFile: indexedFiles > 0 ? chunks / indexedFiles : null,
+  };
+}
+
 interface IndexHealthProps {
   status?: string | null;
   indexedFileCount?: number | null;
@@ -133,6 +159,9 @@ interface IndexHealthProps {
   embeddingProgress?: number | null;
   embeddingError?: string | null;
   lastEmbeddingAttempt?: Date | string | null;
+  /** Index footprint, from the insights aggregate rather than the project row. */
+  chunks?: number | null;
+  tokens?: number | null;
   isLoading?: boolean;
 }
 
@@ -144,8 +173,11 @@ function IndexHealth({
   embeddingProgress,
   embeddingError,
   lastEmbeddingAttempt,
+  chunks,
+  tokens,
   isLoading,
 }: IndexHealthProps) {
+  const now = useNow();
   if (isLoading) {
     return (
       <div className="space-y-3" aria-hidden="true">
@@ -156,15 +188,39 @@ function IndexHealth({
     );
   }
 
-  const embedded = indexedFileCount ?? 0;
+  const embedded = Math.max(0, indexedFileCount ?? 0);
   const skipped = Math.max((totalFileCount ?? 0) - embedded, 0);
-  const unconsidered = Math.max((totalFiles ?? 0) - (totalFileCount ?? 0), 0);
-  const health = describeIndexHealth(status, { embedded, skipped, unconsidered });
+  const unconsidered = Math.max(
+    (totalFiles ?? 0) - Math.max(totalFileCount ?? 0, embedded),
+    0,
+  );
+  const total = embedded + skipped + unconsidered;
+  const coverage = total > 0 ? (embedded / total) * 100 : null;
+  const health = describeIndexHealth(status, {
+    embedded,
+    skipped,
+    unconsidered,
+  });
   const tone = TONE_CLASS[health.tone];
   const inFlight = isIndexingInFlight(status ?? "pending");
+  const economy = describeIndexEconomy({
+    chunks,
+    tokens,
+    indexedFiles: embedded,
+  });
 
   return (
     <div className="min-w-0 space-y-3">
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-semibold tracking-tight tabular-nums">
+          {coverage === null
+            ? "—"
+            : `${coverage.toFixed(coverage < 100 && coverage > 0 ? 1 : 0)}%`}
+        </span>
+        <span className="text-muted-foreground text-[11px]">
+          searchable coverage
+        </span>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border border-current/20 px-2 py-0.5 text-xs font-medium ${tone.text}`}
@@ -182,14 +238,14 @@ function IndexHealth({
           </span>
           {health.label}
         </span>
-        {lastEmbeddingAttempt && !inFlight && (
+        {lastEmbeddingAttempt && !inFlight && now && (
           <span className="text-muted-foreground text-xs">
-            Last run {formatRelativeShort(lastEmbeddingAttempt)}
+            Last run {formatRelativeShort(lastEmbeddingAttempt, now)}
           </span>
         )}
       </div>
 
-      <p className="text-foreground text-sm leading-relaxed font-medium">
+      <p className="text-foreground text-xs leading-relaxed">
         {health.headline}
       </p>
 
@@ -198,11 +254,45 @@ function IndexHealth({
         progress={inFlight ? (embeddingProgress ?? 0) : null}
       />
 
+      {/* Only rendered once there is a real index to divide. An empty ratio row
+          would read as "measured, and the answer is nothing". */}
+      {economy && (
+        <details className="group border-border/60 border-t pt-3">
+          <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px] transition-colors">
+            Index details · {formatCount(chunks ?? 0)} chunks
+          </summary>
+          <dl className="mt-3 grid gap-2 text-[11px]">
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-muted-foreground">Tokens per chunk</dt>
+              <dd className="text-foreground font-semibold tabular-nums">
+                {formatCount(economy.tokensPerChunk)}
+              </dd>
+            </div>
+            {economy.chunksPerFile !== null && (
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-muted-foreground">Chunks per file</dt>
+                <dd className="text-foreground font-semibold tabular-nums">
+                  {economy.chunksPerFile.toFixed(1)}
+                </dd>
+              </div>
+            )}
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-muted-foreground">Indexed tokens</dt>
+              <dd className="text-foreground font-semibold tabular-nums">
+                {formatTokens(tokens ?? 0)}
+              </dd>
+            </div>
+          </dl>
+        </details>
+      )}
+
       {/* `embeddingError` is populated only on `failed`, and it is the only place
           the actual reason reaches the user — the generic headline above says
           that the index is unusable but not why. */}
-      {status === "failed" && embeddingError && (
-        <p className="text-gv-ember bg-gv-ember/5 border-gv-ember/20 line-clamp-3 rounded-md border px-2.5 py-1.5 text-xs">
+      {(status === "failed" || status === "partial") && embeddingError && (
+        <p
+          className={`rounded-md border px-2.5 py-2 text-xs leading-relaxed break-words ${status === "failed" ? "text-gv-ember bg-gv-ember/5 border-gv-ember/20" : "text-muted-foreground border-border bg-muted/30"}`}
+        >
           {embeddingError}
         </p>
       )}

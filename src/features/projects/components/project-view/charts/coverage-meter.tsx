@@ -19,12 +19,17 @@
  * The progress of a run in flight is a fourth, separate thing: `embeddingProgress`
  * is how far the current run has got, which is not the same as coverage and does
  * not accumulate across runs.
+ *
+ * The bar itself is `SegmentedBar`, shared with the open-work age histogram and
+ * the contributor share bar, so the three cannot drift apart on how a small
+ * non-zero band is drawn.
  */
 
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { formatCount } from "@/shared/lib/format";
+import { SegmentedBar, type Segment } from "./segmented-bar";
 
 export interface CoverageBands {
   /** Files embedded and therefore searchable. */
@@ -44,11 +49,6 @@ interface CoverageMeterProps {
   showLegend?: boolean;
 }
 
-function bandWidth(value: number, total: number): string {
-  if (total <= 0) return "0%";
-  return `${Math.max((value / total) * 100, value > 0 ? 0.5 : 0)}%`;
-}
-
 function CoverageMeter({
   bands,
   progress,
@@ -58,12 +58,20 @@ function CoverageMeter({
   const total = bands.embedded + bands.skipped + bands.unconsidered;
   const coverage = total > 0 ? (bands.embedded / total) * 100 : 0;
 
+  // "Not considered" is deliberately *not* a drawn band: it is the empty track
+  // behind the meter, which is what makes a partly-considered project read as
+  // incomplete rather than as busy.
+  const segments: Segment[] = [
+    { key: "embedded", value: bands.embedded, className: "bg-gv-moss" },
+    { key: "skipped", value: bands.skipped, className: "bg-gv-amber" },
+  ];
+
   return (
     <div className={cn("space-y-2", className)}>
-      <div
-        className="bg-muted/60 relative h-2 overflow-hidden rounded-full"
-        role="img"
-        aria-label={
+      <SegmentedBar
+        segments={segments}
+        total={total}
+        ariaLabel={
           total > 0
             ? `Index coverage: ${Math.round(coverage)}% — ${formatCount(
                 bands.embedded,
@@ -74,29 +82,7 @@ function CoverageMeter({
               }.`
             : "Index coverage: no files counted yet"
         }
-      >
-        {total > 0 && (
-          <>
-            <motion.span
-              className="bg-gv-moss absolute inset-y-0 left-0 rounded-l-full"
-              initial={{ width: 0 }}
-              animate={{ width: bandWidth(bands.embedded, total) }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            />
-            {bands.skipped > 0 && (
-              <motion.span
-                className="bg-gv-amber absolute inset-y-0"
-                initial={{ width: 0 }}
-                animate={{ width: bandWidth(bands.skipped, total) }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                style={{
-                  left: bandWidth(bands.embedded, total),
-                }}
-              />
-            )}
-          </>
-        )}
-      </div>
+      />
 
       {progress !== null && progress !== undefined && progress < 100 && (
         <div className="text-muted-foreground flex items-center gap-2 text-[11px]">

@@ -93,6 +93,15 @@ export const projectRouter = createTRPCRouter({
       return projectService.getProjectFiles(input.projectId, ctx.userId);
     }),
 
+  getIndexedFiles: protectedProcedure
+    .input(projectIdSchema)
+    .query(async ({ input, ctx }) => {
+      return projectService.getIndexedProjectFiles(
+        input.projectId,
+        ctx.userId,
+      );
+    }),
+
   getCommits: protectedProcedure
     // Commits are keyset-paged on `(author_date, id)`, so their cursor is the
     // same `<ISO timestamp>|<uuid>` position the issue and comment cursors
