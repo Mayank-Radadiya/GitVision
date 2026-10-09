@@ -5,6 +5,17 @@ import ProjectPage from "@/src/features/projects/components/project-view/project
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ projectId: "p1" }),
+  usePathname: () => "/dashboard/user-project/p1",
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  // The page shell pushes to /chat/:id for the "Ask AI" call to action.
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
 }));
 
 vi.mock("@/src/features/projects/hooks/use-project", () => ({
@@ -61,13 +72,19 @@ vi.mock(
   () => ({ default: () => <div>issues</div> }),
 );
 
+vi.mock("@/features/projects/components/project-view/project-actions", () => ({
+  useProjectActionController: () => ({}),
+  ProjectActionsProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
+}));
+
 const TAB_NAMES = [
   "Overview",
-  "Issues",
+  "Commits",
   "Pull Requests",
+  "Issues",
   "Files",
   "Contributors",
-  "Commits",
   "Settings",
 ];
 
@@ -94,30 +111,22 @@ describe("section rail", () => {
     );
   });
 
-  // `aria-orientation` describes the layout that was rendered, and the same
-  // component renders as a vertical rail at `lg` and a horizontal pill row below
-  // it — so it has to be asserted in both, not assumed from the markup.
-  it("reports the orientation it is actually rendered in", () => {
-    // jsdom's default innerWidth is 1024, which is exactly Tailwind's `lg`.
-    render(<SectionRail activeTab="overview" onTabChange={vi.fn()} />);
-    expect(screen.getByRole("tablist")).toHaveAttribute(
-      "aria-orientation",
-      "vertical",
-    );
-  });
-
-  it("flips to horizontal below the lg breakpoint", () => {
-    window.innerWidth = 768;
-    try {
-      render(<SectionRail activeTab="overview" onTabChange={vi.fn()} />);
-      expect(screen.getByRole("tablist")).toHaveAttribute(
-        "aria-orientation",
-        "horizontal",
-      );
-    } finally {
-      window.innerWidth = 1024;
-    }
-  });
+  it.each([390, 1024, 1440])(
+    "reports horizontal navigation at %ipx",
+    (width) => {
+      const previous = window.innerWidth;
+      window.innerWidth = width;
+      try {
+        render(<SectionRail activeTab="overview" onTabChange={vi.fn()} />);
+        expect(screen.getByRole("tablist")).toHaveAttribute(
+          "aria-orientation",
+          "horizontal",
+        );
+      } finally {
+        window.innerWidth = previous;
+      }
+    },
+  );
 
   it("badges a section with its open count, and hides the badge at zero", () => {
     render(
@@ -129,9 +138,9 @@ describe("section rail", () => {
     );
     const issues = screen.getByRole("tab", { name: /Issues/ });
     expect(issues).toHaveTextContent("12");
-    expect(screen.getByRole("tab", { name: /Pull Requests/ })).not.toHaveTextContent(
-      "0",
-    );
+    expect(
+      screen.getByRole("tab", { name: /Pull Requests/ }),
+    ).not.toHaveTextContent("0");
     // Counts above 99 are clamped, so the badge never widens the rail.
     expect(screen.getByRole("tab", { name: /Files/ })).toHaveTextContent("99+");
   });
@@ -145,25 +154,25 @@ describe("section rail", () => {
       "tabindex",
       "-1",
     );
-    fireEvent.keyDown(overview, { key: "ArrowDown" });
-    expect(change).toHaveBeenLastCalledWith("issues");
-    expect(screen.getByRole("tab", { name: "Issues" })).toHaveFocus();
+    fireEvent.keyDown(overview, { key: "ArrowRight" });
+    expect(change).toHaveBeenLastCalledWith("commits");
+    expect(screen.getByRole("tab", { name: "Commits" })).toHaveFocus();
     fireEvent.keyDown(overview, { key: "End" });
     expect(change).toHaveBeenLastCalledWith("settings");
     fireEvent.keyDown(overview, { key: "Home" });
     expect(change).toHaveBeenLastCalledWith("overview");
-    fireEvent.keyDown(overview, { key: "ArrowUp" });
+    fireEvent.keyDown(overview, { key: "ArrowLeft" });
     expect(change).toHaveBeenLastCalledWith("settings");
   });
 
-  it("navigates with left/right when rendered as the horizontal pill row", () => {
+  it("navigates with left/right in the horizontally scrolling row", () => {
     window.innerWidth = 768;
     try {
       const change = vi.fn();
       render(<SectionRail activeTab="overview" onTabChange={change} />);
       const overview = screen.getByRole("tab", { name: "Overview" });
       fireEvent.keyDown(overview, { key: "ArrowRight" });
-      expect(change).toHaveBeenLastCalledWith("issues");
+      expect(change).toHaveBeenLastCalledWith("commits");
       fireEvent.keyDown(overview, { key: "ArrowLeft" });
       expect(change).toHaveBeenLastCalledWith("settings");
       // The horizontal row must not also answer to the vertical arrows, or a

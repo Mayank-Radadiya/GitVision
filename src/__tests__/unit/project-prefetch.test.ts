@@ -49,20 +49,16 @@ describe("prefetchProject", () => {
   it("returns a promise so the caller can await the cache before dehydrating", async () => {
     const result: unknown = prefetchProject("p1");
 
-    expect(typeof (result as Promise<unknown> | undefined)?.then).toBe("function");
+    expect(typeof (result as Promise<unknown> | undefined)?.then).toBe(
+      "function",
+    );
     await result;
   });
 
   it("awaits every query", async () => {
     await prefetchProject("p1");
 
-    expect(h.settled).toEqual([
-      "getDetails",
-      "getCommits",
-      "getIssues",
-      "getIssues",
-      "getInsights",
-    ]);
+    expect(h.settled).toEqual(["getDetails", "getInsights"]);
   });
 
   it("prefetches the insights aggregate at the window the client opens with", async () => {
@@ -81,8 +77,8 @@ describe("prefetchProject", () => {
     expect((insights[0].input as { days: number }).days).toBe(30);
   });
 
-  it("builds the commits prefetch as an infinite query so the key matches useInfiniteQuery", async () => {
-    await prefetchProject("p1");
+  it("builds the selected commits prefetch as an infinite query so the key matches useInfiniteQuery", async () => {
+    await prefetchProject("p1", { section: "commits", days: 30 });
 
     const commits = h.calls.filter(
       (c) => (c.input as { limit?: number })?.limit !== undefined,
@@ -90,4 +86,23 @@ describe("prefetchProject", () => {
     expect(commits).toHaveLength(1);
     expect(commits[0].kind).toBe("infinite");
   });
+  it.each(["issues", "pull-requests"] as const)(
+    "hydrates the %s infinite query with matching pagination inputs",
+    async (section) => {
+      await prefetchProject("p1", { section, days: 7 });
+      expect(h.calls).toContainEqual({
+        kind: "infinite",
+        input: {
+          projectId: "p1",
+          isPullRequest: section === "pull-requests",
+          limit: 50,
+        },
+      });
+      expect(h.calls).toContainEqual({
+        kind: "query",
+        input: { projectId: "p1", days: 7 },
+      });
+      expect(h.settled).toEqual(["getDetails", "getInsights", "getIssues"]);
+    },
+  );
 });

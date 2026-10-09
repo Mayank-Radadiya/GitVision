@@ -1,22 +1,6 @@
 "use client";
 
-/**
- * Top contributors — who is actually moving this repository, in the window the
- * chart above describes.
- *
- * The previous version of this widget aggregated the ten commits
- * `useProjectCommits` returns and then drew a seven-day velocity sparkline for
- * each person. Both halves were unusable: at ten commits the "velocity" was a
- * bucket that could not exist yet, and the commit counts were a sample of a
- * history presented as a total. `team-tab.tsx` even said so in a footnote — "Counts
- * reflect loaded history" — which is an admission, not a caveat.
- *
- * Both counts now come from a `GROUP BY` over the selected window in the database,
- * so the figure under a person's name is the real figure for that window, and the
- * row total reconciles against the activity chart's headline number.
- */
-
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Users } from "lucide-react";
 import {
   Avatar,
@@ -39,15 +23,31 @@ interface TopContributorsProps {
   totalCommitsInWindow?: number;
   windowLabel?: string;
   isLoading?: boolean;
+  /**
+   * The insights query failed. Distinct from an empty list, which means the query
+   * succeeded and found nobody — "no human commits in this window" is a finding,
+   * whereas rendering it after a failure would be a lie about the repository.
+   */
+  hasFailed?: boolean;
   onOpenTeam?: () => void;
 }
+
+/**
+ * Mirrors the `LIMIT 12` in the `getInsights` contributor query. Exported so the
+ * caption can distinguish "this repo has exactly twelve authors" from "the query
+ * stopped at twelve", which is a difference the old caption got wrong.
+ */
+const CONTRIBUTOR_CAP = 12;
 
 function initials(name: string): string {
   // GitHub hands `authorName` back as anything from "Ada Lovelace" to a
   // `noreply` address, so an email's domain is noise — and splitting on the dot
   // in "example.com" would yield the initials "AC".
   const local = name.includes("@") ? name.slice(0, name.indexOf("@")) : name;
-  const parts = local.trim().split(/[\s._-]+/).filter(Boolean);
+  const parts = local
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
@@ -56,9 +56,12 @@ function initials(name: string): string {
 function TopContributors({
   contributors,
   windowLabel = "this window",
+  totalCommitsInWindow,
   isLoading,
+  hasFailed,
   onOpenTeam,
 }: TopContributorsProps) {
+  const [expanded, setExpanded] = useState(false);
   if (isLoading) {
     return (
       <div className="space-y-3" aria-hidden="true">
@@ -72,20 +75,43 @@ function TopContributors({
     );
   }
 
+  if (hasFailed) {
+    return (
+      <div
+        role="status"
+        className="text-muted-foreground flex flex-col items-center justify-center py-6 text-center"
+      >
+        <p className="text-sm font-medium">Contributors unavailable</p>
+        <p className="mt-1 max-w-56 text-xs">
+          This rollup is computed server-side, so it could not be read for this
+          project right now.
+        </p>
+      </div>
+    );
+  }
+
   if (contributors.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-6 text-center">
-        <Users className="text-muted-foreground mb-2 size-5" aria-hidden="true" />
-        <p className="text-sm font-medium">No human commits</p>
+        <Users
+          className="text-muted-foreground mb-2 size-5"
+          aria-hidden="true"
+        />
+        <p className="text-sm font-medium">
+          {totalCommitsInWindow === 0
+            ? "No activity in this period"
+            : "No contributor activity"}
+        </p>
         <p className="text-muted-foreground mt-1 max-w-56 text-xs">
-          Nothing landed in {windowLabel} from anyone but bot accounts.
+          No contributor activity was found in {windowLabel}. Bot accounts are
+          excluded.
         </p>
       </div>
     );
   }
 
   const max = contributors[0]!.commits || 1;
-  const visible = contributors.slice(0, 8);
+  const visible = expanded ? contributors : contributors.slice(0, 5);
 
   return (
     <div className="space-y-2.5">
@@ -116,10 +142,12 @@ function TopContributors({
               <div className="bg-muted/40 mt-1 h-1 overflow-hidden rounded-full">
                 <div
                   className={cn(
-                    "h-full rounded-full transition-[width] duration-700 ease-out",
+                    "h-full rounded-full",
                     index === 0 ? "bg-primary" : "bg-primary/45",
                   )}
-                  style={{ width: `${Math.max((person.commits / max) * 100, 2)}%` }}
+                  style={{
+                    width: `${Math.max((person.commits / max) * 100, 2)}%`,
+                  }}
                 />
               </div>
             </div>
@@ -127,20 +155,37 @@ function TopContributors({
         ))}
       </ol>
 
-      <p className="text-muted-foreground flex items-center justify-between gap-2 text-[11px]">
+      {contributors.length > 5 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          className="text-muted-foreground hover:text-foreground w-full rounded py-1 text-left text-[11px] transition-colors"
+        >
+          {expanded ? "Show fewer" : `Show ${contributors.length - 5} more`}
+        </button>
+      )}
+      <p className="text-muted-foreground border-border flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-[10px]">
         <span>
-          {contributors.length} author{contributors.length === 1 ? "" : "s"} in{" "}
-          {windowLabel}; bots excluded
-          {contributors.length > visible.length &&
-            ` · ${contributors.length - visible.length} more`}
+          {/*
+            The query is `GROUP BY LOWER(author_email) ... LIMIT 12`, so
+            `contributors.length` is a *capped* count, not the number of people
+            who committed. Printing "12 authors in this window" is simply false
+            for any repo with more than twelve. When the cap is the binding
+            constraint the caption says so with a `+`; when the list is short
+            enough that no author was dropped, the exact count is safe to state.
+          */}
+          {contributors.length >= CONTRIBUTOR_CAP
+            ? `Top ${visible.length} of ${CONTRIBUTOR_CAP}+ authors`
+            : `${contributors.length} author${contributors.length === 1 ? "" : "s"} in ${windowLabel}`}
         </span>
         {onOpenTeam && (
           <button
             type="button"
             onClick={onOpenTeam}
-            className="hover:text-foreground focus-visible:ring-ring rounded font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="hover:text-foreground focus-visible:ring-ring shrink-0 rounded font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
-            All contributors
+            View contributors
           </button>
         )}
       </p>
@@ -148,5 +193,5 @@ function TopContributors({
   );
 }
 
-export { TopContributors, initials };
+export { TopContributors, initials, CONTRIBUTOR_CAP };
 export default memo(TopContributors);

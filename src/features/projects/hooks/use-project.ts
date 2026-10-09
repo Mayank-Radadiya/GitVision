@@ -84,6 +84,17 @@ export function useProjectFiles(projectId: string) {
 }
 
 /**
+ * Fetches stored files with retrieval facts for the index-aware viewer.
+ * Stale time: 10 minutes — files change less often than commits.
+ */
+export function useIndexedProjectFiles(projectId: string) {
+  return trpc.project.getIndexedFiles.useQuery(
+    { projectId },
+    { enabled: !!projectId, staleTime: 10 * 60 * 1000 },
+  );
+}
+
+/**
  * Fetches single file code content.
  * Keeps file tree lightweight while allowing code to be loaded on demand.
  */
@@ -173,6 +184,7 @@ export function useSyncIssues(projectId: string) {
     onSuccess: () => {
       utils.project.getIssues.invalidate({ projectId, isPullRequest: false });
       utils.project.getIssues.invalidate({ projectId, isPullRequest: true });
+      void utils.project.getInsights.invalidate({ projectId });
     },
   });
 }

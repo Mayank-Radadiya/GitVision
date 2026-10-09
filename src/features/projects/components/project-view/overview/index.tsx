@@ -1,52 +1,65 @@
 "use client";
 
-/**
- * Overview — the project's state, in the order a person asks about it.
- *
- * "Can I ask this thing anything useful?" then "is it moving?" then the supporting
- * counts, then the prose explanation. That ordering is the argument for the layout:
- * index health and the activity trend share the top surface because they are the
- * only two figures that change a decision, and everything below is context for a
- * decision already made.
- *
- * Structure follows one rule that the previous version broke repeatedly: sections
- * are separated by hairlines inside a small number of surfaces, never by a grid of
- * independently rounded cards. The old Overview stacked `WorkspaceSummary` →
- * `BentoCard` → the pulse widget's own `bg-card rounded-xl` → its inner
- * `border rounded-xl shadow-sm`, which is four nested borders deep and reads as
- * four unrelated widgets rather than one page. There are exactly two surfaces here:
- * the hero panel, which earns its elevation because it is the headline, and the
- * body, which is a single `divide-y` stack.
- */
-
 import { memo } from "react";
+import { ArrowRight, RefreshCw, AlertCircle } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
+import { formatCount, formatShortDate } from "@/shared/lib/format";
 import type { LanguageEntry, RepoBriefing } from "@/db/schema";
 import type { ProjectTab } from "@/features/projects/types/project.types";
 import { IndexHealth } from "./index-health";
-import { ActivityPanel, type ActivityWindow } from "./activity-panel";
+import {
+  ActivityPanel,
+  ActivityWindowControl,
+  type ActivityWindow,
+} from "./activity-panel";
 import { MetricStrip, type MetricStripData } from "./metric-strip";
 import { WorkItems, type WorkSummary } from "./work-items";
 import { Composition } from "./composition";
-import {
-  TopContributors,
-  type ContributorRowData,
-} from "./top-contributors";
+import { TopContributors, type ContributorRowData } from "./top-contributors";
 import { RepoBriefingSection } from "./repo-briefing";
+import { RecentActivity, type RecentCommit } from "./recent-activity";
+import { ProjectPanel, PanelHeading, SectionHeading } from "../workspace-ui";
 
 export interface OverviewInsights {
+  days?: number;
+  lastActivityAt?: Date | string | null;
   series: { date: string; commits: number }[];
   priorSeries?: { date: string; commits: number }[];
-  totals?: { commitsInWindow: number; priorWindowCommits: number; activeDays: number };
+  totals?: {
+    commitsInWindow: number;
+    priorWindowCommits: number;
+    activeDays: number;
+  };
   work?: WorkSummary;
   contributors?: ContributorRowData[];
   fileLanguages?: { language: string; files: number }[];
   index?: { chunks: number; tokens: number };
+  recentCommits?: RecentCommit[];
+  lifecycle?: {
+    firstCommitAt: Date | string | null;
+    spanDays: number | null;
+    bucketsAgree: boolean;
+  };
 }
 
-interface OverviewDashboardProps {
+export interface OverviewDashboardProps {
+  githubUrl?: string;
+  onAskAI?: () => void;
+  isAskingAI?: boolean;
+  onSync?: () => void;
+  isSyncing?: boolean;
+  onRetryInsights?: () => void;
+  isPlaceholderData?: boolean;
   insights: OverviewInsights | undefined;
   isInsightsLoading: boolean;
   isInsightsFetching: boolean;
+  /**
+   * The insights aggregate failed. It is kept separate from "no insights yet"
+   * because the two degrade very differently: `project.getDetails` succeeded, so
+   * index health, the briefing and the repository vitals are all still true and
+   * still worth showing. Only the insight-derived bands go dark.
+   */
+  insightsError?: boolean;
   window: ActivityWindow;
   onWindowChange: (days: ActivityWindow) => void;
 
@@ -61,6 +74,10 @@ interface OverviewDashboardProps {
   totalCommits?: number | null;
   totalContributors?: number | null;
   estimatedTokens?: number | null;
+  star?: number | null;
+  forks?: number | null;
+  totalBranches?: number | null;
+  lastSyncedAt?: Date | string | null;
   languages: LanguageEntry[];
   briefing: RepoBriefing | null | undefined;
 
@@ -71,6 +88,7 @@ function OverviewDashboard({
   insights,
   isInsightsLoading,
   isInsightsFetching,
+  insightsError,
   window,
   onWindowChange,
   embeddingStatus,
@@ -86,27 +104,179 @@ function OverviewDashboard({
   languages,
   briefing,
   onNavigate,
+  githubUrl,
+  onAskAI,
+  isAskingAI,
+  onSync,
+  isSyncing,
+  onRetryInsights,
+  isPlaceholderData,
 }: OverviewDashboardProps) {
   const work = insights?.work;
-  const openItems = work ? work.openIssues + work.openPullRequests : null;
-
+  const insightsFailed = insightsError === true && insights === undefined;
+  const servedWindow = insights?.days;
+  const displayedWindow: ActivityWindow =
+    servedWindow === 7 || servedWindow === 30 || servedWindow === 90
+      ? servedWindow
+      : window;
+  const series = insights?.series ?? [];
+  const hasSearchableIndex = ["completed", "partial"].includes(
+    embeddingStatus ?? "",
+  );
   const metricData: MetricStripData = {
     totalCommits,
-    totalContributors,
+    commitsInWindow: insights?.totals?.commitsInWindow,
+    priorWindowCommits: insights?.totals?.priorWindowCommits,
+    days: displayedWindow,
     totalFiles,
-    estimatedTokens,
-    chunks: insights?.index?.chunks,
-    openItems,
+    indexedFiles: indexedFileCount,
+    work,
   };
-
-  const windowLabel = window === 7 ? "this week" : `the last ${window} days`;
-
   return (
     <div className="min-w-0 space-y-6">
-      {/* ── Hero: the two figures that change a decision ───────────────────── */}
-      <div className="border-border bg-card grid gap-px overflow-hidden rounded-lg border shadow-xs">
-        <div className="bg-card grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-          <div className="lg:border-border lg:border-r lg:pr-6">
+      <SectionHeading
+        title="Project overview"
+        description="A clear view of activity, open work, and repository readiness."
+        action={
+          <div className="flex items-center gap-2">
+            <ActivityWindowControl days={window} onChange={onWindowChange} />
+            {onRetryInsights && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onRetryInsights}
+                disabled={isInsightsFetching}
+                aria-label="Refresh project insights"
+              >
+                <RefreshCw
+                  className={`size-4 ${isInsightsFetching ? "animate-spin" : ""}`}
+                />
+              </Button>
+            )}
+          </div>
+        }
+      />
+      {insightsError && (
+        <div
+          role="alert"
+          className="border-gv-amber/20 bg-gv-amber/5 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm"
+        >
+          <AlertCircle
+            className="text-gv-amber size-4 shrink-0"
+            aria-hidden="true"
+          />
+          <p className="min-w-0 flex-1">
+            {insights
+              ? "Insights could not be refreshed. Showing the last available data."
+              : "Activity and work insights are unavailable. Repository details are still available."}
+          </p>
+          {onRetryInsights && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRetryInsights}
+              disabled={isInsightsFetching}
+            >
+              {isInsightsFetching ? "Retrying…" : "Try again"}
+            </Button>
+          )}
+        </div>
+      )}
+      {isPlaceholderData && (
+        <p role="status" className="text-muted-foreground text-xs">
+          Loading the {window}-day view. Showing the previous {displayedWindow}
+          -day period until it is ready.
+        </p>
+      )}
+      <MetricStrip
+        data={metricData}
+        isLoading={isInsightsLoading}
+        onNavigate={onNavigate}
+      />
+      <div className="overview-row">
+        <ProjectPanel aria-busy={isInsightsFetching}>
+          <ActivityPanel
+            series={series}
+            prior={insights?.priorSeries}
+            summary={insights?.totals}
+            days={displayedWindow}
+            onWindowChange={onWindowChange}
+            showWindowControl={false}
+            isLoading={isInsightsLoading}
+            isFetching={isInsightsFetching}
+            hasFailed={insightsFailed}
+          />
+          {series.length > 0 && (
+            <p className="text-muted-foreground mt-4 text-xs">
+              {formatShortDate(series[0]!.date)} –{" "}
+              {formatShortDate(series[series.length - 1]!.date)} · synced
+              history · daily totals in UTC
+            </p>
+          )}
+        </ProjectPanel>
+        <ProjectPanel aria-labelledby="open-work-heading">
+          <PanelHeading
+            id="open-work-heading"
+            title="Open work"
+            description="Current backlog · all time"
+          />
+          <WorkItems
+            work={work}
+            isLoading={isInsightsLoading && !work}
+            hasFailed={insightsFailed}
+            onOpenIssues={onNavigate ? () => onNavigate("issues") : undefined}
+            onOpenPullRequests={
+              onNavigate ? () => onNavigate("pull-requests") : undefined
+            }
+          />
+        </ProjectPanel>
+      </div>
+      <div className="overview-row">
+        <ProjectPanel aria-labelledby="recent-activity-heading">
+          <PanelHeading
+            id="recent-activity-heading"
+            title="Recent commits"
+            description={
+              totalCommits == null
+                ? "Latest changes in the synced history"
+                : `${formatCount(totalCommits)} repository commits reported by GitHub · all time`
+            }
+          />
+          <RecentActivity
+            commits={insights?.recentCommits ?? []}
+            githubUrl={githubUrl}
+            isLoading={isInsightsLoading && !insights?.recentCommits}
+            hasFailed={insightsFailed}
+            onViewAll={onNavigate ? () => onNavigate("commits") : undefined}
+          />
+        </ProjectPanel>
+        <ProjectPanel aria-labelledby="contributors-heading">
+          <PanelHeading
+            id="contributors-heading"
+            title="Contributors"
+            description={`${totalContributors == null ? "All-time count unavailable" : `${formatCount(totalContributors)} all time`} · activity over ${displayedWindow}d`}
+          />
+          <TopContributors
+            totalCommitsInWindow={insights?.totals?.commitsInWindow}
+            contributors={insights?.contributors ?? []}
+            windowLabel={`the last ${displayedWindow} days`}
+            isLoading={isInsightsLoading && !insights?.contributors}
+            hasFailed={insightsFailed}
+            onOpenTeam={onNavigate ? () => onNavigate("team") : undefined}
+          />
+        </ProjectPanel>
+      </div>
+      <div className="border-border border-t pt-6">
+        <h2 className="text-muted-foreground mb-5 text-sm font-semibold">
+          Repository context
+        </h2>
+        <div className="overview-context">
+          <ProjectPanel aria-labelledby="index-heading">
+            <PanelHeading
+              id="index-heading"
+              title="AI readiness"
+              description="What the repository index can answer"
+            />
             <IndexHealth
               status={embeddingStatus}
               indexedFileCount={indexedFileCount}
@@ -115,67 +285,59 @@ function OverviewDashboard({
               embeddingProgress={embeddingProgress}
               embeddingError={embeddingError}
               lastEmbeddingAttempt={lastEmbeddingAttempt}
+              chunks={insights?.index?.chunks}
+              tokens={insights?.index?.tokens ?? estimatedTokens}
               isLoading={isInsightsLoading && !embeddingStatus}
             />
-          </div>
-          <ActivityPanel
-            series={insights?.series ?? []}
-            prior={insights?.priorSeries}
-            summary={insights?.totals}
-            days={window}
-            onWindowChange={onWindowChange}
-            isLoading={isInsightsLoading}
-            isFetching={isInsightsFetching}
-          />
-        </div>
-      </div>
-
-      <MetricStrip data={metricData} isLoading={false} onNavigate={onNavigate} />
-
-      {/* ── Supporting detail: one surface, hairline-separated ─────────────── */}
-      <div className="border-border divide-border/70 divide-y overflow-hidden rounded-lg border">
-        <div className="grid gap-x-8 gap-y-6 p-5 lg:grid-cols-2">
-          <section aria-label="Work item health">
-            <h3 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-              Work items
-            </h3>
-            <WorkItems
-              work={work}
-              isLoading={isInsightsLoading && !work}
-              onOpenIssues={() => onNavigate?.("issues")}
-              onOpenPullRequests={() => onNavigate?.("pull-requests")}
+            <div className="mt-5 flex flex-wrap gap-2">
+              {onAskAI && hasSearchableIndex ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onAskAI}
+                  disabled={isAskingAI}
+                >
+                  {isAskingAI ? "Opening…" : "Ask about this repository"}
+                  <ArrowRight className="size-3.5" />
+                </Button>
+              ) : (
+                onNavigate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onNavigate("files")}
+                  >
+                    Explore available files
+                    <ArrowRight className="size-3.5" />
+                  </Button>
+                )
+              )}
+              {embeddingStatus === "failed" && onSync && (
+                <Button size="sm" onClick={onSync} disabled={isSyncing}>
+                  {isSyncing ? "Queueing…" : "Retry file sync"}
+                </Button>
+              )}
+            </div>
+          </ProjectPanel>
+          <ProjectPanel aria-labelledby="composition-heading">
+            <PanelHeading
+              id="composition-heading"
+              title="Languages"
+              description="Repository composition and stored source files"
             />
-          </section>
-
-          <section aria-label="Repository composition">
-            <h3 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-              Composition
-            </h3>
             <Composition
               languages={languages}
               fileCounts={insights?.fileLanguages ?? []}
             />
-          </section>
+          </ProjectPanel>
         </div>
-
-        <section aria-label="Top contributors" className="p-5">
-          <h3 className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-            Top contributors
-          </h3>
-          <TopContributors
-            contributors={insights?.contributors ?? []}
-            windowLabel={windowLabel}
-            isLoading={isInsightsLoading && !insights?.contributors}
-            onOpenTeam={() => onNavigate?.("team")}
-          />
-        </section>
       </div>
-
-      {/* ── Below the fold ──────────────────────────────────────────────────── */}
-      <RepoBriefingSection briefing={briefing} embeddingStatus={embeddingStatus} />
+      <RepoBriefingSection
+        briefing={briefing}
+        embeddingStatus={embeddingStatus}
+      />
     </div>
   );
 }
-
 export { OverviewDashboard };
 export default memo(OverviewDashboard);

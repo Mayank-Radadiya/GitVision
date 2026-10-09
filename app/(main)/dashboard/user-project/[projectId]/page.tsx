@@ -9,21 +9,37 @@
 import { prefetchProject } from "@/features/projects/server/prefetch";
 import { HydrateClient } from "@/src/lib/trpc/server";
 import ProjectPage from "@/features/projects/components/project-view/project-page";
+import { Suspense } from "react";
+import WorkspaceSkeleton from "@/features/projects/components/project-view/workspace-skeleton";
+import { readWorkspaceLocation } from "@/features/projects/components/project-view/workspace-navigation";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function UserProjectPage({ params }: PageProps) {
+export default async function UserProjectPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { projectId } = await params;
+  const search = await searchParams;
+  const location = readWorkspaceLocation({
+    get: (key) => {
+      const value = search[key];
+      return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+    },
+  });
 
-  // Prefetch project data on the server (details + initial commits).
+  // Hydrate shared metadata and the selected section before rendering.
   // Must settle before `HydrateClient` dehydrates, or the client refetches it all.
-  await prefetchProject(projectId);
+  await prefetchProject(projectId, location);
 
   return (
     <HydrateClient>
-      <ProjectPage key={projectId} />
+      <Suspense fallback={<WorkspaceSkeleton />}>
+        <ProjectPage key={projectId} />
+      </Suspense>
     </HydrateClient>
   );
 }

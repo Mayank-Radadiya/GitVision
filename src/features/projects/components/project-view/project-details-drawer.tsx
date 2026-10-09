@@ -1,11 +1,13 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, ExternalLink, Copy } from "lucide-react";
+import { useRef } from "react";
+import { X, ExternalLink, Copy, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/shared/components/ui/button";
 import { IndexingStatusBadge } from "./indexing-status-badge";
 import EditableProjectName from "./editable-project-name";
+import { useProjectActions } from "./project-actions";
 import type { WorkspaceProject } from "./workspace-types";
 
 export default function ProjectDetailsDrawer({
@@ -17,6 +19,13 @@ export default function ProjectDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   project: WorkspaceProject;
 }) {
+  const actions = useProjectActions();
+  const opener = useRef<HTMLElement | null>(
+    typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   const date = (value: Date | string | null) =>
     value
       ? new Date(value).toLocaleString(undefined, {
@@ -31,12 +40,14 @@ export default function ProjectDetailsDrawer({
         .replace(/^https:\/\/github\.com\//, "")
         .replace(/\.git$/, ""),
     ],
+    ["Commits", project.totalCommits.toLocaleString()],
+    ["Contributors", project.totalContributors.toLocaleString()],
     ["Branches", project.totalBranches.toLocaleString()],
     ["Stars", project.star.toLocaleString()],
     ["Forks", project.forks.toLocaleString()],
     [
       "Indexed files",
-      `${project.indexedFileCount ?? 0} / ${project.totalFileCount ?? 0}`,
+      `${project.indexedFileCount ?? "—"} / ${project.totalFileCount ?? project.totalFiles ?? "—"}`,
     ],
     ["Added", date(project.createdAt)],
     [
@@ -49,8 +60,14 @@ export default function ProjectDetailsDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="bg-foreground/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-50 backdrop-blur-sm duration-200" />
-        <Dialog.Content className="project-workspace border-border bg-background data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-xl duration-200 sm:max-w-md">
+        <Dialog.Overlay className="project-workspace data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-50 bg-black/35 duration-150" />
+        <Dialog.Content
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (opener.current?.isConnected) opener.current.focus();
+          }}
+          className="project-workspace border-border bg-background data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-xl duration-150 sm:max-w-[420px]"
+        >
           <div className="border-border flex items-center justify-between border-b px-6 py-5">
             <Dialog.Title className="text-sm font-semibold">
               Project details
@@ -103,8 +120,18 @@ export default function ProjectDetailsDrawer({
                   Indexing needs attention
                 </p>
                 <p className="text-muted-foreground mt-1">
-                  Use Sync now in the project menu to retry indexing.
+                  Queue a file sync to retry repository indexing.
                 </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={actions.syncProject}
+                  disabled={actions.syncing || actions.deleting}
+                >
+                  <RefreshCw className="size-3.5" />
+                  {actions.syncing ? "Queueing…" : "Retry file sync"}
+                </Button>
               </div>
             )}
             {project.embeddingStatus === "partial" && (

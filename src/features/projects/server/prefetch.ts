@@ -1,8 +1,8 @@
 /**
  * Project View — Server-Side Prefetch
  *
- * Prefetches project details and initial commits on the server
- * so the page renders with data immediately (no loading flash).
+ * Hydrates shared project details and insights plus the requested section.
+ * Infinite-query inputs match the client hooks to avoid duplicate fetching.
  *
  * Called from the server component page.tsx before hydrating the client.
  * Uses the `prefetch()` utility from `trpc/server.tsx` which handles
@@ -10,47 +10,50 @@
  */
 
 import { trpc, prefetch } from "@/src/lib/trpc/server";
+import type { WorkspaceLocation } from "../components/project-view/workspace-navigation";
 
 /**
  * Prefetches project data for the detail page.
  * Runs on the server before the client component mounts.
  */
-export async function prefetchProject(projectId: string) {
+export async function prefetchProject(
+  projectId: string,
+  location: WorkspaceLocation = { section: "overview", days: 30 },
+) {
   // The caller must await this before `HydrateClient` dehydrates, or the
   // page ships an empty cache and refetches everything on the client.
-  await Promise.all([
+  const queries = [
     // Project details (standard query)
     prefetch(trpc.project.getDetails.queryOptions({ projectId })),
 
-    // First page of commits. The client hook is `useInfiniteQuery`, which tags
-    // the key `type: "infinite"` and strips the cursor, so a plain
-    // `queryOptions` prefetch can never match it.
     prefetch(
-      trpc.project.getCommits.infiniteQueryOptions(
-        { projectId, limit: 10 },
-        { getNextPageParam: (lastPage) => lastPage.nextCursor },
+      trpc.project.getInsights.queryOptions({ projectId, days: location.days }),
+    ),
+  ];
+  if (location.section === "commits")
+    queries.push(
+      // First page of commits. The client hook is `useInfiniteQuery`, which tags
+      // the key `type: "infinite"` and strips the cursor, so a plain
+      // `queryOptions` prefetch can never match it.
+      prefetch(
+        trpc.project.getCommits.infiniteQueryOptions(
+          { projectId, limit: 10 },
+          { getNextPageParam: (lastPage) => lastPage.nextCursor },
+        ),
       ),
-    ),
-
-    // Issues + pull requests so tabs render instantly (no loading flash)
-    prefetch(
-      trpc.project.getIssues.queryOptions({
-        projectId,
-        isPullRequest: false,
-      }),
-    ),
-    prefetch(
-      trpc.project.getIssues.queryOptions({
-        projectId,
-        isPullRequest: true,
-      }),
-    ),
-
-    // The overview dashboard's aggregates, at its default window. Prefetched
-    // for the same reason as everything above: the hero chart is the first
-    // thing painted, and a query that lands after hydration shows an empty
-    // chart on a page that was supposed to render with data. A different window
-    // fetches on the client, which is the intended behaviour of the switcher.
-    prefetch(trpc.project.getInsights.queryOptions({ projectId, days: 30 })),
-  ]);
+    );
+  if (location.section === "issues" || location.section === "pull-requests")
+    queries.push(
+      prefetch(
+        trpc.project.getIssues.infiniteQueryOptions(
+          {
+            projectId,
+            isPullRequest: location.section === "pull-requests",
+            limit: 50,
+          },
+          { getNextPageParam: (page) => page.nextCursor ?? undefined },
+        ),
+      ),
+    );
+  await Promise.all(queries);
 }

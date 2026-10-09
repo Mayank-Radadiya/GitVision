@@ -1,27 +1,11 @@
 "use client";
 
-/**
- * Activity panel — the trend, its direction, and the window it describes.
- *
- * The trend figure is the whole reason this exists. "412 commits" says a project
- * is large; "+18% vs the previous 30 days" says whether it is *moving*, which is
- * the question a person opening a project dashboard actually has.
- *
- * The delta is computed from the prior window the server returns alongside the
- * current one. Two rules keep it honest, both learned from the chart it replaces:
- *
- *   1. A prior period of zero has no percentage. `+∞%` is not a number, so a
- *      project that went from nothing to something reads as "new activity" rather
- *      than an unwitnessable growth rate.
- *   2. A window with no activity at all is not a "−100% decline" in a chart — it
- *      is an empty chart, and the panel says so instead of drawing a flat line.
- */
-
 import { memo } from "react";
 import { ArrowDownRight, ArrowUpRight, Loader2, Minus } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { formatCompact, formatCount, formatDelta } from "@/shared/lib/format";
-import { ActivityAreaChart, type ActivityPoint } from "../charts/activity-area-chart";
+import { Skeleton } from "@/shared/components/ui/skeleton";
+import { ActivityChart, type ActivityPoint } from "../charts/activity-chart";
 
 export const ACTIVITY_WINDOWS = [7, 30, 90] as const;
 export type ActivityWindow = (typeof ACTIVITY_WINDOWS)[number];
@@ -65,14 +49,16 @@ export function describeTrend(summary: ActivitySummary): {
   };
 }
 
-const TREND_STYLE: Record<TrendDirection, { className: string; Icon: typeof ArrowUpRight }> =
-  {
-    up: { className: "text-gv-moss", Icon: ArrowUpRight },
-    down: { className: "text-gv-ember", Icon: ArrowDownRight },
-    flat: { className: "text-muted-foreground", Icon: Minus },
-    new: { className: "text-gv-wire", Icon: ArrowUpRight },
-    idle: { className: "text-muted-foreground", Icon: Minus },
-  };
+const TREND_STYLE: Record<
+  TrendDirection,
+  { className: string; Icon: typeof ArrowUpRight }
+> = {
+  up: { className: "text-gv-moss", Icon: ArrowUpRight },
+  down: { className: "text-gv-ember", Icon: ArrowDownRight },
+  flat: { className: "text-muted-foreground", Icon: Minus },
+  new: { className: "text-gv-wire", Icon: ArrowUpRight },
+  idle: { className: "text-muted-foreground", Icon: Minus },
+};
 
 interface ActivityPanelProps {
   series: ActivityPoint[];
@@ -82,6 +68,14 @@ interface ActivityPanelProps {
   onWindowChange: (days: ActivityWindow) => void;
   isLoading?: boolean;
   isFetching?: boolean;
+  /**
+   * The insights aggregate errored. Distinct from an empty `series`, which means
+   * a successful query over a quiet window — that still gets its "no commits
+   * landed" line. A failure must not be rendered as an empty chart frame, which
+   * would tell the reader the repository is quiet when in fact nothing was asked.
+   */
+  hasFailed?: boolean;
+  showWindowControl?: boolean;
 }
 
 function ActivityPanel({
@@ -92,6 +86,8 @@ function ActivityPanel({
   onWindowChange,
   isLoading,
   isFetching,
+  hasFailed,
+  showWindowControl = true,
 }: ActivityPanelProps) {
   const trend = summary
     ? describeTrend(summary)
@@ -99,12 +95,18 @@ function ActivityPanel({
   const style = TREND_STYLE[trend.direction];
 
   return (
-    <section aria-label="Commit activity" className="flex min-w-0 flex-col gap-3">
+    <section
+      aria-label="Commit activity"
+      className="flex min-w-0 flex-col gap-5"
+    >
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
+          <h3 className="mb-4 text-sm font-semibold tracking-tight">
+            Commit activity
+          </h3>
           <div className="flex items-baseline gap-2">
-            <span className="text-foreground text-2xl font-semibold tracking-tight tabular-nums">
-              {isLoading || !summary
+            <span className="text-foreground text-3xl font-semibold tracking-tight tabular-nums">
+              {isLoading || !summary || hasFailed
                 ? "—"
                 : formatCompact(summary.commitsInWindow)}
             </span>
@@ -112,45 +114,50 @@ function ActivityPanel({
               {days === 7 ? "commits this week" : `commits / ${days}d`}
             </span>
           </div>
-          <p
-            className={cn(
-              "mt-0.5 flex items-center gap-1 text-xs font-medium",
-              style.className,
-            )}
-          >
-            <style.Icon className="size-3" aria-hidden="true" />
-            {trend.label}
-            {summary && summary.commitsInWindow > 0 && (
-              <span className="text-muted-foreground font-normal">
-                {" · "}
-                {summary.activeDays} active{" "}
-                {summary.activeDays === 1 ? "day" : "days"}
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div
-          role="group"
-          aria-label="Activity window"
-          className="border-border bg-muted/40 flex shrink-0 gap-0.5 rounded-md border p-0.5"
-        >
-          {ACTIVITY_WINDOWS.map((window) => (
-            <button
-              key={window}
-              type="button"
-              onClick={() => onWindowChange(window)}
-              aria-pressed={days === window}
+          {/* Suppressed outright on failure rather than rendered as a dash. A lone "—"
+              where a comparison used to be reads as a broken sentence, and the
+              chart's own callout directly below already says what happened. A
+              genuine quiet window is a different thing entirely — it keeps its
+              trend line, because "no activity" is a real finding. */}
+          {!hasFailed && (
+            <p
               className={cn(
-                "focus-visible:ring-ring rounded px-2 py-1 font-mono text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                days === window
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground",
+                "mt-0.5 flex items-center gap-1 text-xs font-medium",
+                style.className,
               )}
             >
-              {window}d
-            </button>
-          ))}
+              <style.Icon className="size-3" aria-hidden="true" />
+              {trend.label}
+              {summary && summary.commitsInWindow > 0 && (
+                <span className="text-muted-foreground font-normal">
+                  {" · "}
+                  {summary.activeDays} active{" "}
+                  {summary.activeDays === 1 ? "day" : "days"}
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col items-end gap-4">
+          {showWindowControl && (
+            <ActivityWindowControl days={days} onChange={onWindowChange} />
+          )}
+          <div
+            className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]"
+            aria-hidden="true"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="bg-primary h-2 w-2 rounded-xs" />
+              Current
+            </span>
+            {prior?.length ? (
+              <span className="flex items-center gap-1.5">
+                <span className="border-muted-foreground w-3 border-t border-dashed" />
+                Previous
+              </span>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -161,31 +168,76 @@ function ActivityPanel({
             aria-label="Updating"
           />
         )}
-        <ActivityAreaChart
-          series={series}
-          prior={prior}
-          // Dimmed rather than removed: the shape of the previous period is the
-          // context for the trend number directly above it, so hiding it on
-          // refetch would make the two disagree mid-interaction.
-          className={cn(isFetching && !isLoading && "opacity-60 transition-opacity")}
-        />
+        {isLoading ? (
+          <Skeleton className="h-[240px] w-full" />
+        ) : hasFailed ? (
+          <p
+            role="status"
+            className="text-muted-foreground bg-muted/30 rounded-md px-3 py-6 text-center text-xs"
+          >
+            Commit activity couldn’t be loaded. The rest of this project is
+            unaffected.
+          </p>
+        ) : (
+          <ActivityChart
+            height={240}
+            series={series}
+            prior={prior}
+            // Dimmed rather than removed: the shape of the previous period is the
+            // context for the trend number directly above it, so hiding it on
+            // refetch would make the two disagree mid-interaction.
+            className={cn(
+              isFetching && !isLoading && "opacity-60 transition-opacity",
+            )}
+          />
+        )}
       </div>
 
-      {series.length > 0 && series.every((point) => point.commits === 0) && (
-        <p className="text-muted-foreground -mt-1 text-xs">
-          No commits landed in this {days}-day window.
-        </p>
-      )}
+      {/* Only for a *successful* empty window. Gated on `!hasFailed` so a
+          failure can never be misreported as a repository that went quiet. */}
+      {!hasFailed &&
+        series.length > 0 &&
+        series.every((point) => point.commits === 0) && (
+          <p className="text-muted-foreground -mt-1 text-xs">
+            No commits landed in this {days}-day window.
+          </p>
+        )}
 
-      {prior && prior.length > 0 && (
-        <p className="text-muted-foreground text-[11px]">
-          Dashed line: the {days} days before this window
-          {" · "}
-          {formatCount(
-            prior.reduce((sum, point) => sum + point.commits, 0),
-          )}{" "}
-          commits.
-        </p>
+      {!isLoading && !hasFailed && summary && (
+        <dl className="border-border grid grid-cols-3 gap-3 border-t pt-4">
+          <div>
+            <dt className="text-muted-foreground text-[11px]">Active days</dt>
+            <dd className="mt-1 text-sm font-medium tabular-nums">
+              {summary.activeDays}
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                / {days}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-[11px]">Daily average</dt>
+            <dd className="mt-1 text-sm font-medium tabular-nums">
+              {(summary.commitsInWindow / days).toFixed(1)}
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                commits
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-[11px]">
+              Previous {days} days
+            </dt>
+            <dd className="mt-1 text-sm font-medium tabular-nums">
+              {formatCount(summary.priorWindowCommits)}
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                commits
+              </span>
+            </dd>
+          </div>
+        </dl>
       )}
     </section>
   );
@@ -193,3 +245,38 @@ function ActivityPanel({
 
 export { ActivityPanel };
 export default memo(ActivityPanel);
+export function ActivityWindowControl({
+  days,
+  onChange,
+  disabled,
+}: {
+  days: ActivityWindow;
+  onChange: (days: ActivityWindow) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Activity window"
+      className="border-border bg-muted/40 flex rounded-md border p-0.5"
+    >
+      {ACTIVITY_WINDOWS.map((value) => (
+        <button
+          key={value}
+          type="button"
+          disabled={disabled}
+          aria-pressed={days === value}
+          onClick={() => onChange(value)}
+          className={cn(
+            "relative rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
+            days === value
+              ? "bg-background text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span className="relative">{value}d</span>
+        </button>
+      ))}
+    </div>
+  );
+}

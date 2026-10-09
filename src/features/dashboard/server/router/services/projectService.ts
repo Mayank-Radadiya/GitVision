@@ -13,6 +13,10 @@ import {
 } from "@/db/schema";
 import { eq, desc, and, or, lt, gt, count, sum, sql, gte } from "drizzle-orm";
 import { assertProjectOwnership } from "@/src/lib/guards";
+import {
+  fileIndexState,
+  type FileIndexState,
+} from "@/src/lib/file-index-state";
 import { inngest } from "@/src/lib/inngest/client";
 import { isIndexingInFlight } from "@/src/lib/indexing-status";
 import {
@@ -116,6 +120,38 @@ function aggregateLanguages(
 export const INSIGHT_WINDOWS = [7, 30, 90] as const;
 export type InsightWindow = (typeof INSIGHT_WINDOWS)[number];
 
+export interface IndexedProjectFile {
+  id: string;
+  path: string;
+  language: string;
+  lines: number;
+  bytes: number;
+  chunkCount: number;
+  tokenCount: number;
+  indexState: FileIndexState;
+}
+
+export interface IndexedProjectFiles {
+  project: {
+    status: string;
+    repoFileCount: number;
+    estimatedTokens: number | null;
+  };
+  files: IndexedProjectFile[];
+}
+
+/**
+ * Database/Neon numeric results are typed as numbers but can arrive as strings.
+ * Clamp them defensively so a driver-shape change cannot make 500 files render
+ * as searchable or a negative aggregate reach the UI.
+ */
+function toNonNegativeCount(value: number | string | null | undefined): number {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed as number));
+}
+
+
 /**
  * Bot and service-account authors, excluded from contributor rankings.
  *
@@ -134,6 +170,49 @@ const BOT_AUTHOR_FILTER = sql`(
 /** `YYYY-MM-DD` in UTC — the same key `date_trunc('day', …)::date::text` yields. */
 function utcDayKey(date: Date): string {
   return date.toISOString().split("T")[0]!;
+}
+
+/** Longest subject line the recent-commit feed will emit. */
+export const RECENT_COMMIT_MESSAGE_CAP = 120;
+
+/**
+ * Reduces a commit message to a feed subject line.
+ *
+ * Two things happen, in this order and both deliberately:
+ *
+ * 1. **First line only.** A commit message is a subject plus an optional body
+ *    explaining *why*. A feed has one line per row; carrying the body would mean
+ *    either clipping mid-sentence or shipping bytes nobody on that surface
+ *    reads. Splitting on the first newline is also what makes the ellipsis below
+ *    honest — it marks a truncation that actually happened, rather than a full
+ *    message that merely happened to contain a newline.
+ *
+ * 2. **Hard cap at `RECENT_COMMIT_MESSAGE_CAP`.** `commitMessage` was measured
+ *    averaging 1092 B with a 64 KB peak (T-029), where it alone accounted for
+ *    two thirds of the payload of the commit list. Eight rows of that is a
+ *    hundred kilobytes of feed. The cut prefers a word boundary, and appends an
+ *    ellipsis *after* re-trimming, so the result is never longer than the cap —
+ *    the common alternative, truncating to cap-1 and appending "…", silently
+ *    exceeds it.
+ *
+ * Exported and pure so the cap is testable without a database.
+ */
+export function truncateSubject(
+  message: string | null | undefined,
+): string {
+  if (!message) return "";
+
+  const subject = message.split("\n")[0]!.trim();
+  if (subject.length <= RECENT_COMMIT_MESSAGE_CAP) return subject;
+
+  const hardCut = subject.slice(0, RECENT_COMMIT_MESSAGE_CAP);
+  const lastSpace = hardCut.lastIndexOf(" ");
+  // Only honour the word boundary when it keeps most of the budget; a space in
+  // the first tenth would otherwise produce a three-character subject.
+  const cut =
+    lastSpace > RECENT_COMMIT_MESSAGE_CAP * 0.6 ? hardCut.slice(0, lastSpace) : hardCut;
+
+  return `${cut.trimEnd()}…`;
 }
 
 /**
@@ -594,6 +673,105 @@ export function createProjectService() {
       return { files: fileList, totalFiles: files.length };
     },
 
+    /**
+     * Returns stored files with retrieval facts, not code.
+     *
+     * One statement joins file metadata to per-file embedding aggregates, so
+     * the instrument strip, filter chips, and row dots all read the same
+     * numbers. Lines are counted to match JavaScript `split("\n")`; bytes use
+     * `octet_length`, not character length.
+     */
+    async getIndexedProjectFiles(
+      projectId: string,
+      userId: string,
+    ): Promise<IndexedProjectFiles> {
+      const project = await assertProjectOwnership(projectId, userId);
+
+      const embeddedCounts = db
+        .select({
+          fileId: codeEmbeddings.fileId,
+          chunkCount: sql<number>`count(*)::int`,
+          tokenCount:
+            sql<number>`coalesce(sum(${codeEmbeddings.tokenCount}), 0)::int`,
+        })
+        .from(codeEmbeddings)
+        .where(eq(codeEmbeddings.projectId, projectId))
+        .groupBy(codeEmbeddings.fileId)
+        .as("embedded_counts");
+
+      const rows = await db
+        .select({
+          id: projectFiles.id,
+          fileName: projectFiles.fileName,
+          lineCount:
+            sql<number>`length(${projectFiles.code}) - length(replace(${projectFiles.code}, '\n', '')) + 1`,
+          byteCount: sql<number>`octet_length(${projectFiles.code})`,
+          chunkCount: sql<number>`coalesce(${embeddedCounts.chunkCount}, 0)`,
+          tokenCount: sql<number>`coalesce(${embeddedCounts.tokenCount}, 0)`,
+        })
+        .from(projectFiles)
+        .leftJoin(
+          embeddedCounts,
+          eq(embeddedCounts.fileId, projectFiles.id),
+        )
+        .where(eq(projectFiles.projectId, projectId))
+        .orderBy(projectFiles.fileName);
+
+      const langMap: Record<string, string> = {
+        ts: "typescript",
+        tsx: "tsx",
+        js: "javascript",
+        jsx: "jsx",
+        json: "json",
+        md: "markdown",
+        css: "css",
+        scss: "scss",
+        html: "html",
+        xml: "xml",
+        py: "python",
+        go: "go",
+        rs: "rust",
+        java: "java",
+        rb: "ruby",
+        sh: "bash",
+        sql: "sql",
+        yaml: "yaml",
+        yml: "yaml",
+        toml: "toml",
+      };
+
+      const files = rows.map((row) => {
+        const path = row.fileName.startsWith("/")
+          ? row.fileName
+          : `/${row.fileName}`;
+        const ext = path.split(".").pop()?.toLowerCase() || "";
+        const chunkCount = toNonNegativeCount(row.chunkCount);
+
+        return {
+          id: row.id,
+          path,
+          language: langMap[ext] || "text",
+          lines: toNonNegativeCount(row.lineCount),
+          bytes: toNonNegativeCount(row.byteCount),
+          chunkCount,
+          tokenCount: toNonNegativeCount(row.tokenCount),
+          indexState: fileIndexState({
+            chunkCount,
+            status: project.embeddingStatus,
+          }),
+        };
+      });
+
+      return {
+        project: {
+          status: project.embeddingStatus,
+          repoFileCount: project.totalFiles,
+          estimatedTokens: project.estimatedTokens,
+        },
+        files,
+      };
+    },
+
     /** Fetches a single file's code content on-demand (never in bulk). */
     async getFileContent(projectId: string, fileId: string, userId: string) {
       await assertProjectOwnership(projectId, userId);
@@ -643,6 +821,10 @@ export function createProjectService() {
           totalFiles: projectTables.totalFiles, // ← pre-computed, O(1)
           languages: projectTables.languages, // ← Tech Stack JSONB
           embeddingStatus: projectTables.embeddingStatus,
+          indexedFileCount: projectTables.indexedFileCount,
+          totalFileCount: projectTables.totalFileCount,
+          estimatedTokens: projectTables.estimatedTokens,
+          lastSyncedAt: projectTables.lastSyncedAt,
           createdAt: projectTables.createdAt,
           updatedAt: projectTables.updatedAt,
         })
@@ -1006,12 +1188,18 @@ export function createProjectService() {
      * payload — two integers and at most 90 rows.
      *
      * ── Batch ─────────────────────────────────────────────────────────────────
-     * Five statements in one `db.batch`, the same shape and rationale as
+     * Seven statements in one `db.batch`, the same shape and rationale as
      * `getDashboardData` (T-029/T-030: 10 round-trips / 717 ms → 1 / 424 ms).
      * There is no transaction here and none is needed: `neon-http` is
      * stateless (D-11), and every statement below is an independent read that
      * is individually correct, so a partially-applied batch degrades a metric
      * rather than corrupting state.
+     *
+     * Two of the seven cost nothing beyond their own row: the open-age bands
+     * are four more conditional SUMs on statement 2, and the first-commit date
+     * is a second aggregate on statement 6. Only the recent-commit feed (7) is
+     * a genuinely separate read, and it is eight rows of a table already being
+     * read twice.
      */
     async getProjectInsights(
       projectId: string,
@@ -1033,6 +1221,11 @@ export function createProjectService() {
       const seriesStart = new Date(now);
       seriesStart.setUTCDate(seriesStart.getUTCDate() - safeDays * 2);
 
+      // How long an open work item has been open, in days. One expression,
+      // reused: the median and the four buckets below must describe the same
+      // population or the headline contradicts the histogram drawn from it.
+      const openAgeDays = sql`EXTRACT(EPOCH FROM (NOW() - COALESCE(${issuesTable.githubCreatedAt}, ${issuesTable.createdAt}))) / 86400`;
+
       const [
         dailyRows,
         workRows,
@@ -1040,6 +1233,7 @@ export function createProjectService() {
         indexRows,
         fileLanguageRows,
         lastCommitRows,
+        recentCommitRows,
       ] = await db.batch([
         // 1. Commits per day across both windows, so the prior period is free.
         db
@@ -1071,8 +1265,19 @@ export function createProjectService() {
             // COALESCE to the latter so a partially-synced row still reports an
             // age instead of dropping out of the median.
             medianOpenAgeDays: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (
-              ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(${issuesTable.githubCreatedAt}, ${issuesTable.createdAt}))) / 86400
+              ORDER BY ${openAgeDays}
             ) FILTER (WHERE ${issuesTable.state} = 'open')`,
+            // The same population as the median, split into bands. A median
+            // answers "how old is the typical open item"; it cannot say whether
+            // four items are four days old or four hundred, which is the
+            // difference between a healthy board and a stalled one. Boundless
+            // bands are expressed as cumulative complements so the four cases
+            // are exhaustive and mutually exclusive by construction — a
+            // per-band `<= X AND > Y` ladder can drift if one bound is edited.
+            freshOpen: sql<number>`SUM(CASE WHEN ${issuesTable.state} = 'open' AND ${openAgeDays} <= 7 THEN 1 ELSE 0 END)::int`,
+            agingOpen: sql<number>`SUM(CASE WHEN ${issuesTable.state} = 'open' AND ${openAgeDays} > 7 AND ${openAgeDays} <= 30 THEN 1 ELSE 0 END)::int`,
+            staleOpen: sql<number>`SUM(CASE WHEN ${issuesTable.state} = 'open' AND ${openAgeDays} > 30 AND ${openAgeDays} <= 90 THEN 1 ELSE 0 END)::int`,
+            dormantOpen: sql<number>`SUM(CASE WHEN ${issuesTable.state} = 'open' AND ${openAgeDays} > 90 THEN 1 ELSE 0 END)::int`,
           })
           .from(issuesTable)
           .where(eq(issuesTable.projectId, projectId)),
@@ -1132,20 +1337,63 @@ export function createProjectService() {
           .orderBy(desc(count(projectFiles.id)))
           .limit(8),
 
-        // 6. Most recent commit of any age. Separate from the daily series
-        //    because that one only covers two windows: a repository quiet for a
-        //    month still needs to say "last commit 31 days ago" rather than
-        //    "never".
+        // 6. First and most recent commit of any age. Separate from the daily
+        //    series because that one only covers two windows: a repository
+        //    quiet for a month still needs to say "last commit 31 days ago"
+        //    rather than "never". The oldest commit rides along here because it
+        //    turns out to be the cheapest honest answer to "is this project
+        //    still alive" — see `lifecycle` in the return.
         db
-          .select({ at: sql<Date | null>`MAX(${commitsTable.authorDate})` })
+          .select({
+            at: sql<Date | null>`MAX(${commitsTable.authorDate})`,
+            firstAt: sql<Date | null>`MIN(${commitsTable.authorDate})`,
+          })
           .from(commitsTable)
           .where(eq(commitsTable.projectId, projectId)),
+
+        // 7. Recent commits as a feed. `commitMessage` is the expensive column
+        //    in this table — measured average 1092 B with a 64 KB peak (T-029),
+        //    where it alone was two thirds of the cost of the commit widget.
+        //    The feed needs a subject line, not a diff message, so it is
+        //    truncated in SQL: the row is never shipped whole, so the cap
+        //    applies to the wire payload rather than to rendering.
+        db
+          .select({
+            id: commitsTable.id,
+            hash: commitsTable.commitHash,
+            message: commitsTable.commitMessage,
+            authorName: commitsTable.authorName,
+            authorAvatar: commitsTable.authorAvatar,
+            authorDate: commitsTable.authorDate,
+          })
+          .from(commitsTable)
+          .where(eq(commitsTable.projectId, projectId))
+          .orderBy(desc(commitsTable.authorDate))
+          .limit(8),
       ]);
 
       const series = densifyDailySeries(dailyRows, seriesStart, now);
       const windowSeries = series.slice(-safeDays);
       const priorSeries = series.slice(-safeDays * 2, -safeDays);
       const work = workRows[0];
+
+      // The four bands are exhaustive over open items by construction (see the
+      // SQL), so they sum to the open total. If that ever fails the rows were
+      // read from different points in time and the histogram would be lying;
+      // the sanity check is cheap and the failure mode is silent without it.
+      const openAgeBuckets = {
+        fresh: Number(work?.freshOpen ?? 0),
+        aging: Number(work?.agingOpen ?? 0),
+        stale: Number(work?.staleOpen ?? 0),
+        dormant: Number(work?.dormantOpen ?? 0),
+      };
+      const bucketedOpenTotal =
+        openAgeBuckets.fresh +
+        openAgeBuckets.aging +
+        openAgeBuckets.stale +
+        openAgeBuckets.dormant;
+      const openTotal =
+        Number(work?.openIssues ?? 0) + Number(work?.openPullRequests ?? 0);
 
       return {
         days: safeDays,
@@ -1161,6 +1409,28 @@ export function createProjectService() {
           activeDays: windowSeries.filter((d) => d.commits > 0).length,
         },
         lastActivityAt: lastCommitRows[0]?.at ?? null,
+        // Age of the whole history, for the "how long has this been running"
+        // figure and the dormancy judgement next to it. Both endpoints come
+        // from statement 6, so a project whose only commit is from four years
+        // ago reports a four-year span rather than "never".
+        lifecycle: {
+          firstCommitAt: lastCommitRows[0]?.firstAt ?? null,
+          // Whole days between the two endpoints. Null when the two dates are equal:
+          // that is a repository whose entire history synced inside one day, so
+          // "0 days" would be a true number describing no history at all, and it
+          // renders as "just started" next to a "History" label. A one-commit
+          // repository is a normal state for a fresh import, not a defect.
+          spanDays: (() => {
+            const at = lastCommitRows[0]?.at;
+            const firstAt = lastCommitRows[0]?.firstAt;
+            if (!at || !firstAt) return null;
+            const days = Math.round(
+              (at.getTime() - firstAt.getTime()) / 86_400_000,
+            );
+            return days > 0 ? days : null;
+          })(),
+          bucketsAgree: bucketedOpenTotal === openTotal,
+        },
         work: {
           openIssues: Number(work?.openIssues ?? 0),
           closedIssues: Number(work?.closedIssues ?? 0),
@@ -1170,6 +1440,7 @@ export function createProjectService() {
             work?.medianOpenAgeDays === null || work?.medianOpenAgeDays === undefined
               ? null
               : Math.round(Number(work.medianOpenAgeDays)),
+          openAgeBuckets,
         },
         contributors: contributorRows.map((row) => ({
           email: row.email,
@@ -1187,6 +1458,17 @@ export function createProjectService() {
             language: row.language as string,
             files: Number(row.files),
           })),
+        // Newest first. `truncateSubject` runs here rather than in the
+        // component so the list stays plain data: the cap is a property of
+        // what this endpoint is willing to emit, not a presentational choice.
+        recentCommits: recentCommitRows.map((row) => ({
+          id: row.id,
+          hash: row.hash,
+          message: truncateSubject(row.message),
+          authorName: row.authorName,
+          authorAvatar: row.authorAvatar,
+          authorDate: row.authorDate,
+        })),
       };
     },
 

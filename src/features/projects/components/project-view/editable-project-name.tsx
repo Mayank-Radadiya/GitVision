@@ -105,7 +105,7 @@ export default function EditableProjectName({
           className={
             compact
               ? "truncate text-sm font-medium"
-              : "truncate text-2xl font-semibold tracking-tight sm:text-3xl"
+              : "truncate text-[28px] leading-tight font-semibold tracking-tight"
           }
         >
           {name}

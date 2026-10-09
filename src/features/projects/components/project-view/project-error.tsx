@@ -14,13 +14,14 @@ import { Button } from "@/shared/components/ui/button";
 interface ProjectErrorProps {
   message: string | null;
   onRetry: () => void;
+  pending?: boolean;
 }
 
-function ProjectError({ message, onRetry }: ProjectErrorProps) {
+function ProjectError({ message, onRetry, pending }: ProjectErrorProps) {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen p-6 lg:p-8">
+    <div className="project-workspace bg-background min-h-screen p-4 pt-16 md:p-8">
       {/* Back Button */}
       <Button
         variant="ghost"
@@ -29,18 +30,18 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
         className="text-muted-foreground hover:text-foreground group mb-8 cursor-pointer gap-2"
       >
         <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" />
-        Back to Dashboard
+        Back to projects
       </Button>
 
       {/* Error Card */}
-      <div className="bg-card/80 mx-auto max-w-lg rounded-xl border border-red-500/20 p-12 text-center shadow-xl">
-        <div className="mb-6 inline-flex rounded-xl bg-red-500/10 p-4">
-          <AlertCircle className="h-12 w-12 text-red-400" />
+      <div className="bg-card border-border mx-auto max-w-lg rounded-xl border px-6 py-10 text-center sm:p-10">
+        <div className="bg-destructive/10 mb-5 inline-flex rounded-lg p-3">
+          <AlertCircle className="text-destructive size-6" />
         </div>
 
-        <h2 className="text-foreground mb-3 text-2xl font-bold">
-          Error Loading Project
-        </h2>
+        <h1 className="text-foreground mb-3 text-xl font-semibold tracking-tight">
+          Couldn’t load this project
+        </h1>
 
         <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
           {message ||
@@ -51,14 +52,15 @@ function ProjectError({ message, onRetry }: ProjectErrorProps) {
           <Button
             variant="outline"
             onClick={onRetry}
+            disabled={pending}
             className="cursor-pointer gap-2"
           >
-            <RefreshCw className="h-4 w-4" />
-            Try Again
+            <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
+            {pending ? "Retrying…" : "Try again"}
           </Button>
           <Button
             onClick={() => router.push("/dashboard")}
-            className="from-primary to-primary text-primary-foreground cursor-pointer gap-2 border-0 bg-linear-to-br"
+            className="cursor-pointer gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
             Dashboard

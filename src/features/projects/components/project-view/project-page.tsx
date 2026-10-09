@@ -1,33 +1,7 @@
 "use client";
 
-/**
- * Project workspace shell — header, rail, and lazily-mounted sections.
- *
- * Three changes from the version this replaces, and one behaviour deliberately
- * left alone.
- *
- * Removed: the horizontal `ProjectTabs`, replaced by `SectionRail`; the
- * `WorkspaceSummary` strip, whose five equal-weight tiles ranked "branches" level
- * with AI index coverage and printed coverage as a bare string with no bar; and the
- * block that reprinted the active section's own `label` and `description`
- * directly under the tablist it had just been selected from — the tab already said
- * that, in a control the user had just touched.
- *
- * Removed: a second `useProjectCommits` subscription. `project-pulse-widget` called
- * the hook itself while this component also called it and threaded `commits` down
- * for the same widget to re-consume, so one infinite query was mounted twice. The
- * pulse widget's chart is now the real aggregate from `getInsights`, and its feed
- * is `CommitsTab`, which owns the only remaining subscription.
- *
- * Kept: `visited` panels stay mounted once opened, so a search term typed in the
- * commit feed, an expanded commit body, and a selected file all survive navigating
- * away and back. Heavy sections still load only on first visit, via `dynamic` +
- * `SectionSkeleton`. That is the one piece of this file that is load-bearing
- * rather than cosmetic, and it is unchanged.
- */
-
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { MotionConfig } from "framer-motion";
@@ -39,16 +13,27 @@ import ProjectHeader from "./project-header";
 import SectionRail, { tabId, tabPanelId } from "./rail/section-rail";
 import ProjectError from "./project-error";
 import { SectionSkeleton } from "./workspace-skeleton";
+import { OverviewSkeleton } from "./overview/overview-skeleton";
 import {
   PROJECT_COMMAND_EVENT,
   PROJECT_SECTIONS,
   type ProjectCommand,
+  readWorkspaceLocation,
+  workspaceUrl,
 } from "./workspace-navigation";
+import {
+  ProjectActionsProvider,
+  useProjectActionController,
+} from "./project-actions";
+import { SectionHeading, InlineError } from "./workspace-ui";
 import type { ProjectTab } from "@/features/projects/types/project.types";
 import type { ActivityWindow } from "./overview/activity-panel";
 
+// Overview gets its own skeleton because it is the only section whose loading
+// shape has to match a specific layout — the shared one is a generic 2-up grid
+// that would jump a screenful when insights resolve.
 const OverviewDashboard = dynamic(() => import("./overview"), {
-  loading: SectionSkeleton,
+  loading: OverviewSkeleton,
 });
 const CodeViewer = dynamic(() => import("./code-viewer"), {
   loading: SectionSkeleton,
@@ -73,21 +58,28 @@ const ProjectDetailsDrawer = dynamic(() => import("./project-details-drawer"), {
 });
 
 export default function ProjectPage() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { section: activeTab, days: activityWindow } =
+    readWorkspaceLocation(searchParams);
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
-  const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [activityWindow, setActivityWindow] = useState<ActivityWindow>(30);
   const [visited, setVisited] = useState<Set<ProjectTab>>(
-    () => new Set(["overview"]),
+    () => new Set([activeTab]),
   );
   const {
     data: project,
     isLoading,
     isError,
+    isFetching: detailsFetching,
     error,
     refetch,
   } = useProjectDetails(projectId);
+  const actions = useProjectActionController(
+    projectId,
+    project?.embeddingStatus,
+  );
 
   // Fetched at the shell rather than inside `OverviewDashboard` so the rail can
   // badge its sections with the same counts the Overview renders — one query,
@@ -96,23 +88,63 @@ export default function ProjectPage() {
     data: insights,
     isLoading: insightsLoading,
     isFetching: insightsFetching,
+    isError: insightsError,
+    isPlaceholderData: insightsPlaceholder,
+    refetch: refetchInsights,
   } = useProjectInsights(projectId, activityWindow);
 
-  const navigate = useCallback((tab: ProjectTab) => {
-    setActiveTab(tab);
+  const navigate = useCallback(
+    (tab: ProjectTab) => {
+      const url = workspaceUrl(
+        pathname,
+        new URLSearchParams(window.location.search),
+        { section: tab },
+      );
+      if (url !== `${window.location.pathname}${window.location.search}`)
+        window.history.pushState(null, "", url);
+      setVisited((previous) =>
+        previous.has(tab) ? previous : new Set([...previous, tab]),
+      );
+    },
+    [pathname],
+  );
+  const setActivityWindow = useCallback(
+    (days: ActivityWindow) => {
+      window.history.replaceState(
+        null,
+        "",
+        workspaceUrl(pathname, new URLSearchParams(window.location.search), {
+          days,
+        }),
+      );
+    },
+    [pathname],
+  );
+  useEffect(() => {
     setVisited((previous) =>
-      previous.has(tab) ? previous : new Set([...previous, tab]),
+      previous.has(activeTab) ? previous : new Set([...previous, activeTab]),
     );
-  }, []);
+  }, [activeTab]);
+  const openSection = useCallback(
+    (tab: ProjectTab) => {
+      navigate(tab);
+      requestAnimationFrame(() => {
+        document
+          .getElementById(tabPanelId(tab))
+          ?.focus({ preventScroll: true });
+      });
+    },
+    [navigate],
+  );
   const openDetails = useCallback(() => setDetailsOpen(true), []);
-  const openFiles = useCallback(() => navigate("files"), [navigate]);
+  const openFiles = useCallback(() => openSection("files"), [openSection]);
 
   useEffect(() => {
     const command = (event: Event) => {
       const detail = (event as CustomEvent<ProjectCommand>).detail;
       if (detail === "details") setDetailsOpen(true);
       else if (PROJECT_SECTIONS.some((section) => section.id === detail))
-        navigate(detail);
+        openSection(detail);
     };
     const shortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -134,7 +166,7 @@ export default function ProjectPage() {
       }
       if (event.shiftKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        navigate("files");
+        openSection("files");
       }
     };
     window.addEventListener(PROJECT_COMMAND_EVENT, command);
@@ -143,12 +175,13 @@ export default function ProjectPage() {
       window.removeEventListener(PROJECT_COMMAND_EVENT, command);
       window.removeEventListener("keydown", shortcut);
     };
-  }, [navigate]);
+  }, [openSection]);
 
-  if (isError && !isLoading)
+  if (isError && !isLoading && !project)
     return (
       <ProjectError
         message={error?.message || null}
+        pending={detailsFetching}
         onRetry={() => {
           toast.loading("Retrying…", { id: "retry" });
           void refetch().finally(() => toast.dismiss("retry"));
@@ -163,34 +196,43 @@ export default function ProjectPage() {
 
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.2 }}>
-      <div
-        className="project-workspace bg-background text-foreground min-h-screen"
-        data-project-shortcuts
+      <ProjectActionsProvider
+        actions={actions}
+        projectName={project?.projectName ?? "this project"}
       >
-        <ProjectHeader
-          projectName={project?.projectName}
-          githubUrl={project?.githubUrl}
-          isLoading={isLoading}
-          projectId={projectId}
-          onOpenCodeViewer={openFiles}
-          onOpenDetails={openDetails}
-          embeddingStatus={project?.embeddingStatus}
-          totalFiles={project?.totalFiles}
-          indexedFileCount={project?.indexedFileCount}
-          totalFileCount={project?.totalFileCount}
-        />
-        <div className="mx-auto max-w-7xl px-5 pt-5 pb-12 sm:px-8 lg:px-10">
-          <div className="lg:flex lg:gap-8">
-            <SectionRail
-              activeTab={activeTab}
-              onTabChange={navigate}
-              counts={railCounts}
-            />
-
-            {/* `flex-1` rather than a fixed width: the rail collapses to a
-                horizontal row below `lg`, so the content column has to be allowed
-                to reclaim the full width rather than sit beside an empty gutter. */}
-            <div className="min-w-0 flex-1 pt-6 lg:pt-0">
+        <div
+          className="project-workspace bg-background text-foreground min-h-screen"
+          data-project-shortcuts
+        >
+          <ProjectHeader
+            projectName={project?.projectName}
+            githubUrl={project?.githubUrl}
+            isLoading={isLoading}
+            projectId={projectId}
+            onOpenCodeViewer={openFiles}
+            onOpenDetails={openDetails}
+            embeddingStatus={project?.embeddingStatus}
+            totalFiles={project?.totalFiles}
+            indexedFileCount={project?.indexedFileCount}
+            totalFileCount={project?.totalFileCount}
+            lastSyncedAt={project?.lastSyncedAt}
+          />
+          <SectionRail
+            activeTab={activeTab}
+            onTabChange={navigate}
+            counts={railCounts}
+          />
+          <div className="project-content mx-auto max-w-[1280px] px-4 pt-6 pb-12 md:px-8">
+            {isError && project && (
+              <div className="mb-5">
+                <InlineError
+                  message="Couldn’t refresh project details. Showing the last available data."
+                  onRetry={() => void refetch()}
+                  pending={detailsFetching}
+                />
+              </div>
+            )}
+            <div className="min-w-0">
               {PROJECT_SECTIONS.map(({ id }) => (
                 <div
                   key={id}
@@ -203,7 +245,13 @@ export default function ProjectPage() {
                 >
                   {visited.has(id) &&
                     (isLoading ? (
-                      <SectionSkeleton />
+                      <>
+                        {id === "overview" ? (
+                          <OverviewSkeleton />
+                        ) : (
+                          <SectionSkeleton />
+                        )}
+                      </>
                     ) : (
                       <>
                         {id === "overview" && (
@@ -213,6 +261,16 @@ export default function ProjectPage() {
                             isInsightsFetching={insightsFetching}
                             window={activityWindow}
                             onWindowChange={setActivityWindow}
+                            insightsError={insightsError}
+                            isPlaceholderData={insightsPlaceholder}
+                            onRetryInsights={() => {
+                              void refetchInsights();
+                            }}
+                            githubUrl={project?.githubUrl}
+                            onAskAI={actions.askAI}
+                            isAskingAI={actions.asking}
+                            onSync={actions.syncProject}
+                            isSyncing={actions.syncing}
                             embeddingStatus={project?.embeddingStatus}
                             indexedFileCount={project?.indexedFileCount}
                             totalFileCount={project?.totalFileCount}
@@ -223,9 +281,13 @@ export default function ProjectPage() {
                             totalCommits={project?.totalCommits}
                             totalContributors={project?.totalContributors}
                             estimatedTokens={project?.estimatedTokens}
+                            star={project?.star}
+                            forks={project?.forks}
+                            totalBranches={project?.totalBranches}
+                            lastSyncedAt={project?.lastSyncedAt}
                             languages={project?.languages ?? []}
                             briefing={project?.briefing ?? null}
-                            onNavigate={navigate}
+                            onNavigate={openSection}
                           />
                         )}
                         {id === "commits" && (
@@ -243,10 +305,20 @@ export default function ProjectPage() {
                             repoUrl={project?.githubUrl}
                           />
                         )}
-                        {id === "files" && <CodeViewer projectId={projectId} />}
+                        {id === "files" && (
+                          <div className="space-y-5">
+                            <SectionHeading
+                              title="Repository files"
+                              description="Read the source and explore the files available to AI."
+                            />
+                            <CodeViewer projectId={projectId} />
+                          </div>
+                        )}
                         {id === "team" && (
                           <TeamTab
                             projectId={projectId}
+                            window={activityWindow}
+                            onWindowChange={setActivityWindow}
                             totalContributors={project?.totalContributors ?? 0}
                           />
                         )}
@@ -257,23 +329,17 @@ export default function ProjectPage() {
                     ))}
                 </div>
               ))}
-
-              <p className="text-muted-foreground mt-10 hidden text-xs lg:block">
-                <kbd className="font-mono">Shift D</kbd> details
-                <span className="mx-2">·</span>
-                <kbd className="font-mono">Shift F</kbd> files
-              </p>
             </div>
           </div>
+          {project && detailsOpen && (
+            <ProjectDetailsDrawer
+              open={detailsOpen}
+              onOpenChange={setDetailsOpen}
+              project={project}
+            />
+          )}
         </div>
-        {project && detailsOpen && (
-          <ProjectDetailsDrawer
-            open={detailsOpen}
-            onOpenChange={setDetailsOpen}
-            project={project}
-          />
-        )}
-      </div>
+      </ProjectActionsProvider>
     </MotionConfig>
   );
 }

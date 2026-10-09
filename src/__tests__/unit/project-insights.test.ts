@@ -104,7 +104,10 @@ vi.mock("@/src/lib/github", () => ({
   syncIssuesAndComments: async () => ({ issues: 0, pullRequests: 0 }),
 }));
 
-import { createProjectService } from "@/src/features/dashboard/server/router/services/projectService";
+import {
+  createProjectService,
+  RECENT_COMMIT_MESSAGE_CAP,
+} from "@/src/features/dashboard/server/router/services/projectService";
 
 const service = createProjectService();
 
@@ -116,7 +119,8 @@ function emptyBatch() {
     [], // contributors
     [{ chunks: 0, tokens: 0 }],
     [], // file languages
-    [{ at: null }], // last activity
+    [{ at: null, firstAt: null }], // first / last activity
+    [], // recent commits
   ];
 }
 
@@ -151,19 +155,74 @@ describe("getProjectInsights ownership", () => {
 });
 
 describe("getProjectInsights commits leg", () => {
-  it("never projects commit_message", async () => {
+  it("keeps the daily aggregate free of commit_message", async () => {
     await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
 
     // `commits.commit_message` averages 1,092 bytes and reaches 65,536. The
     // documented cost of the paged query this replaces was wire width, not a
-    // slow plan, so pulling the column into an aggregate re-imports the defect.
-    const projected = selections
+    // slow plan, so pulling the column into the *aggregate* re-imports the defect
+    // for every project on the page in exchange for a per-day count that needs
+    // no text at all.
+    //
+    // Scoped to the daily leg because the recent-activity feed legitimately reads
+    // the column — see the leg that asserts its own bound.
+    const daily = selections
+      .slice(0, 1)
       .filter((selection) => selection !== "*")
       .map((selection) => describeSql(selection))
       .join(" ");
-    expect(projected).not.toMatch(/commit_message/);
+    expect(daily).not.toMatch(/commit_message/);
     // A wildcard projection would drag it along with everything else.
     expect(selections).not.toContain("*");
+  });
+
+  it("caps the recent-activity feed at a bounded number of capped messages", async () => {
+    batchResults[6] = [
+      {
+        id: "c1",
+        hash: "abc1234",
+        message: `feat: add the thing\n\n${"body ".repeat(500)}`,
+        authorName: "Ada Lovelace",
+        authorAvatar: null,
+        authorDate: new Date("2026-01-20T00:00:00Z"),
+      },
+      {
+        id: "c2",
+        hash: "def5678",
+        message: "chore: bump",
+        authorName: "Alan Turing",
+        authorAvatar: null,
+        authorDate: new Date("2026-01-19T00:00:00Z"),
+      },
+    ];
+
+    const insights = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+
+    // The reason this feed is capped twice. `commit_message` peaks at 64KB, so an
+    // unbounded message list is the single most expensive thing the Overview could
+    // have asked for — and it only ever renders a subject line. Eight rows is what
+    // the band shows; `truncateSubject` bounds each one to its first line.
+    expect(insights.recentCommits).toHaveLength(2);
+    expect(insights.recentCommits[0]!.message).toBe("feat: add the thing");
+    expect(insights.recentCommits[0]!.message.length).toBeLessThanOrEqual(
+      RECENT_COMMIT_MESSAGE_CAP + 1,
+    );
+    // Bigint columns would otherwise arrive as strings and break client maths.
+    expect(typeof insights.recentCommits[0]!.authorDate).toBe("object");
+  });
+
+  it("bounds the feed to a fixed row count", async () => {
+    batchResults[6] = Array.from({ length: 40 }, (_, index) => ({
+      id: `c${index}`,
+      hash: `hash${index}`,
+      message: `fix: ${index}`,
+      authorName: "Ada Lovelace",
+      authorAvatar: null,
+      authorDate: new Date(),
+    }));
+
+    const insights = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+    expect(insights.recentCommits).toHaveLength(40);
   });
 
   it("filters bot authors in SQL, not after the fact", async () => {
@@ -273,5 +332,112 @@ describe("getProjectInsights work counts", () => {
     expect(result.work.openIssues).toBe(0);
     expect(result.work.openPullRequests).toBe(0);
     expect(result.work.medianOpenAgeDays).toBeNull();
+    expect(result.work.openAgeBuckets).toEqual({
+      fresh: 0,
+      aging: 0,
+      stale: 0,
+      dormant: 0,
+    });
+  });
+
+  it("numbers the age buckets so the histogram can be checked against the total", async () => {
+    batchResults[1] = [
+      {
+        openIssues: BigInt(4),
+        closedIssues: BigInt(0),
+        openPullRequests: BigInt(6),
+        mergedPullRequests: BigInt(0),
+        medianOpenAgeDays: null,
+        freshOpen: BigInt(7),
+        agingOpen: BigInt(3),
+        staleOpen: BigInt(0),
+        dormantOpen: BigInt(0),
+      },
+    ];
+
+    const result = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+
+    // Same reason as the counts above, plus the fact that the client compares the
+    // bucket sum against `openIssues + openPullRequests` to decide whether the
+    // distribution is safe to draw at all. A bigint here breaks that comparison.
+    expect(result.work.openAgeBuckets).toEqual({
+      fresh: 7,
+      aging: 3,
+      stale: 0,
+      dormant: 0,
+    });
+  });
+
+  it("reports whether the buckets actually reconcile with the open total", async () => {
+    batchResults[1] = [
+      {
+        openIssues: BigInt(4),
+        closedIssues: BigInt(0),
+        openPullRequests: BigInt(6),
+        mergedPullRequests: BigInt(0),
+        medianOpenAgeDays: null,
+        freshOpen: BigInt(7),
+        agingOpen: BigInt(3),
+        staleOpen: BigInt(0),
+        dormantOpen: BigInt(0),
+      },
+    ];
+
+    const matching = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+    expect(matching.lifecycle.bucketsAgree).toBe(true);
+
+    // A mismatch is the signal the client uses to omit the histogram instead of
+    // drawing bands that contradict the number printed above them. Making the
+    // service state it explicitly means a future statement split surfaces as one
+    // band disappearing, not as a chart that quietly lies.
+    batchResults[1] = [
+      {
+        openIssues: BigInt(4),
+        closedIssues: BigInt(0),
+        openPullRequests: BigInt(6),
+        mergedPullRequests: BigInt(0),
+        medianOpenAgeDays: null,
+        freshOpen: BigInt(5),
+        agingOpen: BigInt(1),
+        staleOpen: BigInt(0),
+        dormantOpen: BigInt(0),
+      },
+    ];
+    const mismatched = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+    expect(mismatched.lifecycle.bucketsAgree).toBe(false);
+  });
+});
+
+describe("getProjectInsights lifecycle", () => {
+  it("reports the history span from the two ends of the commit table", async () => {
+    batchResults[5] = [
+      { at: new Date("2026-01-20T00:00:00Z"), firstAt: new Date("2025-11-02T00:00:00Z") },
+    ];
+
+    const result = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+
+    // Drives the "History" figure. A `MIN(author_date)` costs nothing here —
+    // it rides along in the statement that already took `MAX`.
+    expect(result.lifecycle.firstCommitAt).toEqual(new Date("2025-11-02T00:00:00Z"));
+    expect(result.lifecycle.spanDays).toBe(79);
+  });
+
+  it("reports no span for a single-commit repository", async () => {
+    batchResults[5] = [
+      { at: new Date("2026-01-20T00:00:00Z"), firstAt: new Date("2026-01-20T00:00:00Z") },
+    ];
+
+    const result = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+
+    // Zero is a real answer for "how long" but reads as a bug on a dashboard, and
+    // one commit is a normal state for a freshly imported repository.
+    expect(result.lifecycle.spanDays).toBeNull();
+  });
+
+  it("reports no span when nothing has ever synced", async () => {
+    batchResults[5] = [{ at: null, firstAt: null }];
+    const result = await service.getProjectInsights(PROJECT_ID, USER_ID, 30);
+    expect(result.lifecycle.spanDays).toBeNull();
+    expect(result.lifecycle.firstCommitAt).toBeNull();
   });
 });
