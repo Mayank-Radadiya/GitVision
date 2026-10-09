@@ -1,80 +1,110 @@
 "use client";
 
 /**
- * Code Viewer — Project Grid
+ * Code Viewer — Project Picker
  *
- * Displays all user projects as clickable cards.
- * Each card navigates to /code-viewer/[projectId] to view source code.
+ * Command-first list: a jump input filters projects by name or repo path,
+ * rows stay dense (avatar + name + path + file count + top language +
+ * synced age). Index state is a small text adornment, not a dashboard.
  */
 
-import { memo, useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { motion } from "framer-motion";
-import {
-  Code,
-  Star,
-  GitFork,
-  GitCommit,
-  Users,
-  ExternalLink,
-  ArrowRight,
-  Clock,
-  Search,
-} from "lucide-react";
-import { cn } from "@/shared/lib/utils";
+import { useRouter } from "next/navigation";
+import { Code, Search, ChevronRight, ArrowRight } from "lucide-react";
 import { trpc } from "@/src/lib/trpc/client";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Input } from "@/shared/components/ui/input";
+import {
+  formatCount,
+  formatRelativeShort,
+} from "@/shared/lib/format";
+import type { LanguageEntry } from "@/db/schema";
 
-/** Format large numbers: 1200 → "1.2k" */
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toString();
+type ProjectRow = {
+  id: string;
+  projectName: string;
+  githubUrl: string;
+  totalFiles: number;
+  languages: LanguageEntry[] | null;
+  embeddingStatus: string | null;
+  indexedFileCount: number;
+  totalFileCount: number;
+  lastSyncedAt: Date | null;
+  createdAt: Date;
+};
+
+type SortMode = "recent" | "name";
+
+/**
+ * One-line index adornment. Only non-healthy states surface: a finished
+ * run with searchable files needs no explanation on the row.
+ */
+function statusNote(project: ProjectRow): string | null {
+  const status = project.embeddingStatus;
+  if (status === "processing" || status === "pending") return "Indexing…";
+  if (status === "partial") return "Partial index";
+  if (status === "failed") return "Index failed";
+  return null;
 }
 
-function Stat({
-  icon: Icon,
-  value,
-  label,
-  color,
-}: {
-  icon: typeof Star;
-  value: number;
-  label: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5 text-sm" title={label}>
-      <Icon className={cn("h-3.5 w-3.5", color)} />
-      <span className="text-foreground font-medium">{fmt(value)}</span>
-    </div>
-  );
+function repoPathOf(githubUrl: string): string {
+  return githubUrl.replace(/^https?:\/\/(www\.)?github\.com\//, "");
+}
+
+function topLanguage(languages: LanguageEntry[] | null): string | null {
+  if (!languages || languages.length === 0) return null;
+  return [...languages].sort((a, b) => b.size - a.size)[0]?.name ?? null;
 }
 
 function CodeViewerProjectGrid() {
-  const { data: projects = [], isLoading } = trpc.project.getAll.useQuery(
-    undefined,
-    { staleTime: 5 * 60 * 1000 },
-  );
+  const { data, isLoading } = trpc.project.getAll.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
+  const projects = (data ?? []) as ProjectRow[];
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortMode>("recent");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return projects;
-    return projects.filter(
-      (p) =>
-        p.projectName.toLowerCase().includes(q) ||
-        p.githubUrl.toLowerCase().includes(q),
+    const matches = !q
+      ? [...projects]
+      : projects.filter(
+          (p) =>
+            p.projectName.toLowerCase().includes(q) ||
+            p.githubUrl.toLowerCase().includes(q),
+        );
+    matches.sort((a, b) => {
+      if (sort === "name") return a.projectName.localeCompare(b.projectName);
+      const aTime = a.lastSyncedAt ? new Date(a.lastSyncedAt).getTime() : 0;
+      const bTime = b.lastSyncedAt ? new Date(b.lastSyncedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+    return matches;
+  }, [projects, query, sort]);
+
+  const focusRow = useCallback((index: number) => {
+    const clamped = Math.max(
+      0,
+      Math.min(index, listRef.current?.childElementCount ?? 1 - 1),
     );
-  }, [projects, query]);
+    setActiveIndex(clamped);
+    const link = listRef.current?.querySelectorAll("a[data-row-link]")[clamped];
+    (link as HTMLElement | undefined)?.focus();
+  }, []);
 
   const handleQueryChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value),
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setQuery(e.target.value);
+      setActiveIndex(0);
+    },
     [],
   );
 
-  // ─── Page header (shared across all states) ────────────────────────
   const pageHeader = (
     <div className="flex items-center gap-3">
       <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
@@ -83,7 +113,7 @@ function CodeViewerProjectGrid() {
       <div>
         <h1 className="text-foreground text-2xl font-bold">Code Viewer</h1>
         <p className="text-muted-foreground text-sm">
-          Select a project to browse its source code
+          Jump to a project and browse its source
         </p>
       </div>
     </div>
@@ -91,13 +121,12 @@ function CodeViewerProjectGrid() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
+      <div className="container mx-auto max-w-4xl space-y-4 px-4 py-8">
         {pageHeader}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-2xl" />
-          ))}
-        </div>
+        <Skeleton className="h-10 w-full rounded-xl" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
@@ -113,142 +142,144 @@ function CodeViewerProjectGrid() {
           <h3 className="text-foreground mb-2 text-lg font-semibold">
             No projects yet
           </h3>
-          <p className="text-muted-foreground max-w-sm text-sm">
-            Create a project from a GitHub repository to browse its source code
-            here.
+          <p className="text-muted-foreground mb-6 max-w-sm text-sm">
+            Create a project from a GitHub repository to browse its source
+            code here.
           </p>
+          <Link
+            href="/create-project"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
+          >
+            Create a project
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
+    <div className="container mx-auto max-w-4xl space-y-4 px-4 py-8">
       {pageHeader}
-      {/* Search */}
-      {projects.length > 3 && (
-        <div className="relative max-w-md">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <input
-            type="text"
+
+      {/* Command */}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+            aria-hidden="true"
+          />
+          <Input
+            ref={inputRef}
+            aria-label="Jump to project"
+            placeholder="Jump to project…"
             value={query}
             onChange={handleQueryChange}
-            placeholder="Search projects…"
-            aria-label="Search projects"
-            className="border-border/40 bg-card/50 text-foreground placeholder:text-muted-foreground/60 focus:ring-primary/20 focus:border-primary/30 w-full rounded-xl border py-2.5 pr-4 pl-10 text-sm backdrop-blur-sm transition-all duration-200 focus:ring-2 focus:outline-none"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setQuery("");
+                setActiveIndex(0);
+              } else if (event.key === "ArrowDown") {
+                event.preventDefault();
+                focusRow(activeIndex + 1);
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                focusRow(activeIndex - 1);
+              } else if (event.key === "Enter") {
+                const target = filtered[Math.min(activeIndex, filtered.length - 1)];
+                if (target) {
+                  router.push(`/code-viewer/${target.id}`);
+                }
+              }
+            }}
+            className="pl-9"
           />
+        </div>
+        <div role="group" aria-label="Sort projects" className="flex shrink-0 gap-1">
+          {(["recent", "name"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={sort === mode}
+              onClick={() => setSort(mode)}
+              className={
+                sort === mode
+                  ? "bg-primary/10 text-primary rounded-md px-2.5 py-1.5 text-xs font-medium capitalize"
+                  : "text-muted-foreground hover:text-foreground rounded-md px-2.5 py-1.5 text-xs font-medium capitalize"
+              }
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* No match */}
+      {filtered.length === 0 && (
+        <div className="py-12 text-center">
+          <p className="text-muted-foreground text-sm">
+            No projects match &ldquo;{query.trim()}&rdquo;
+          </p>
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="text-primary hover:text-primary/80 mt-2 cursor-pointer text-xs font-medium"
+          >
+            Clear search
+          </button>
         </div>
       )}
 
-      {/* No results */}
-      {filtered.length === 0 && query && (
-        <p className="text-muted-foreground py-12 text-center text-sm">
-          No projects match &ldquo;{query}&rdquo;
-        </p>
-      )}
-
-      {/* Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((project, i) => {
-          const repoPath = project.githubUrl.replace(
-            /^https?:\/\/(www\.)?github\.com\//,
-            "",
-          );
-          const timeAgo = formatDistanceToNow(new Date(project.createdAt), {
-            addSuffix: true,
-          });
-
+      {/* Dense list */}
+      <ul ref={listRef} className="border-border/60 divide-y divide-border/60 rounded-xl border">
+        {filtered.map((project) => {
+          const total = Math.max(project.totalFileCount, project.totalFiles, 0);
+          const lang = topLanguage(project.languages);
+          const note = statusNote(project);
+          const recency = project.lastSyncedAt
+            ? `Synced ${formatRelativeShort(project.lastSyncedAt)}`
+            : "Never synced";
           return (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.04 }}
-            >
-              <div
-                className="group border-border/60 hover:border-primary/30 bg-card/80 relative flex min-h-45 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-lg"
+            <li key={project.id}>
+              <Link
+                href={`/code-viewer/${project.id}`}
+                data-row-link
+                className="hover:bg-accent/40 flex items-center gap-3 px-4 py-3 transition-colors outline-none focus-visible:ring-ring/70 focus-visible:ring-2 focus-visible:ring-inset"
               >
-                {/* Ambient glow */}
-                <div className="from-primary absolute -top-6 -right-6 h-24 w-24 rounded-full bg-linear-to-br to-blue-400 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
-
-                <div className="relative z-10 flex flex-col gap-4">
-                  {/* Header: Avatar + Name */}
-                  <div className="flex items-start gap-3">
-                    <div className="from-primary/15 text-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br to-blue-400/15 text-base font-bold transition-transform duration-200 group-hover:scale-105">
-                      {project.projectName.charAt(0).toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-foreground group-hover:text-primary truncate font-semibold transition-colors">
-                        {/* Stretched link: the ::after covers the card, so the
-                            whole card navigates and the repository link below
-                            stays a separate link. */}
-                        <Link
-                          href={`/code-viewer/${project.id}`}
-                          className="after:absolute after:inset-0 after:content-['']"
-                        >
-                          {project.projectName}
-                        </Link>
-                      </h3>
-                      <a
-                        href={project.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-primary relative z-10 inline-flex items-center gap-1 text-xs transition-colors"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        <span className="truncate">{repoPath}</span>
-                      </a>
-                    </div>
-                  </div>
-
-                  {/* Stats row */}
-                  <div className="flex items-center gap-4">
-                    <Stat
-                      icon={Star}
-                      value={project.star}
-                      label="Stars"
-                      color="text-amber-500"
-                    />
-                    <Stat
-                      icon={GitFork}
-                      value={project.forks}
-                      label="Forks"
-                      color="text-blue-500"
-                    />
-                    <Stat
-                      icon={GitCommit}
-                      value={project.totalCommits}
-                      label="Commits"
-                      color="text-emerald-500"
-                    />
-                    <Stat
-                      icon={Users}
-                      value={project.totalContributors}
-                      label="Contributors"
-                      color="text-cyan-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Footer: Time + CTA */}
-                <div className="border-border/30 relative z-10 mt-4 flex items-center justify-between border-t pt-3">
-                  <div className="text-muted-foreground/60 flex items-center gap-1 text-xs">
-                    <Clock className="h-3 w-3" />
-                    <span>{timeAgo}</span>
-                  </div>
-
-                  <div className="text-primary/70 group-hover:text-primary flex items-center gap-1 text-xs font-medium transition-colors">
-                    <Code className="h-3.5 w-3.5" />
-                    <span>Browse Code</span>
-                    <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+                <span
+                  className="from-primary/15 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-linear-to-br to-blue-400/15 text-sm font-bold"
+                  aria-hidden="true"
+                >
+                  {project.projectName.charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="text-foreground block truncate text-sm font-medium">
+                    {project.projectName}
+                  </span>
+                  <span className="text-muted-foreground block truncate text-xs">
+                    {repoPathOf(project.githubUrl)}
+                  </span>
+                </span>
+                <span className="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:block">
+                  {formatCount(total)} files{lang ? ` · ${lang}` : ""}
+                </span>
+                {note && (
+                  <span className="text-muted-foreground/70 hidden shrink-0 text-[11px] md:block">
+                    {note}
+                  </span>
+                )}
+                <span className="text-muted-foreground shrink-0 text-[11px]">
+                  {recency}
+                </span>
+                <ChevronRight
+                  className="text-muted-foreground/50 h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
+              </Link>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }

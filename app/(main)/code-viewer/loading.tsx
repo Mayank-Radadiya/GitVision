@@ -12,10 +12,11 @@ export default function Loading() {
         </div>
       </div>
 
-      {/* Grid skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Command + list skeleton */}
+      <Skeleton className="h-10 w-full rounded-xl" />
+      <div className="space-y-0">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 rounded-2xl" />
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
         ))}
       </div>
     </div>

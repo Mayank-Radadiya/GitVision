@@ -87,14 +87,17 @@ describe("project card", () => {
 });
 
 describe("code viewer project grid", () => {
-  it("is a link that does not swallow the repository link", () => {
+  it("is a single row link with the repo path as plain text", () => {
     render(<CodeViewerProjectGrid />);
 
-    const card = screen.getByRole("link", { name: "demo" });
-    expect(card).toHaveAttribute("href", "/code-viewer/p1");
+    const row = screen.getByRole("link", { name: /demo/ });
+    expect(row).toHaveAttribute("href", "/code-viewer/p1");
 
-    const repo = screen.getByRole("link", { name: "acme/demo" });
-    expect(card.contains(repo)).toBe(false);
+    // The repo path renders as text inside the row, not a nested link.
+    expect(
+      screen.queryByRole("link", { name: "acme/demo" }),
+    ).not.toBeInTheDocument();
+    expect(row.textContent).toContain("acme/demo");
   });
 });
 

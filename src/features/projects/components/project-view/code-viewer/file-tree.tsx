@@ -24,12 +24,17 @@ import {
   File as FileIcon,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import { formatCount } from "@/shared/lib/format";
+import { describeFileIndex } from "@/src/lib/file-index-state";
+import IndexDot from "./index-dot";
 import type { TreeNode } from "./utils";
 
 interface FileTreeProps {
   tree: TreeNode[];
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  /** Project embedding status — feeds the per-row index tooltips. */
+  indexStatus?: string;
 }
 
 /** Shared by the tree and every row: a row is focusable, not its button. */
@@ -108,6 +113,25 @@ function getFileIcon(node: TreeNode) {
   }
 }
 
+/**
+ * Directory tooltips describe the folder's files, not the folder: the
+ * per-file detail copy ("Indexed · N chunks") would misdescribe an aggregate.
+ */
+function directoryIndexTitle(
+  state: TreeNode["indexState"],
+): string | undefined {
+  switch (state) {
+    case "indexed":
+      return "Every file in this folder is searchable";
+    case "skipped":
+      return "Files in this folder were skipped by the index run";
+    case "not-indexed":
+      return "Files in this folder are not indexed";
+    default:
+      return undefined;
+  }
+}
+
 // ─── Directory Node ──────────────────────────────────────────────────────────
 
 interface DirectoryNodeProps {
@@ -117,6 +141,7 @@ interface DirectoryNodeProps {
   activePath: string | null;
   onActivePath: (path: string) => void;
   onSelect: (path: string) => void;
+  indexStatus: string;
 }
 
 function DirectoryNode({
@@ -126,6 +151,7 @@ function DirectoryNode({
   activePath,
   onActivePath,
   onSelect,
+  indexStatus,
 }: DirectoryNodeProps) {
   // Auto-expand first level, plus every ancestor of the selected file so a
   // ?file= deep link into a nested path renders its row instead of
@@ -173,6 +199,14 @@ function DirectoryNode({
           />
         )}
         <span className="truncate font-medium">{node.name}</span>
+        <span className="ml-auto flex shrink-0 items-center pl-2">
+          <IndexDot
+            state={node.indexState ?? "not-indexed"}
+            status={indexStatus}
+            dimmed
+            title={directoryIndexTitle(node.indexState)}
+          />
+        </span>
       </button>
 
       {/* Children — animated open/close */}
@@ -187,6 +221,7 @@ function DirectoryNode({
               activePath={activePath}
               onActivePath={onActivePath}
               onSelect={onSelect}
+              indexStatus={indexStatus}
             />
           ))}
         </div>
@@ -204,6 +239,7 @@ interface FileNodeProps {
   activePath: string | null;
   onActivePath: (path: string) => void;
   onSelect: (path: string) => void;
+  indexStatus: string;
 }
 
 function FileNode({
@@ -213,7 +249,13 @@ function FileNode({
   activePath,
   onActivePath,
   onSelect,
+  indexStatus,
 }: FileNodeProps) {
+  const description = describeFileIndex({
+    chunkCount: node.chunkCount ?? 0,
+    tokenCount: node.tokenCount ?? 0,
+    status: indexStatus,
+  });
   return (
     <div
       role="treeitem"
@@ -237,6 +279,26 @@ function FileNode({
       >
         {getFileIcon(node)}
         <span className="truncate">{node.name}</span>
+        <span className="sr-only">, {description.label}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+          {/* Line count is the one per-file fact a reader can act on before
+              opening the file: it separates a 12-line util from a 900-line
+              module without a round trip. */}
+          {(node.lines ?? 0) > 0 && (
+            <span
+              className="text-muted-foreground/60 hidden font-mono text-[11px] tabular-nums sm:inline"
+              title={`${formatCount(node.lines ?? 0)} lines`}
+            >
+              {formatCount(node.lines ?? 0)}
+            </span>
+          )}
+          <IndexDot
+            state={node.indexState ?? "not-indexed"}
+            chunks={node.chunkCount}
+            tokens={node.tokenCount}
+            status={indexStatus}
+          />
+        </span>
       </button>
     </div>
   );
@@ -251,6 +313,7 @@ interface TreeNodeComponentProps {
   activePath: string | null;
   onActivePath: (path: string) => void;
   onSelect: (path: string) => void;
+  indexStatus: string;
 }
 
 function TreeNodeComponent({
@@ -260,6 +323,7 @@ function TreeNodeComponent({
   activePath,
   onActivePath,
   onSelect,
+  indexStatus,
 }: TreeNodeComponentProps) {
   if (node.type === "directory") {
     return (
@@ -270,6 +334,7 @@ function TreeNodeComponent({
         activePath={activePath}
         onActivePath={onActivePath}
         onSelect={onSelect}
+        indexStatus={indexStatus}
       />
     );
   }
@@ -282,13 +347,19 @@ function TreeNodeComponent({
       activePath={activePath}
       onActivePath={onActivePath}
       onSelect={onSelect}
+      indexStatus={indexStatus}
     />
   );
 }
 
 // ─── Root Component ──────────────────────────────────────────────────────────
 
-function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
+function FileTree({
+  tree,
+  selectedPath,
+  onSelect,
+  indexStatus = "pending",
+}: FileTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Roving tabindex: one row is in the tab order, so the tree is a single tab
   // stop and the arrow keys move within it. The stop follows the selection
@@ -327,16 +398,24 @@ function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
     };
 
     switch (event.key) {
+      // `j`/`k`/`g`/`G` are aliases for the WAI-ARIA tree keys above, so a
+      // reader who lives in a terminal can drive the explorer the same way.
+      // They deliberately do nothing when a modifier is held: the viewer's
+      // own `⌘K` and the browser's chords own those.
       case "ArrowDown":
+      case "j":
         step(1);
         break;
       case "ArrowUp":
+      case "k":
         step(-1);
         break;
       case "Home":
+      case "g":
         moveTo(rows[0]);
         break;
       case "End":
+      case "G":
         moveTo(rows[rows.length - 1]);
         break;
       case "ArrowRight":
@@ -379,6 +458,7 @@ function FileTree({ tree, selectedPath, onSelect }: FileTreeProps) {
           activePath={tabStop}
           onActivePath={setActivePath}
           onSelect={onSelect}
+          indexStatus={indexStatus}
         />
       ))}
     </div>
