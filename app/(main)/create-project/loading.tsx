@@ -9,7 +9,7 @@
 export default function Loading() {
   return (
     <div className="gv-page relative min-h-screen overflow-hidden">
-      <div className="bg-grid-small-white pointer-events-none absolute inset-0 opacity-40" />
+      <div className="bg-grid-small-black dark:bg-grid-small-white pointer-events-none absolute inset-0 opacity-40" />
 
       <div className="relative mx-auto w-full max-w-[600px] px-5 py-8 sm:px-6 sm:py-12">
         <div className="mb-6 h-4 w-28 rounded bg-gv-hairline/60 animate-pulse" />

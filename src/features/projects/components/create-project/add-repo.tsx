@@ -166,7 +166,7 @@ export default function CreateNewProjectForm() {
     <div className="gv-page relative min-h-screen overflow-hidden">
       <div
         aria-hidden
-        className="bg-grid-small-white pointer-events-none absolute inset-0 opacity-40"
+        className="bg-grid-small-black dark:bg-grid-small-white pointer-events-none absolute inset-0 opacity-40"
       />
 
       <div className="relative mx-auto w-full max-w-[600px] px-5 py-8 sm:px-6 sm:py-12">

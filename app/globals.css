@@ -70,6 +70,7 @@ body {
   --color-gv-moss: var(--gv-moss);
   --color-gv-ember: var(--gv-ember);
   --color-gv-wire: var(--gv-wire);
+  --color-gv-amber-fg: var(--gv-amber-fg);
   --color-ink-950: var(--ink-950);
   --color-ink-900: var(--ink-900);
   --color-ink-800: var(--ink-800);
@@ -115,15 +116,15 @@ body {
 :root {
   --radius: 0.5rem;
   /* GitVision redesign palette — cold blue-violet dark tone (brief §2) */
-  --ink-950: #0A0B0F;
-  --ink-900: #14161F;
-  --ink-800: #1D2029;
-  --ember-500: #E8A33D;
-  --diff-add-500: #5FBF7A;
-  --diff-remove-500: #E2607A;
-  --wire-400: #4FD1D9;
-  --text-100: #F1EFE9;
-  --text-500: #8A8D98;
+  --ink-950: #0a0b0f;
+  --ink-900: #14161f;
+  --ink-800: #1d2029;
+  --ember-500: #e8a33d;
+  --diff-add-500: #5fbf7a;
+  --diff-remove-500: #e2607a;
+  --wire-400: #4fd1d9;
+  --text-100: #f1efe9;
+  --text-500: #8a8d98;
 
   /* Backwards-compatible mappings for existing components */
   --gv-void: var(--ink-950);
@@ -240,11 +241,42 @@ body {
 
 /* ─── GitVision add-repo page ───────────────────────────────────────────── */
 
-/* Dark-first identity page: force dark color-scheme regardless of theme */
+/* Identity page. The `gv-*` aliases are indirect pointers at the `ink-*` /
+   `text-*` primitives, so re-pointing the primitives here re-points all ten
+   aliases at once. `:root` keeps the dark defaults, so anything outside this
+   scope is untouched. */
 .gv-page {
-  color-scheme: dark;
+  --ink-950: #fbfbfd;
+  --ink-900: #ffffff;
+  --ink-800: #f4f5f8;
+  --text-100: #10131a;
+  --text-500: #5c6272;
+  --gv-hairline: #e3e6ed;
+  /* Bright amber reads ~2.2:1 on white — too weak for the focus label. */
+  --gv-amber: #9a6a12;
+  --gv-card-top: #ffffff;
+  --gv-card-inset: rgb(0 0 0 / 0.04);
+  --gv-card-glow: rgb(255 255 255 / 0);
+  /* Amber button label. --gv-void flips to near-white in light mode, which
+     would put white text on an amber fill, so it gets its own token. */
+  --gv-amber-fg: #14161f;
+  color-scheme: light;
   background: var(--ink-950);
   color: var(--text-100);
+}
+.dark .gv-page {
+  --ink-950: #0a0b0f;
+  --ink-900: #14161f;
+  --ink-800: #1d2029;
+  --text-100: #f1efe9;
+  --text-500: #8a8d98;
+  --gv-hairline: #262c36;
+  --gv-amber: #e8a33d;
+  --gv-card-top: #171b26;
+  --gv-card-inset: rgb(255 255 255 / 0.05);
+  --gv-card-glow: rgb(255 255 255 / 0.03);
+  --gv-amber-fg: #0a0b0f;
+  color-scheme: dark;
 }
 
 /* Premium raised surface — layered dark material (Linear/Vercel-style).
@@ -253,9 +285,9 @@ body {
   position: relative;
   border-radius: 1rem;
   border: 1px solid var(--gv-hairline);
-  background: linear-gradient(180deg, #171b26 0%, var(--ink-900) 100%);
+  background: linear-gradient(180deg, var(--gv-card-top) 0%, var(--ink-900) 100%);
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.05),
+    inset 0 1px 0 0 var(--gv-card-inset),
     0 24px 48px -28px rgb(0 0 0 / 0.7);
 }
 .gv-card::before {
@@ -266,7 +298,7 @@ body {
   pointer-events: none;
   background: radial-gradient(
     120% 60% at 50% 0%,
-    rgb(255 255 255 / 0.03),
+    var(--gv-card-glow),
     transparent 55%
   );
 }
@@ -308,7 +340,8 @@ body {
 
 /* Validation error single border pulse */
 @keyframes gv-error-border-pulse {
-  0%, 100% {
+  0%,
+  100% {
     border-color: var(--diff-remove-500);
     box-shadow: 0 0 0 2px rgba(226, 96, 122, 0.25);
   }
@@ -479,7 +512,6 @@ body {
   }
 }
 
-
 /* ── Utilities referenced by components but never defined ──────────────────
  * `bg-grid-small-black` and `bg-grid-small-white` are used by the landing
  * page, the auth layout and the dashboard hero to draw a faint grid backdrop.
@@ -510,41 +542,124 @@ body {
   }
 }
 
-/* Repository workspace: one accent and AA text pairs in both themes. Scoped
-   tokens keep the rest of the application's existing palette unchanged. */
+/* Project workspace tokens also travel with portalled menus and dialogs. */
 .project-workspace {
-  --primary: oklch(0.48 0.2 260);
-  --primary-foreground: oklch(0.99 0 0);
+  --background: #f8fafc;
+  --card: #ffffff;
+  --foreground: #182230;
+  --card-foreground: var(--foreground);
+  --muted: #eef1f5;
+  --border: #e2e7ee;
+  --input: var(--border);
+  --accent: #eef2f7;
+  --accent-foreground: var(--foreground);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --gv-moss: #187344;
+  --gv-amber: #885b0b;
+  --gv-ember: #b33450;
+  --gv-wire: #087582;
+  --destructive: #b42338;
+  --primary: #2456da;
+  --primary-foreground: #ffffff;
   --ring: var(--primary);
-  --muted-foreground: oklch(0.46 0.015 286);
+  --muted-foreground: #5c6879;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
 }
 .dark .project-workspace {
-  --primary: oklch(0.72 0.14 260);
-  --primary-foreground: oklch(0.15 0.01 260);
-  --muted-foreground: oklch(0.74 0.015 286);
+  --background: #101318;
+  --card: #171b22;
+  --foreground: #edf1f7;
+  --muted: #232a34;
+  --border: #2c3441;
+  --accent: #232a34;
+  --gv-moss: #7cc99e;
+  --gv-amber: #e0bd79;
+  --gv-ember: #ee8d9e;
+  --gv-wire: #79ccd5;
+  --destructive: #ee8d9e;
+  --primary: #8aacff;
+  --primary-foreground: #111827;
+  --muted-foreground: #a4b0c0;
 }
-.project-workspace :where(button, a, input, select, [role="button"]):focus-visible {
+.project-workspace
+  :where(button, a, input, select, summary, [role="button"]):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
+.project-workspace [data-slot="button"] {
+  color: inherit;
+}
+.project-workspace [data-slot="button"].bg-primary {
+  color: var(--primary-foreground);
+}
+.project-workspace [data-slot="button"].bg-primary:hover {
+  background: color-mix(in srgb, var(--primary) 92%, var(--foreground));
+}
+.project-workspace [data-slot="button"].bg-destructive,
+.project-workspace [data-slot="alert-dialog-action"] {
+  color: #ffffff;
+}
+.dark .project-workspace [data-slot="alert-dialog-action"] {
+  color: #111827;
+}
+.project-workspace [data-slot="button"].text-destructive {
+  color: var(--destructive);
+}
+.project-workspace select {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.project-content {
+  container-type: inline-size;
+}
+.overview-row,
+.overview-context {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+@container (min-width: 640px) {
+  .project-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .overview-context {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 960px) {
+  .overview-row {
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  }
+}
 .project-section:not([hidden]) {
-  animation: project-section-enter 180ms ease-out;
+  animation: project-section-enter 120ms ease-out;
 }
 @keyframes project-section-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .project-workspace *, .project-workspace *::before, .project-workspace *::after {
+  .project-workspace *,
+  .project-workspace *::before,
+  .project-workspace *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-.project-workspace [data-slot="button"].bg-primary,
-.project-workspace [data-slot="button"].from-primary {
-  color: var(--primary-foreground);
 }
 
 /* Landing hero: local semantic aliases preserve the rest of the application. */
@@ -552,7 +667,11 @@ body {
   --hero-accent: color-mix(in srgb, var(--primary) 78%, var(--foreground));
   --hero-wire: color-mix(in oklch, var(--wire-400) 50%, var(--foreground));
   --hero-add: color-mix(in oklch, var(--diff-add-500) 50%, var(--foreground));
-  --hero-remove: color-mix(in oklch, var(--diff-remove-500) 65%, var(--foreground));
+  --hero-remove: color-mix(
+    in oklch,
+    var(--diff-remove-500) 65%,
+    var(--foreground)
+  );
   --hero-ember: color-mix(in oklch, var(--ember-500) 45%, var(--foreground));
   --muted-foreground: oklch(0.46 0.018 260);
   --hero-shadow: color-mix(in srgb, var(--foreground) 14%, transparent);
@@ -571,34 +690,70 @@ body {
   --hero-ember: var(--ember-500);
   --hero-shadow: color-mix(in srgb, var(--background) 80%, transparent);
 }
-.gitvision-hero .hero-accent { color: var(--hero-accent); }
-.gitvision-hero .hero-wire, .gitvision-hero .hero-syntax-function { color: var(--hero-wire); }
-.gitvision-hero .hero-diff-add { color: var(--hero-add); }
-.gitvision-hero .hero-diff-remove { color: var(--hero-remove); }
-.gitvision-hero .hero-syntax-keyword { color: var(--hero-accent); }
-.gitvision-hero .hero-syntax-string { color: var(--hero-ember); }
-.gitvision-hero .hero-syntax-muted { color: var(--muted-foreground); }
+.gitvision-hero .hero-accent {
+  color: var(--hero-accent);
+}
+.gitvision-hero .hero-wire,
+.gitvision-hero .hero-syntax-function {
+  color: var(--hero-wire);
+}
+.gitvision-hero .hero-diff-add {
+  color: var(--hero-add);
+}
+.gitvision-hero .hero-diff-remove {
+  color: var(--hero-remove);
+}
+.gitvision-hero .hero-syntax-keyword {
+  color: var(--hero-accent);
+}
+.gitvision-hero .hero-syntax-string {
+  color: var(--hero-ember);
+}
+.gitvision-hero .hero-syntax-muted {
+  color: var(--muted-foreground);
+}
 .gitvision-hero .hero-grid {
-  background-image: linear-gradient(color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--foreground) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--foreground) 5%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 72px 72px;
   mask-image: radial-gradient(ellipse 65% 48% at 50% 22%, black, transparent);
 }
 .gitvision-hero .hero-noise {
   opacity: 0.025;
-  background-image: repeating-radial-gradient(circle at 17% 32%, var(--foreground) 0 0.5px, transparent 0.5px 3px);
+  background-image: repeating-radial-gradient(
+    circle at 17% 32%,
+    var(--foreground) 0 0.5px,
+    transparent 0.5px 3px
+  );
   background-size: 7px 11px;
   mask-image: linear-gradient(black, transparent 70%);
 }
 .gitvision-hero .hero-spotlight {
-  background: radial-gradient(ellipse 50% 35% at 50% 20%, color-mix(in oklch, var(--primary) 8%, transparent), transparent);
+  background: radial-gradient(
+    ellipse 50% 35% at 50% 20%,
+    color-mix(in oklch, var(--primary) 8%, transparent),
+    transparent
+  );
 }
 .gitvision-hero .hero-workbench {
-  box-shadow: 0 30px 80px -30px var(--hero-shadow), 0 0 0 5px color-mix(in srgb, var(--border) 20%, transparent);
+  box-shadow:
+    0 30px 80px -30px var(--hero-shadow),
+    0 0 0 5px color-mix(in srgb, var(--border) 20%, transparent);
 }
 .gitvision-hero .hero-control {
   position: relative;
   cursor: pointer;
-  transition: transform var(--hero-feedback) ease-out, opacity var(--hero-feedback) ease-out;
+  transition:
+    transform var(--hero-feedback) ease-out,
+    opacity var(--hero-feedback) ease-out;
 }
 .gitvision-hero .hero-control::after {
   content: "";
@@ -610,10 +765,16 @@ body {
   opacity: 0;
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform var(--hero-sweep) ease-out, opacity var(--hero-feedback) ease-out;
+  transition:
+    transform var(--hero-sweep) ease-out,
+    opacity var(--hero-feedback) ease-out;
 }
-.gitvision-hero .hero-control:active:not(:disabled) { transform: scale(var(--hero-press)); }
-.gitvision-hero .hero-control:disabled::after { display: none; }
+.gitvision-hero .hero-control:active:not(:disabled) {
+  transform: scale(var(--hero-press));
+}
+.gitvision-hero .hero-control:disabled::after {
+  display: none;
+}
 .gitvision-hero :where(a, button, input):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 4px;
@@ -623,31 +784,53 @@ body {
   color: var(--ink-950);
 }
 .gitvision-hero .hero-search {
-  transition: border-color var(--hero-feedback) ease-out, box-shadow var(--hero-feedback) ease-out;
+  transition:
+    border-color var(--hero-feedback) ease-out,
+    box-shadow var(--hero-feedback) ease-out;
 }
-.gitvision-hero .hero-search :where(input):focus-visible { outline: none; }
+.gitvision-hero .hero-search :where(input):focus-visible {
+  outline: none;
+}
 .gitvision-hero .hero-search:focus-within {
   border-color: var(--hero-accent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--hero-accent) 35%, transparent);
 }
-.gitvision-hero .hero-search[data-invalid="true"] { border-style: dashed; border-color: var(--foreground); }
+.gitvision-hero .hero-search[data-invalid="true"] {
+  border-style: dashed;
+  border-color: var(--foreground);
+}
 .gitvision-hero .hero-tree-highlight {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   border-color: var(--hero-accent);
 }
-.gitvision-hero .hero-line-add { background: color-mix(in srgb, var(--hero-add) 7%, transparent); }
-.gitvision-hero .hero-line-remove { background: color-mix(in srgb, var(--hero-remove) 7%, transparent); }
+.gitvision-hero .hero-line-add {
+  background: color-mix(in srgb, var(--hero-add) 7%, transparent);
+}
+.gitvision-hero .hero-line-remove {
+  background: color-mix(in srgb, var(--hero-remove) 7%, transparent);
+}
 @media (hover: hover) and (pointer: fine) {
   .gitvision-hero .hero-spotlight {
-    background: radial-gradient(ellipse 50% 35% at var(--spotlight-x, 50%) var(--spotlight-y, 20%), color-mix(in oklch, var(--primary) 8%, transparent), transparent);
+    background: radial-gradient(
+      ellipse 50% 35% at var(--spotlight-x, 50%) var(--spotlight-y, 20%),
+      color-mix(in oklch, var(--primary) 8%, transparent),
+      transparent
+    );
   }
-  .gitvision-hero .hero-control:hover::after { transform: scaleX(1); opacity: 0.8; }
+  .gitvision-hero .hero-control:hover::after {
+    transform: scaleX(1);
+    opacity: 0.8;
+  }
 }
 @media (hover: none), (pointer: coarse) {
-  .gitvision-hero .hero-pointer-motion { transform: none !important; }
+  .gitvision-hero .hero-pointer-motion {
+    transform: none !important;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gitvision-hero *, .gitvision-hero *::before, .gitvision-hero *::after {
+  .gitvision-hero *,
+  .gitvision-hero *::before,
+  .gitvision-hero *::after {
     animation: none !important;
     transition: none !important;
     transform: none !important;

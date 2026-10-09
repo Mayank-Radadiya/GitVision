@@ -26,8 +26,8 @@ export function SubmitButton({ isLoading, isValid, disabled = false }: SubmitBut
       className={cn(
         "group relative flex h-12 w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl font-gv-mono text-sm font-semibold tracking-wide transition-all duration-200 select-none",
         !isDisabled
-          ? "border-gv-amber/70 bg-gradient-to-r from-gv-amber via-amber-500 to-amber-600 text-gv-void shadow-[0_0_24px_rgba(232,163,61,0.25)] hover:shadow-[0_0_32px_rgba(232,163,61,0.4)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-          : "border-white/6 bg-gv-graphite-2/40 text-gv-fog/40 cursor-not-allowed",
+          ? "border-gv-amber/70 bg-gradient-to-r from-gv-amber via-amber-500 to-amber-600 text-gv-amber-fg shadow-[0_0_24px_rgba(232,163,61,0.25)] hover:shadow-[0_0_32px_rgba(232,163,61,0.4)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+          : "border-gv-hairline bg-gv-graphite-2/40 text-gv-fog/40 cursor-not-allowed",
       )}
     >
       {/* Loading sweep animation */}

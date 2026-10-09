@@ -63,7 +63,7 @@ export function PresetPills({
                   "font-gv-mono inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors duration-150",
                   isSelected
                     ? "border-gv-amber/50 bg-gv-amber/15 text-gv-amber"
-                    : "border-gv-hairline bg-gv-graphite-2/50 text-gv-fog hover:border-white/20 hover:bg-gv-graphite-2 hover:text-gv-bone",
+                    : "border-gv-hairline bg-gv-graphite-2/50 text-gv-fog hover:border-gv-fog/30 hover:bg-gv-graphite-2 hover:text-gv-bone",
                   disabled && "cursor-not-allowed opacity-50",
                 )}
               >

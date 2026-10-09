@@ -97,7 +97,7 @@ export function ProjectNameField({
             "relative flex items-center rounded-xl border bg-gv-graphite-2/90 transition-[border-color,background-color,box-shadow] duration-[120ms] ease-out",
             isFocused
               ? "border-gv-amber/70 bg-gv-graphite-2 shadow-[0_0_0_1px_rgba(232,163,61,0.4),0_0_16px_rgba(232,163,61,0.1)]"
-              : "border-white/8 hover:border-white/14 shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)]",
+              : "border-gv-hairline hover:border-gv-fog/30 shadow-[inset_0_1px_1px_var(--gv-card-inset)]",
             hasError &&
               "border-gv-ember/80 focus-within:border-gv-ember focus-within:ring-2 focus-within:ring-gv-ember/20 gv-input-error",
             isLoading ? "cursor-not-allowed opacity-60" : "",
