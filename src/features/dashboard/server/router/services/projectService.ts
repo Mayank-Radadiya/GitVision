@@ -1343,10 +1343,17 @@ export function createProjectService() {
         //    rather than "never". The oldest commit rides along here because it
         //    turns out to be the cheapest honest answer to "is this project
         //    still alive" — see `lifecycle` in the return.
+        //    `.mapWith` is load-bearing, not decoration: a raw fragment carries
+        //    no column type, so without it the driver hands back the raw
+        //    `timestamp` text and the `getTime()` call in `spanDays` throws.
         db
           .select({
-            at: sql<Date | null>`MAX(${commitsTable.authorDate})`,
-            firstAt: sql<Date | null>`MIN(${commitsTable.authorDate})`,
+            at: sql<Date | null>`MAX(${commitsTable.authorDate})`.mapWith(
+              commitsTable.authorDate,
+            ),
+            firstAt: sql<Date | null>`MIN(${commitsTable.authorDate})`.mapWith(
+              commitsTable.authorDate,
+            ),
           })
           .from(commitsTable)
           .where(eq(commitsTable.projectId, projectId)),
