@@ -1,16 +1,3 @@
-/**
- * =============================================================================
- * SIDEBAR MOBILE COMPONENTS
- * =============================================================================
- *
- * Mobile-specific sidebar components:
- * - Mobile menu trigger button
- * - Mobile overlay backdrop
- * - Mobile drawer container
- *
- * @module Sidebar/components/SidebarMobile
- */
-
 "use client";
 
 import { Menu, X } from "lucide-react";
@@ -19,36 +6,28 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/shared/components/ui/button";
 import { SIDEBAR_SPRING_CONFIG } from "../sidebar.constants";
 
-// =============================================================================
-// MOBILE MENU BUTTON
-// =============================================================================
-
 interface MobileMenuButtonProps {
   /** Callback when menu button is clicked */
   onClick: () => void;
 }
 
 /**
- * Floating menu button for mobile viewport
- * Fixed position in top-left corner
+ * Compact menu trigger button for mobile viewports.
  */
 export function MobileMenuButton({ onClick }: MobileMenuButtonProps) {
   return (
     <Button
+      type="button"
       variant="ghost"
       size="icon"
       onClick={onClick}
       aria-label="Open navigation menu"
-      className="bg-background/80 fixed top-4 left-4 z-50 h-10 w-10 rounded-xl shadow-lg backdrop-blur-sm md:hidden"
+      className="border-border/80 bg-background/90 hover:bg-accent fixed top-3.5 left-3.5 z-50 h-9 w-9 rounded-lg border shadow-md backdrop-blur-md md:hidden"
     >
-      <Menu className="h-5 w-5" />
+      <Menu className="h-4.5 w-4.5" strokeWidth={1.75} />
     </Button>
   );
 }
-
-// =============================================================================
-// MOBILE OVERLAY
-// =============================================================================
 
 interface MobileOverlayProps {
   /** Whether overlay is visible */
@@ -58,8 +37,7 @@ interface MobileOverlayProps {
 }
 
 /**
- * Semi-transparent backdrop behind mobile sidebar
- * Clicking closes the sidebar
+ * Semi-transparent backdrop behind the mobile navigation drawer.
  */
 export function MobileOverlay({ isOpen, onClose }: MobileOverlayProps) {
   return (
@@ -69,18 +47,15 @@ export function MobileOverlay({ isOpen, onClose }: MobileOverlayProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
           onClick={onClose}
           aria-hidden="true"
-          className="bg-background/80 fixed inset-0 z-90 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-90 bg-black/60 backdrop-blur-[2px] md:hidden"
         />
       )}
     </AnimatePresence>
   );
 }
-
-// =============================================================================
-// MOBILE DRAWER
-// =============================================================================
 
 interface MobileDrawerProps {
   /** Whether drawer is visible */
@@ -92,8 +67,7 @@ interface MobileDrawerProps {
 }
 
 /**
- * Slide-in drawer container for mobile sidebar
- * Includes close button and glass effect background
+ * Slide-in modal navigation drawer for mobile viewports.
  */
 export function MobileDrawer({ isOpen, onClose, children }: MobileDrawerProps) {
   return (
@@ -119,16 +93,16 @@ export function MobileDrawer({ isOpen, onClose, children }: MobileDrawerProps) {
                 <DialogPrimitive.Title className="sr-only">
                   Navigation menu
                 </DialogPrimitive.Title>
-                <div className="bg-background/95 relative h-full shadow-2xl backdrop-blur-xl">
-                  {/* Close Button */}
+                <div className="sidebar-rail border-sidebar-border relative h-full overflow-hidden border-r shadow-2xl">
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     onClick={onClose}
                     aria-label="Close navigation menu"
-                    className="absolute top-3 right-3 h-8 w-8 rounded-lg"
+                    className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground absolute top-3.5 right-3 z-20 h-7 w-7 rounded-md"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4" strokeWidth={1.75} />
                   </Button>
                   {children}
                 </div>
