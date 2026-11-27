@@ -1,32 +1,13 @@
-/**
- * =============================================================================
- * SIDEBAR LOGO COMPONENT
- * =============================================================================
- *
- * Displays the GitVision brand logo with animated text.
- * Includes collapse toggle button when expanded.
- *
- * @module Sidebar/components/SidebarLogo
- */
-
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { FADE_TRANSITION } from "../sidebar.constants";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/src/shared/components/ui/tooltip";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+import { SidebarTooltip } from "./SidebarTooltip";
 
 interface SidebarLogoProps {
   /** Whether sidebar is collapsed */
@@ -35,81 +16,78 @@ interface SidebarLogoProps {
   onToggle: () => void;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * Sidebar header with logo and collapse toggle
- *
- * Features:
- * - Animated logo with hover effects
- * - Brand text that fades out when collapsed
- * - Collapse toggle button (desktop only)
+ * Sidebar brand header with refined GitVision wordmark and persistent collapse/expand control.
  */
 export function SidebarLogo({ isCollapsed, onToggle }: SidebarLogoProps) {
   return (
     <div
       className={cn(
-        "border-border/50 flex shrink-0 items-center border-b p-4",
-        isCollapsed ? "justify-center" : "justify-between",
+        "border-sidebar-border flex shrink-0 border-b transition-colors duration-200",
+        isCollapsed
+          ? "flex-col items-center gap-2 px-2 py-3"
+          : "h-14 items-center justify-between px-3.5",
       )}
     >
-      {/* Logo Link */}
+      {/* Brand Link */}
       <Link
         href="/"
+        aria-label="GitVision home"
         className={cn(
-          "group flex items-center gap-3 transition-all duration-300",
+          "group focus-visible:ring-sidebar-ring flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2",
           isCollapsed && "justify-center",
         )}
       >
-        {/* Logo Icon Container */}
-        <div className="from-primary/20 via-primary/10 ring-primary/20 group-hover:ring-primary/40 group-hover:shadow-primary/10 relative flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br to-transparent ring-1 transition-all duration-300 group-hover:shadow-lg">
-          <div className="from-primary/5 absolute inset-0 rounded-xl bg-linear-to-br to-transparent" />
+        {/* Precision Logo Container */}
+        <div className="border-border/80 bg-background/80 group-hover:border-primary/40 group-hover:bg-primary/[0.06] relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-200 dark:bg-white/[0.04]">
           <Image
             src="/Github.svg"
             alt="GitVision Logo"
-            width={24}
-            height={24}
-            className="relative z-10 transition-transform duration-300 group-hover:scale-110"
+            width={18}
+            height={18}
+            className="transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-3"
           />
         </div>
 
-        {/* Brand Text - Animated visibility */}
-        <AnimatePresence mode="wait">
+        {/* Crisp Two-Tone Wordmark */}
+        <AnimatePresence initial={false}>
           {!isCollapsed && (
             <motion.span
-              initial={{ opacity: 0, x: -10 }}
+              initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0, x: -6 }}
               transition={FADE_TRANSITION}
-              className="from-foreground to-foreground/70 bg-linear-to-r bg-clip-text text-lg font-bold tracking-tight text-transparent"
+              className="text-[15px] font-semibold tracking-[-0.025em] whitespace-nowrap select-none"
             >
-              Git<span className="text-primary">Vision</span>
+              <span className="text-foreground">Git</span>
+              <span className="text-primary">Vision</span>
             </motion.span>
           )}
         </AnimatePresence>
       </Link>
 
-      {/* Collapse Toggle Button - Desktop Only */}
-      {!isCollapsed && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-              className="text-muted-foreground hover:bg-accent hover:text-foreground hidden h-8 w-8 shrink-0 rounded-lg md:flex"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="font-medium">
-            Collapse (Ctrl + B)
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {/* Persistent Collapse / Expand Control (Desktop) */}
+      <SidebarTooltip
+        content={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        shortcut="⌘B"
+        side="right"
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!isCollapsed}
+          className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground hidden h-7 w-7 shrink-0 rounded-md transition-all duration-150 active:scale-95 md:flex"
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
+          )}
+        </Button>
+      </SidebarTooltip>
     </div>
   );
 }

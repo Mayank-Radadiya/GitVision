@@ -1,29 +1,9 @@
-/**
- * =============================================================================
- * SIDEBAR FOOTER COMPONENT
- * =============================================================================
- *
- * Bottom section of the sidebar containing:
- * - User profile (when signed in)
- * - App version
- * - Theme toggle
- * - Expand button (when collapsed)
- *
- * @module Sidebar/components/SidebarFooter
- */
-
 "use client";
 
-import { ChevronLeft } from "lucide-react";
-import { cn } from "@/shared/lib/utils";
-import { Button } from "@/shared/components/ui/button";
-import ModeToggle from "@/shared/components/theme/mode-toggle";
 import { APP_VERSION } from "../sidebar.constants";
-import { SidebarUserProfile, SidebarCredits } from "./";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+import { SidebarUserProfile } from "./SidebarUserProfile";
+import { SidebarCredits } from "./SidebarCredits";
+import { SidebarThemeToggle } from "./SidebarThemeToggle";
 
 interface UserData {
   fullName: string | null;
@@ -38,65 +18,38 @@ interface SidebarFooterProps {
   user: UserData | null | undefined;
   /** Whether sidebar is collapsed */
   isCollapsed: boolean;
-  /** Callback to expand the sidebar */
-  onExpand: () => void;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * Sidebar footer with user profile, version, and controls
- *
- * Features:
- * - AI Credits Display
- * - User profile section (when signed in)
- * - App version display (when expanded)
- * - Theme toggle button
- * - Expand button (when collapsed)
+ * Cohesive sidebar footer integrating AI Credits, user profile row,
+ * version metadata, and compact theme controls.
  */
-export function SidebarFooter({
-  user,
-  isCollapsed,
-  onExpand,
-}: SidebarFooterProps) {
+export function SidebarFooter({ user, isCollapsed }: SidebarFooterProps) {
   return (
-    <div className="border-border/50 flex flex-col gap-2 border-t p-3">
-      {/* AI Credits */}
+    <div className="mt-auto shrink-0">
+      {/* AI Credits Instrumentation */}
       <SidebarCredits isCollapsed={isCollapsed} />
 
-      {/* User Profile */}
-      {user && <SidebarUserProfile user={user} isCollapsed={isCollapsed} />}
+      {/* Integrated Footer Region */}
+      <div className="border-sidebar-border border-t bg-black/[0.015] dark:bg-white/[0.015]">
+        {isCollapsed ? (
+          <div className="flex flex-col items-center gap-1.5 px-2 py-2.5">
+            {user && <SidebarUserProfile user={user} isCollapsed={true} />}
+            <SidebarThemeToggle isCollapsed={true} />
+          </div>
+        ) : (
+          <>
+            {user && <SidebarUserProfile user={user} isCollapsed={false} />}
 
-      {/* Version & Theme Toggle Row */}
-      <div
-        className={cn(
-          "mt-3 flex items-center",
-          isCollapsed ? "justify-center" : "justify-between px-2",
+            <div className="border-sidebar-border/60 flex items-center justify-between border-t px-3 py-2">
+              <span className="text-muted-foreground/80 font-mono text-[11px] tabular-nums select-none">
+                {APP_VERSION}
+              </span>
+              <SidebarThemeToggle isCollapsed={false} />
+            </div>
+          </>
         )}
-      >
-        {/* App Version - Hidden when collapsed */}
-        {!isCollapsed && (
-          <span className="text-muted-foreground/60 text-[10px] font-medium">
-            {APP_VERSION}
-          </span>
-        )}
-        <ModeToggle />
       </div>
-
-      {/* Expand Button - Shown only when collapsed */}
-      {isCollapsed && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onExpand}
-          aria-label="Expand sidebar"
-          className="text-muted-foreground hover:bg-accent hover:text-foreground mt-2 h-8 w-full rounded-lg"
-        >
-          <ChevronLeft className="h-4 w-4 rotate-180" />
-        </Button>
-      )}
     </div>
   );
 }

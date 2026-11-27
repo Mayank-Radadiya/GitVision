@@ -9,7 +9,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/src/lib/trpc/client";
+import { belongsToProject } from "@/features/projects/hooks/use-project";
 import { isSearchableIndexingStatus } from "@/src/lib/indexing-status";
 import {
   AlertDialog,
@@ -28,14 +30,34 @@ export function useProjectActionController(
 ) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const chatLock = useRef(false);
   const syncLock = useRef(false);
   const deleteLock = useRef(false);
   const deleteTrigger = useRef<HTMLElement | null>(null);
   const remove = trpc.project.delete.useMutation({
-    onSuccess: () => {
+    // Deleting is not a flaky operation. Retrying it after a timeout risks a
+    // second delete against a row that is already gone, reported to the user as
+    // a failure for something that worked.
+    retry: false,
+    onSuccess: async () => {
       setDeleteOpen(false);
+
+      // Purge this project's cached queries before navigating away, not after.
+      // `router.push` unmounts the observers, but it does not delete what they
+      // were reading: the entries outlive them by `gcTime`, and the `getDetails`
+      // observer is the one carrying a `refetchInterval`. Navigating first left a
+      // live poll asking about a row that had just been deleted — a 404 on a
+      // five-second loop, in a cache the user could still navigate back into.
+      const isThisProject = (query: { queryKey: readonly unknown[] }) =>
+        belongsToProject(query.queryKey, projectId);
+      // Cancelling aborts in-flight fetches and reverts their optimistic state;
+      // removing before those settle would let a late response recreate the
+      // entry behind us.
+      await queryClient.cancelQueries({ predicate: isThisProject });
+      queryClient.removeQueries({ predicate: isThisProject });
+
       void utils.project.getAll.invalidate();
       void utils.project.getDashboardData.invalidate();
       toast.success("Project deleted");

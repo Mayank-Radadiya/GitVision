@@ -1,14 +1,3 @@
-/**
- * =============================================================================
- * SIDEBAR USER PROFILE COMPONENT
- * =============================================================================
- *
- * Displays the current user's profile information at the bottom of the sidebar.
- * Includes avatar with online status indicator.
- *
- * @module Sidebar/components/SidebarUserProfile
- */
-
 "use client";
 
 import Image from "next/image";
@@ -16,10 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import { FADE_TRANSITION } from "../sidebar.constants";
 import { SidebarSignOut } from "./SidebarSignOut";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+import { SidebarTooltip } from "./SidebarTooltip";
 
 interface UserData {
   /** User's full name */
@@ -39,70 +25,89 @@ interface SidebarUserProfileProps {
   isCollapsed: boolean;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * User profile section with avatar and details
- *
- * Features:
- * - User avatar with ring styling
- * - Online status indicator (green dot)
- * - Name and email that fade when collapsed
- * - Hover effect on container
+ * Cohesive footer user row with crisp avatar, clear name/email hierarchy,
+ * subtle online status indicator, and low-profile sign-out action.
  */
 export function SidebarUserProfile({
   user,
   isCollapsed,
 }: SidebarUserProfileProps) {
+  const displayName = user.fullName || "Account";
+  const email = user.primaryEmailAddress?.emailAddress;
+
+  const avatar = (
+    <div className="relative shrink-0">
+      <div className="border-border/80 bg-muted h-8 w-8 overflow-hidden rounded-full border">
+        <Image
+          src={user.imageUrl}
+          alt={displayName}
+          className="h-full w-full object-cover"
+          width={32}
+          height={32}
+        />
+      </div>
+      <span
+        className="ring-sidebar absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2"
+        title="Online"
+        aria-label="Online"
+      />
+    </div>
+  );
+
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1.5">
+        <SidebarTooltip
+          content={
+            <div className="flex flex-col">
+              <span className="font-medium">{displayName}</span>
+              {email && (
+                <span className="text-muted-foreground text-[11px] font-normal">
+                  {email}
+                </span>
+              )}
+            </div>
+          }
+          side="right"
+        >
+          <div className="flex h-8 w-8 items-center justify-center">
+            {avatar}
+          </div>
+        </SidebarTooltip>
+        <SidebarSignOut isCollapsed={true} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "bg-accent/30 hover:bg-accent/50 flex items-center gap-3 rounded-xl p-2.5 transition-all duration-200",
-        isCollapsed && "justify-center bg-transparent p-0",
+        "hover:bg-sidebar-accent/40 flex items-center gap-2.5 px-3 py-2.5 transition-colors duration-150",
       )}
     >
-      {/* Avatar Container */}
-      <div className="relative shrink-0">
-        <div className="ring-primary/20 h-9 w-9 overflow-hidden rounded-full ring-2">
-          <Image
-            src={user.imageUrl}
-            alt={user.fullName || "User avatar"}
-            className="h-full w-full object-cover"
-            width={36}
-            height={36}
-          />
-        </div>
-        {/* Online Status Indicator */}
-        <div
-          className="border-background absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 bg-emerald-500"
-          aria-label="Online"
-        />
-      </div>
+      {avatar}
 
-      {/* User Details - Animated visibility */}
-      <AnimatePresence mode="wait">
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={FADE_TRANSITION}
-            className="min-w-0 flex-1"
-          >
-            <p className="text-foreground truncate text-sm font-medium">
-              {user.fullName}
+      <AnimatePresence initial={false}>
+        <motion.div
+          initial={{ opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -4 }}
+          transition={FADE_TRANSITION}
+          className="min-w-0 flex-1"
+        >
+          <p className="text-foreground truncate text-[13px] leading-tight font-medium">
+            {displayName}
+          </p>
+          {email && (
+            <p className="text-muted-foreground mt-0.5 truncate text-[11px] leading-tight">
+              {email}
             </p>
-            <p className="text-muted-foreground truncate text-xs">
-              {user.primaryEmailAddress?.emailAddress}
-            </p>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </AnimatePresence>
 
-      {/* Signout Button */}
-      <SidebarSignOut isCollapsed={isCollapsed} />
+      <SidebarSignOut isCollapsed={false} />
     </div>
   );
 }

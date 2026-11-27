@@ -22,8 +22,8 @@ import {
   TRPCQueryOptions,
 } from "@trpc/tanstack-react-query";
 import { cache } from "react";
-import { makeQueryClient } from "./query-client";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { dehydrateForRsc, makeQueryClient } from "./query-client";
+import { HydrationBoundary } from "@tanstack/react-query";
 import { appRouter } from "./routers/_app";
 import { createTRPCContext } from "./init";
 
@@ -116,6 +116,13 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
  * Wraps children in a React Query HydrationBoundary.
  * Used to restore prefetched server-side data on the client,
  * enabling seamless hydration without additional network requests.
+ *
+ * `dehydrateForRsc` rather than `dehydrate`: a query that errored during
+ * prefetch carries a live error instance, and this component is a server
+ * component passing the state into a Client Component as a prop — a position
+ * React Flight only accepts plain objects in. The scrub preserves the message
+ * and `data.code`, so a prefetch that found the project deleted arrives in the
+ * browser as the same 404 instead of being silently omitted and re-requested.
  */
 
 export function HydrateClient(props: { children: React.ReactNode }) {
@@ -123,7 +130,7 @@ export function HydrateClient(props: { children: React.ReactNode }) {
 
   // Provide dehydrated server state so React Query can hydrate on the client
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
+    <HydrationBoundary state={dehydrateForRsc(queryClient)}>
       {props.children}
     </HydrationBoundary>
   );

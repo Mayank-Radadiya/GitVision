@@ -1,33 +1,14 @@
-/**
- * =============================================================================
- * SIDEBAR NAVIGATION ITEM COMPONENT
- * =============================================================================
- *
- * Individual navigation link with active state indicator and animations.
- * Shows tooltip when sidebar is collapsed.
- *
- * @module Sidebar/components/SidebarNavItem
- */
-
 "use client";
 
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/shared/lib/utils";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/components/ui/tooltip";
-import {
   NavItem,
   FADE_TRANSITION,
   ACTIVE_INDICATOR_SPRING,
 } from "../sidebar.constants";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+import { SidebarTooltip } from "./SidebarTooltip";
 
 interface SidebarNavItemProps {
   /** Navigation item configuration */
@@ -38,18 +19,8 @@ interface SidebarNavItemProps {
   isCollapsed: boolean;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * Single navigation item with active state and animations
- *
- * Features:
- * - Animated active indicator bar
- * - Icon glow effect when active
- * - Text fades in/out on collapse
- * - Tooltip shown when collapsed
+ * Single cohesive navigation item with animated active rail indicator and collapsed tooltip.
  */
 export function SidebarNavItem({
   item,
@@ -58,71 +29,63 @@ export function SidebarNavItem({
 }: SidebarNavItemProps) {
   const Icon = item.icon;
 
-  // The actual navigation link content
-  const content = (
+  const linkContent = (
     <Link
       href={item.href}
-      className="block"
       aria-current={isActive ? "page" : undefined}
+      aria-label={isCollapsed ? item.name : undefined}
+      className={cn(
+        "group focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar relative flex h-9 items-center rounded-lg text-[13.5px] font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 active:scale-[0.99]",
+        isCollapsed ? "mx-auto w-9 justify-center px-0" : "gap-2.5 px-2.5",
+        isActive
+          ? "bg-primary/[0.09] text-foreground ring-primary/15 dark:bg-primary/[0.13] dark:ring-primary/20 ring-1 ring-inset"
+          : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground dark:hover:bg-white/[0.04]",
+      )}
     >
-      <div
+      {/* Active Indicator Bar */}
+      {isActive && (
+        <motion.span
+          layoutId="sidebarActiveIndicator"
+          aria-hidden="true"
+          transition={ACTIVE_INDICATOR_SPRING}
+          className="bg-primary absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-r-full"
+        />
+      )}
+
+      {/* Icon */}
+      <Icon
+        aria-hidden="true"
+        strokeWidth={isActive ? 2 : 1.75}
         className={cn(
-          "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+          "h-4 w-4 shrink-0 transition-transform duration-150",
           isActive
-            ? "from-primary/15 via-primary/10 text-foreground bg-linear-to-r to-transparent"
-            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+            ? "text-primary"
+            : "text-muted-foreground group-hover:text-foreground group-hover:scale-[1.04]",
         )}
-      >
-        {/* Active Indicator Bar - Animated position */}
-        {isActive && (
-          <motion.div
-            layoutId="activeIndicator"
-            className="from-primary to-primary/60 absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-full bg-linear-to-b"
-            transition={ACTIVE_INDICATOR_SPRING}
-          />
+      />
+
+      {/* Label */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.span
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -4 }}
+            transition={FADE_TRANSITION}
+            className="truncate whitespace-nowrap"
+          >
+            {item.name}
+          </motion.span>
         )}
-
-        {/* Icon Container with Glow Effect */}
-        <div
-          className={cn(
-            "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
-            isActive
-              ? "bg-primary/10 text-primary shadow-[0_0_12px_rgba(var(--primary-rgb),0.3)]"
-              : "text-muted-foreground group-hover:bg-accent group-hover:text-foreground",
-          )}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </div>
-
-        {/* Text Label - Animated visibility */}
-        <AnimatePresence mode="wait">
-          {!isCollapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={FADE_TRANSITION}
-              className="truncate whitespace-nowrap"
-            >
-              {item.name}
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </div>
+      </AnimatePresence>
     </Link>
   );
 
-  // Wrap in tooltip when collapsed
-  if (isCollapsed) {
-    return (
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent side="right" className="font-medium">
-          {item.name}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return content;
+  return (
+    <li>
+      <SidebarTooltip content={item.name} enabled={isCollapsed} side="right">
+        {linkContent}
+      </SidebarTooltip>
+    </li>
+  );
 }

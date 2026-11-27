@@ -1,67 +1,36 @@
-/**
- * =============================================================================
- * SIDEBAR SIGN OUT BUTTON COMPONENT
- * =============================================================================
- *
- * Sign out button with Clerk integration.
- * Shows tooltip when sidebar is collapsed.
- *
- * @module Sidebar/components/SidebarSignOut
- */
-
 "use client";
 
 import { LogOut } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+import { SidebarTooltip } from "./SidebarTooltip";
 
 interface SidebarSignOutProps {
   /** Whether sidebar is collapsed */
   isCollapsed: boolean;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * Sign out button with conditional tooltip
- *
- * Features:
- * - Clerk SignOutButton integration
- * - Destructive hover styling
- * - Tooltip when collapsed
- * - Full text when expanded
+ * Low-profile sign out trigger integrated into the sidebar footer.
  */
 export function SidebarSignOut({ isCollapsed }: SidebarSignOutProps) {
   return (
     <SignOutButton>
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <Button
-            aria-label="Sign out"
-            className={cn(
-              "text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer justify-center rounded-xl bg-transparent",
-              isCollapsed && "h-9 w-9 p-0",
-            )}
-          >
-            <LogOut className="h-4.5 w-4.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="font-medium">
-          Sign out
-        </TooltipContent>
-      </Tooltip>
+      <SidebarTooltip content="Sign out" side="right">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Sign out"
+          className={cn(
+            "text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0 cursor-pointer transition-all duration-150 active:scale-95",
+            isCollapsed ? "mx-auto h-8 w-8 rounded-lg" : "h-7 w-7 rounded-md",
+          )}
+        >
+          <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+        </Button>
+      </SidebarTooltip>
     </SignOutButton>
   );
 }

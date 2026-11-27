@@ -1,24 +1,10 @@
-/**
- * =============================================================================
- * SIDEBAR NAVIGATION SECTION COMPONENT
- * =============================================================================
- *
- * Groups navigation items under a section label.
- * Renders a list of SidebarNavItem components.
- *
- * @module Sidebar/components/SidebarNavSection
- */
-
 "use client";
 
+import { useId } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/shared/lib/utils";
 import { NavItem } from "../sidebar.constants";
 import { SidebarNavItem } from "./SidebarNavItem";
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
 
 interface SidebarNavSectionProps {
   /** Section label (e.g., "Menu", "Settings") */
@@ -27,45 +13,61 @@ interface SidebarNavSectionProps {
   items: NavItem[];
   /** Whether sidebar is collapsed */
   isCollapsed: boolean;
+  /** Show a subtle divider above the section when collapsed */
+  showCollapsedDivider?: boolean;
 }
 
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
- * Navigation section with label and items
- *
- * Features:
- * - Section label hidden when collapsed
- * - Maps items to SidebarNavItem components
- * - Automatically determines active state
+ * Grouped navigation section with accessible list semantics and readable section label.
  */
 export function SidebarNavSection({
   label,
   items,
   isCollapsed,
+  showCollapsedDivider = false,
 }: SidebarNavSectionProps) {
   const pathname = usePathname();
+  const headingId = useId();
 
   return (
-    <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-3")}>
-      {/* Section Label - Hidden when collapsed */}
-      {!isCollapsed && (
-        <p className="text-muted-foreground/70 mb-3 px-3 text-xs font-semibold tracking-wider uppercase">
+    <div
+      className={cn(isCollapsed ? "px-2" : "px-3")}
+      role="group"
+      aria-labelledby={!isCollapsed ? headingId : undefined}
+      aria-label={isCollapsed ? label : undefined}
+    >
+      {/* Section Label (expanded) or subtle divider (collapsed) */}
+      {!isCollapsed ? (
+        <h2
+          id={headingId}
+          className="text-muted-foreground mb-1.5 px-2.5 text-[11px] font-medium tracking-[0.06em] uppercase select-none"
+        >
           {label}
-        </p>
+        </h2>
+      ) : (
+        showCollapsedDivider && (
+          <div
+            className="bg-sidebar-border mx-auto mb-2.5 h-px w-5"
+            aria-hidden="true"
+          />
+        )
       )}
 
       {/* Navigation Items */}
-      {items.map((item) => (
-        <SidebarNavItem
-          key={item.name}
-          item={item}
-          isActive={pathname === item.href || pathname.startsWith(item.href)}
-          isCollapsed={isCollapsed}
-        />
-      ))}
+      <ul className="space-y-0.5">
+        {items.map((item) => {
+          const isActive =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <SidebarNavItem
+              key={item.href}
+              item={item}
+              isActive={isActive}
+              isCollapsed={isCollapsed}
+            />
+          );
+        })}
+      </ul>
     </div>
   );
 }

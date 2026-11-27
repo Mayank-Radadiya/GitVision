@@ -65,30 +65,39 @@ export const APP_VERSION = "v2.2.0";
 // =============================================================================
 
 /**
- * Spring animation config for smooth expand/collapse transitions
- * Used by Framer Motion for sidebar width changes
+ * Synchronized cubic-bezier curve for desktop sidebar collapse/expand.
+ * Matches DashboardShell's CSS padding-left transition so the rail border
+ * and main content move as a single unit without drift.
+ */
+export const SIDEBAR_WIDTH_TRANSITION = {
+  duration: 0.2,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
+/**
+ * Spring animation config for mobile drawer slide-in/out
  */
 export const SIDEBAR_SPRING_CONFIG = {
   type: "spring" as const,
-  stiffness: 300,
-  damping: 30,
+  stiffness: 340,
+  damping: 34,
 };
 
 /**
- * Animation config for fade/slide transitions
- * Used for text labels appearing/disappearing
+ * Animation config for label/content visibility transitions
  */
 export const FADE_TRANSITION = {
-  duration: 0.2,
+  duration: 0.15,
+  ease: "easeOut" as const,
 };
 
 /**
- * Animation config for active indicator movement
+ * Animation config for active indicator pill movement
  */
 export const ACTIVE_INDICATOR_SPRING = {
   type: "spring" as const,
-  stiffness: 350,
-  damping: 30,
+  stiffness: 420,
+  damping: 34,
 };
 
 // =============================================================================

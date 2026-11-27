@@ -15,6 +15,43 @@ import { trpc } from "@/src/lib/trpc/client";
 import { useQueryClient } from "@tanstack/react-query";
 
 /**
+ * How often the details query re-reads a project while its index is moving.
+ *
+ * Named so the progress header and the poll can be read as one decision: a
+ * five-second tick is only ever visible because something is re-asking.
+ */
+export const EMBEDDING_POLL_INTERVAL_MS = 5000;
+
+/**
+ * The slice of React Query's state this decision reads.
+ *
+ * Structural rather than imported so the policy can be tested as a plain
+ * function — the bug this guards against is a predicate reading the wrong field
+ * of the query state, which no amount of rendering would have caught.
+ */
+export interface PollableQueryState {
+  status: string;
+  data?: { embeddingStatus?: string | null } | undefined;
+}
+
+/**
+ * Whether a details query is still waiting on indexing progress.
+ *
+ * The `status === "success"` gate is the load-bearing half. React Query keeps the
+ * last successful `data` in place when a refetch fails and flips `status` to
+ * `"error"` — so reading only `data.embeddingStatus` meant a project deleted
+ * while its index was still running answered 404 on a five-second loop forever,
+ * each tick paying the client's retry budget on the way to the same permanent
+ * error. Nothing about the project was still in flight; the row was gone.
+ *
+ * An `error` state therefore never polls, whatever the retained data claims.
+ */
+export function shouldPollEmbeddingStatus(state: PollableQueryState): boolean {
+  if (state.status !== "success") return false;
+  return ["pending", "processing"].includes(state.data?.embeddingStatus ?? "");
+}
+
+/**
  * Fetches project details by ID.
  * Stale time: 5 minutes — project metadata rarely changes.
  */
@@ -25,13 +62,35 @@ export function useProjectDetails(projectId: string) {
       enabled: !!projectId,
       staleTime: 5 * 60 * 1000,
       refetchInterval: (query) =>
-        ["pending", "processing"].includes(
-          query.state.data?.embeddingStatus ?? "",
-        )
-          ? 5000
+        shouldPollEmbeddingStatus(query.state)
+          ? EMBEDDING_POLL_INTERVAL_MS
           : false,
     },
   );
+}
+
+/**
+ * Whether a cached query is scoped to one project.
+ *
+ * tRPC builds a query key as `[path, { input, type }]`
+ * (`getQueryKeyInternal` in `@trpc/react-query`), so the input — and with it
+ * the `projectId` — is one level down rather than at a fixed index. Reading it
+ * through the shape rather than a hard-coded `queryKey[1]` is what lets this
+ * match every project procedure at once instead of only the ones that take
+ * `{ projectId }` first.
+ *
+ * Needed by the delete flow: a deleted project's cached entries outlive the
+ * observers that were reading them by `gcTime`, and one of those observers was
+ * the polling query. The predicate is exported so the teardown is testable
+ * without a React tree.
+ */
+export function belongsToProject(
+  queryKey: readonly unknown[],
+  projectId: string,
+): boolean {
+  const input = (queryKey[1] as { input?: unknown } | undefined)?.input;
+  if (typeof input !== "object" || input === null) return false;
+  return (input as { projectId?: unknown }).projectId === projectId;
 }
 
 /**

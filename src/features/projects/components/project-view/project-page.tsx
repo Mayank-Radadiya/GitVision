@@ -181,6 +181,7 @@ export default function ProjectPage() {
     return (
       <ProjectError
         message={error?.message || null}
+        code={error?.data?.code}
         pending={detailsFetching}
         onRetry={() => {
           toast.loading("Retrying…", { id: "retry" });

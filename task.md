@@ -26,29 +26,10 @@
 
 ### Phase 0 — Make It True (Week 1) — est. 23h (19 S, 1 M)
 
-- **F-07** — Add chat rename, delete, export, and load-more
-  - **What:** `chat.delete` and `chat.rename` exist as tRPC procedures with **no UI caller** (only `src/__tests__/unit/chat-delete.test.ts` references them), and `chat.ts:15` caps history at `MAX_MESSAGE_LIMIT = 300` with no "load more".
-  - **How:** Add a per-chat dropdown calling the two existing procedures plus a Markdown export; add per-message regenerate; make the 300 cap visible and pageable.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.7
-
-- **T-066** — Lazy-load issue comments to kill the N+1
-  - **What:** `use-project.ts:104` prefetches comments and is called at `issues-tab.tsx:40`, so N issues mean N queries on the hottest tab.
-  - **How:** Pass `enabled: expanded` to `useIssueComments` so comments fetch on row expand; the hook already exists.
-  - **Dependencies:** none
-  - **Effort/Priority:** S / ⚠️ P1
-  - **Source:** §5.22, §2.3 row 10
-
+- Complated
 ### Phase 1 — Make It Provable (Week 2) — est. 182h (6 S, 10 M, 1 L, 8 XL)
 
-- **T-090** — Small-project path never populates `relatedFiles`, so no citation ever renders
-  - **What:** The product's thesis is "ask about a repo and get an answer that points at the code", and that pointer is dead for every project this account holds. `app/api/chat/route.ts:523`'s `isSmallProject()` fast path builds a system prompt from the full file dump but never assigns `relatedFiles` — it is declared `[]` at `:485` and written only on the RAG branch at `:560-566`. Line 600 gates the `data-sources` stream part on `relatedFiles.length > 0`, so the fast path emits no sources, `chat-room.tsx` never sets `relatedFiles`, and `chat-message.tsx:326` renders zero `CitationBadge`s. The user gets a well-grounded answer and no citations, and nothing in the UI can tell the difference. The data compounds it: every project reporting `embedding_status = 'completed'` has `estimated_tokens = 0` with an empty `code_embeddings` table, and `isSmallProject(0)` is `0 < 150_000`, so the fast path is the only path taken.
-  - **How:** Have `getAllProjectFilesForContext` return the paths it actually dumped and assign them to `relatedFiles` on that branch, so the existing `data-sources` gate carries them without touching the retrieval branch. Then investigate why ingestion writes `embedding_status = 'completed'` while leaving `estimated_tokens` null and `code_embeddings` empty — a status that says "indexed" over a table with no rows is a second lie. Delete the `test.fixme` in `e2e/rag-chat.spec.ts` once real citations render.
-  - **Dependencies:** T-035 (gated on this)
-  - **Effort/Priority:** S / ⚠️ P0
-  - **Source:** found while verifying T-086; evidence in `task.md` Lane p1-e T-035 entry
-
+-Complated
 
 
 

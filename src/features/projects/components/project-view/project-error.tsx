@@ -15,10 +15,12 @@ interface ProjectErrorProps {
   message: string | null;
   onRetry: () => void;
   pending?: boolean;
+  code?: string | null;
 }
 
-function ProjectError({ message, onRetry, pending }: ProjectErrorProps) {
+function ProjectError({ message, onRetry, pending, code }: ProjectErrorProps) {
   const router = useRouter();
+  const isNotFound = code === "NOT_FOUND";
 
   return (
     <div className="project-workspace bg-background min-h-screen p-4 pt-16 md:p-8">
@@ -40,24 +42,28 @@ function ProjectError({ message, onRetry, pending }: ProjectErrorProps) {
         </div>
 
         <h1 className="text-foreground mb-3 text-xl font-semibold tracking-tight">
-          Couldn’t load this project
+          {isNotFound ? "Couldn’t find this project" : "Couldn’t load this project"}
         </h1>
 
         <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
           {message ||
-            "An unexpected error occurred. Please try again or return to the dashboard."}
+            (isNotFound
+              ? "This project could not be found or you don't have access to it."
+              : "An unexpected error occurred. Please try again or return to the dashboard.")}
         </p>
 
         <div className="flex justify-center gap-3">
-          <Button
-            variant="outline"
-            onClick={onRetry}
-            disabled={pending}
-            className="cursor-pointer gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
-            {pending ? "Retrying…" : "Try again"}
-          </Button>
+          {!isNotFound && (
+            <Button
+              variant="outline"
+              onClick={onRetry}
+              disabled={pending}
+              className="cursor-pointer gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
+              {pending ? "Retrying…" : "Try again"}
+            </Button>
+          )}
           <Button
             onClick={() => router.push("/dashboard")}
             className="cursor-pointer gap-2"
